@@ -36,7 +36,8 @@ const AttendanceManager: React.FC<Props> = ({ sewadars, attendance, onSaveAttend
   const [newGender, setNewGender] = useState<Gender>(activeVolunteer.assignedGroup === 'Ladies' ? 'Ladies' : 'Gents');
   const [newGroup, setNewGroup] = useState<GentsGroup | 'Ladies'>(activeVolunteer.assignedGroup || 'Monday');
 
-  const [markingSewadar, setMarkingSewadar] = useState<Sewadar | null>(null);
+  // Inline marking state
+  const [expandedSewadarId, setExpandedSewadarId] = useState<string | null>(null);
   const [inTime, setInTime] = useState('');
   const [outTime, setOutTime] = useState('');
   const [sewaPoint, setSewaPoint] = useState<string>('');
@@ -66,6 +67,7 @@ const AttendanceManager: React.FC<Props> = ({ sewadars, attendance, onSaveAttend
     setSelectedGender(null);
     setSelectedGroup(null);
     setSearchTerm('');
+    setExpandedSewadarId(null);
   };
 
   const handleGenderSelect = (g: Gender) => {
@@ -76,13 +78,18 @@ const AttendanceManager: React.FC<Props> = ({ sewadars, attendance, onSaveAttend
     } else setStep('GROUP');
   };
 
-  const handleOpenMarking = (s: Sewadar) => {
+  const toggleMarking = (s: Sewadar) => {
+    if (expandedSewadarId === s.id) {
+      setExpandedSewadarId(null);
+      return;
+    }
+
     const record = getAttendanceRecord(s.id);
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     
-    setMarkingSewadar(s);
+    setExpandedSewadarId(s.id);
     if (record) {
-      setIsInTimeLocked(true); // Lock In Time because record already exists
+      setIsInTimeLocked(true);
       setInTime(record.inTime || now);
       setOutTime(record.outTime || now);
       setSewaPoint(record.sewaPoint || '');
@@ -96,22 +103,20 @@ const AttendanceManager: React.FC<Props> = ({ sewadars, attendance, onSaveAttend
     }
   };
 
-  const handleSaveAttendance = () => {
-    if (markingSewadar) {
-      onSaveAttendance(markingSewadar.id, { 
-        inTime, 
-        outTime, 
-        sewaPoint, 
-        workshopLocation: individualLocation 
-      });
-      setMarkingSewadar(null);
-    }
+  const handleSaveAttendance = (id: string) => {
+    onSaveAttendance(id, { 
+      inTime, 
+      outTime, 
+      sewaPoint, 
+      workshopLocation: individualLocation 
+    });
+    setExpandedSewadarId(null);
   };
 
-  const handleDeleteAttendance = () => {
-    if (markingSewadar && window.confirm(`Remove attendance for ${markingSewadar.name}?`)) {
-      onSaveAttendance(markingSewadar.id, {}, true);
-      setMarkingSewadar(null);
+  const handleDeleteAttendance = (id: string, name: string) => {
+    if (window.confirm(`Remove attendance for ${name}?`)) {
+      onSaveAttendance(id, {}, true);
+      setExpandedSewadarId(null);
     }
   };
 
@@ -192,109 +197,92 @@ const AttendanceManager: React.FC<Props> = ({ sewadars, attendance, onSaveAttend
           const record = getAttendanceRecord(s.id);
           const isMarked = !!record;
           const isDone = isMarked && !!record.outTime;
+          const isExpanded = expandedSewadarId === s.id;
           
           return (
-            <button key={s.id} onClick={() => handleOpenMarking(s)} className={`w-full bg-white px-6 py-4 rounded-3xl shadow-sm border-2 flex items-center justify-between transition-all text-left ${isMarked ? (isDone ? 'border-indigo-200 bg-indigo-50/10' : 'border-emerald-200 bg-emerald-50/10') : 'border-slate-100'}`}>
-              <div className="flex items-center gap-5">
-                <div className="text-[10px] font-black text-slate-300 w-6 text-center">{idx + 1}</div>
-                <div className="flex flex-col">
-                  <span className={`font-black text-base ${isMarked ? 'text-slate-900' : 'text-slate-600'}`}>{s.name}</span>
-                  {isMarked && (
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${isDone ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                        {isDone ? 'Duty Completed' : 'Present'}
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400">
-                        In: {record.inTime} {record.outTime && `• Out: ${record.outTime}`}
-                      </span>
-                      {(record.sewaPoint || record.workshopLocation) && (
-                        <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
-                          {record.workshopLocation && <span>{record.workshopLocation}</span>}
-                          {record.workshopLocation && record.sewaPoint && <span>•</span>}
-                          {record.sewaPoint && <span>{record.sewaPoint}</span>}
+            <div key={s.id} className="flex flex-col gap-1">
+              <button onClick={() => toggleMarking(s)} className={`w-full bg-white px-6 py-4 rounded-3xl shadow-sm border-2 flex items-center justify-between transition-all text-left ${isMarked ? (isDone ? 'border-indigo-200 bg-indigo-50/10' : 'border-emerald-200 bg-emerald-50/10') : 'border-slate-100'} ${isExpanded ? 'ring-4 ring-indigo-50' : ''}`}>
+                <div className="flex items-center gap-5">
+                  <div className="text-[10px] font-black text-slate-300 w-6 text-center">{idx + 1}</div>
+                  <div className="flex flex-col">
+                    <span className={`font-black text-base ${isMarked ? 'text-slate-900' : 'text-slate-600'}`}>{s.name}</span>
+                    {isMarked && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${isDone ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                          {isDone ? 'Duty Completed' : 'Present'}
                         </span>
-                      )}
-                    </div>
-                  )}
+                        <span className="text-[9px] font-bold text-slate-400">
+                          In: {record.inTime} {record.outTime && `• Out: ${record.outTime}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className={`w-14 h-14 rounded-[1.25rem] border-2 flex items-center justify-center transition-all ${isMarked ? (isDone ? 'bg-indigo-500 border-indigo-400' : 'bg-emerald-500 border-emerald-400') : 'bg-slate-50 border-slate-100'}`}>
-                {isMarked ? <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <div className="w-5 h-5 rounded-full border-2 border-slate-200"></div>}
-              </div>
-            </button>
+                <div className={`w-14 h-14 rounded-[1.25rem] border-2 flex items-center justify-center transition-all ${isMarked ? (isDone ? 'bg-indigo-500 border-indigo-400' : 'bg-emerald-500 border-emerald-400') : 'bg-slate-50 border-slate-100'}`}>
+                  {isMarked ? <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <div className="w-5 h-5 rounded-full border-2 border-slate-200"></div>}
+                </div>
+              </button>
+
+              {/* Inline Marking Form */}
+              {isExpanded && (
+                <div className="bg-white border-2 border-indigo-100 rounded-[2rem] p-6 shadow-xl animate-in slide-in-from-top-2 duration-300 mx-2">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                          In Time {isInTimeLocked && <svg className="w-2.5 h-2.5 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>}
+                        </label>
+                        <input 
+                          type="time" 
+                          disabled={isInTimeLocked}
+                          className={`w-full px-4 py-3 border-2 rounded-xl font-black text-sm text-center transition-all ${isInTimeLocked ? 'bg-slate-50 border-slate-50 text-slate-400' : 'bg-slate-50 border-slate-100'}`} 
+                          value={inTime} 
+                          onChange={(e) => setInTime(e.target.value)} 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Out Time</label>
+                        <input type="time" className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-sm text-center" value={outTime} onChange={(e) => setOutTime(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Location</label>
+                        <select 
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-xs outline-none focus:border-indigo-400"
+                          value={individualLocation}
+                          onChange={(e) => setIndividualLocation(e.target.value)}
+                        >
+                          <option value="">Select Location</option>
+                          <option value="Kirpal Bagh">Kirpal Bagh</option>
+                          <option value="Kirpal Ashram">Kirpal Ashram</option>
+                          <option value="Sawan Ashram">Sawan Ashram</option>
+                          <option value="Burari">Burari</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sewa Point (Spot)</label>
+                        <input type="text" className="w-full px-4 py-3 bg-amber-50/20 border-2 border-amber-50 rounded-xl font-black text-sm outline-none focus:border-amber-300 transition-all placeholder:text-amber-200" placeholder="e.g. Main Gate" value={sewaPoint} onChange={(e) => setSewaPoint(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                      <button onClick={() => handleSaveAttendance(s.id)} className="flex-1 py-3.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">Save Changes</button>
+                      <div className="flex gap-2">
+                        <button onClick={() => setExpandedSewadarId(null)} className="flex-1 sm:flex-none px-6 py-3.5 bg-slate-100 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest">Close</button>
+                        {isMarked && (
+                          <button onClick={() => handleDeleteAttendance(s.id, s.name)} className="px-6 py-3.5 bg-red-50 text-red-500 border border-red-100 rounded-xl font-black text-[10px] uppercase tracking-widest">Delete</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
-
-      {/* Marking Details Modal */}
-      {markingSewadar && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in" onClick={() => setMarkingSewadar(null)}></div>
-          <div className="relative bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom-20">
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-black text-slate-900">{markingSewadar.name}</h3>
-              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1">{markingSewadar.group} Group Duty</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                    In Time {isInTimeLocked && <svg className="w-2.5 h-2.5 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>}
-                  </label>
-                  <input 
-                    type="time" 
-                    disabled={isInTimeLocked}
-                    className={`w-full px-5 py-3.5 border-2 rounded-2xl font-black text-lg text-center transition-all ${isInTimeLocked ? 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 border-slate-100'}`} 
-                    value={inTime} 
-                    onChange={(e) => setInTime(e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Out Time</label>
-                  <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-lg text-center" value={outTime} onChange={(e) => setOutTime(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sewa Location (General Area)</label>
-                <select 
-                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-base outline-none focus:border-indigo-400 transition-all"
-                  value={individualLocation}
-                  onChange={(e) => setIndividualLocation(e.target.value)}
-                >
-                  <option value="">Select Location</option>
-                  <option value="Kirpal Bagh">Kirpal Bagh</option>
-                  <option value="Kirpal Ashram">Kirpal Ashram</option>
-                  <option value="Sawan Ashram">Sawan Ashram</option>
-                  <option value="Burari">Burari</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sewa Point (Specific Spot)</label>
-                <div className="relative">
-                   <input type="text" className="w-full px-6 py-4 bg-amber-50/30 border-2 border-amber-100 rounded-2xl font-black text-lg text-center outline-none focus:border-amber-400 transition-all placeholder:text-amber-200/50" placeholder="e.g. Main Gate" value={sewaPoint} onChange={(e) => setSewaPoint(e.target.value)} />
-                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-amber-500">
-                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
-                   </div>
-                </div>
-              </div>
-
-              <div className="pt-4 space-y-3">
-                <button onClick={handleSaveAttendance} className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.1em] shadow-xl hover:bg-indigo-700 transition-all active:scale-95">Save Duty Details</button>
-                <div className="flex gap-3">
-                  <button onClick={() => setMarkingSewadar(null)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest">Cancel</button>
-                  {getAttendanceRecord(markingSewadar.id) && (
-                    <button onClick={handleDeleteAttendance} className="flex-1 py-4 bg-red-50 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest border border-red-100">Clear Records</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showAddForm && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
