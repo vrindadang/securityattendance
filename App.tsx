@@ -199,6 +199,25 @@ const App: React.FC = () => {
     });
   };
 
+  const handleUpdatePassword = async (newPassword: string): Promise<boolean> => {
+    if (!activeVolunteer) return false;
+    try {
+      const { error } = await supabase
+        .from('volunteers')
+        .upsert({ id: activeVolunteer.id, password: newPassword });
+      
+      if (error) throw error;
+      
+      const updatedVolunteer = { ...activeVolunteer, password: newPassword };
+      setActiveVolunteer(updatedVolunteer);
+      localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(updatedVolunteer));
+      return true;
+    } catch (err) {
+      console.error("Update Password Error:", err);
+      return false;
+    }
+  };
+
   const saveAttendance = async (id: string, details: Partial<AttendanceRecord>, isDelete: boolean = false) => {
     if (!selectedSession || selectedSession.completed) return;
     const sessionDate = selectedSession.date;
@@ -485,6 +504,7 @@ const App: React.FC = () => {
             onReportIssue={handleReportIssue}
             onUpdateIssue={handleUpdateIssue}
             onDeleteIssue={handleDeleteIssue}
+            onUpdatePassword={handleUpdatePassword}
             isLoading={loading}
             dutyStartTime={selectedSession?.start_time || ''}
             dutyEndTime={selectedSession?.end_time || ''}
@@ -503,7 +523,7 @@ const App: React.FC = () => {
         </button>
         <button onClick={() => setActiveView('Dashboard')} className={`flex flex-col items-center gap-1 group transition-all ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}>
           <div className={`p-2 rounded-xl transition-all ${activeView === 'Dashboard' ? 'bg-indigo-50' : 'group-hover:bg-slate-50'}`}>
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
           </div>
           <span className="text-[10px] font-black uppercase tracking-widest">Reports</span>
         </button>

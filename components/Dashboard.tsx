@@ -17,6 +17,7 @@ interface Props {
   onReportIssue: (desc: string, photo?: string) => void;
   onUpdateIssue?: (id: string, desc: string, photo?: string) => void;
   onDeleteIssue?: (id: string) => void;
+  onUpdatePassword?: (newPassword: string) => Promise<boolean>;
   isLoading: boolean;
   dutyStartTime: string;
   dutyEndTime: string;
@@ -35,6 +36,7 @@ const Dashboard: React.FC<Props> = ({
   onReportIssue,
   onUpdateIssue,
   onDeleteIssue,
+  onUpdatePassword,
   isLoading, 
   dutyStartTime,
   dutyEndTime,
@@ -43,9 +45,17 @@ const Dashboard: React.FC<Props> = ({
 }) => {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [issueDesc, setIssueDesc] = useState('');
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
   const [editingIssueId, setEditingIssueId] = useState<string | null>(null);
+  
+  // Password Change States
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +93,7 @@ const Dashboard: React.FC<Props> = ({
       let h = dateObj.getHours();
       const ampm = h >= 12 ? 'PM' : 'AM';
       h = h % 12;
-      h = h ? h : 12; // the hour '0' should be '12'
+      h = h ? h : 12;
       const min = String(dateObj.getMinutes()).padStart(2, '0');
       
       return `${d}/${m}/${y} ${h}:${min} ${ampm}`;
@@ -267,6 +277,27 @@ const Dashboard: React.FC<Props> = ({
     setShowReportConfirmModal(false);
   };
 
+  const handleUpdatePasswordClick = async () => {
+    if (!newPassword || newPassword !== confirmPassword) {
+      setPasswordFeedback({ type: 'error', msg: 'Passwords must match and not be empty.' });
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    setPasswordFeedback(null);
+    
+    if (onUpdatePassword) {
+      const success = await onUpdatePassword(newPassword);
+      if (success) {
+        setPasswordFeedback({ type: 'success', msg: 'Password updated successfully!' });
+        setTimeout(() => setShowProfileModal(false), 1500);
+      } else {
+        setPasswordFeedback({ type: 'error', msg: 'Failed to update password.' });
+      }
+    }
+    setIsUpdatingPassword(false);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -278,14 +309,12 @@ const Dashboard: React.FC<Props> = ({
 
   const submitIssue = () => {
     if (!issueDesc.trim()) return;
-    
     if (editingIssueId && onUpdateIssue) {
       onUpdateIssue(editingIssueId, issueDesc.trim(), issuePhoto || undefined);
       setEditingIssueId(null);
     } else {
       onReportIssue(issueDesc.trim(), issuePhoto || undefined);
     }
-    
     setIssueDesc('');
     setIssuePhoto(null);
   };
@@ -351,33 +380,33 @@ const Dashboard: React.FC<Props> = ({
           </div>
         </div>
         
-        <div className="flex flex-col items-stretch w-full md:w-auto gap-3">
-           <div className="flex gap-2">
-             {!isSessionCompleted && (
-               <button 
-                onClick={onOpenSettings} 
-                className="px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all active:scale-95"
-               >
-                 Config Duty
-               </button>
-             )}
-             <button 
-              onClick={() => totalPresent > 0 && setShowReportConfirmModal(true)} 
-              disabled={totalPresent === 0} 
-              className={`flex-1 px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg ${totalPresent > 0 ? (isSessionCompleted ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white') : 'bg-slate-100 text-slate-300'}`}
-             >
-               {isSessionCompleted ? 'RE-EXPORT PDF' : 'Report PDF'}
-             </button>
+        <div className="flex items-center gap-2">
+           <button 
+             onClick={() => setShowProfileModal(true)}
+             className="w-12 h-12 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-all active:scale-95 shadow-sm"
+             title="Profile Settings"
+           >
+             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+           </button>
+           <div className="flex flex-col items-stretch w-full md:w-auto gap-3">
+              <div className="flex gap-2">
+                {!isSessionCompleted && (
+                  <button 
+                   onClick={onOpenSettings} 
+                   className="px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all active:scale-95"
+                  >
+                    Config Duty
+                  </button>
+                )}
+                <button 
+                 onClick={() => totalPresent > 0 && setShowReportConfirmModal(true)} 
+                 disabled={totalPresent === 0} 
+                 className={`flex-1 px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg ${totalPresent > 0 ? (isSessionCompleted ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white') : 'bg-slate-100 text-slate-300'}`}
+                >
+                  {isSessionCompleted ? 'RE-EXPORT PDF' : 'Report PDF'}
+                </button>
+              </div>
            </div>
-          
-          {incompleteRecords.length > 0 && !isSessionCompleted && (
-            <button 
-              onClick={() => setShowPendingModal(true)}
-              className="text-[9px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-4 py-2.5 rounded-xl animate-pulse text-center shadow-sm border border-amber-100"
-            >
-              Pending {incompleteRecords.length} Out-times
-            </button>
-          )}
         </div>
       </div>
 
@@ -467,14 +496,12 @@ const Dashboard: React.FC<Props> = ({
                     <button 
                       onClick={() => startEditIssue(issue)}
                       className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:text-indigo-600 hover:bg-indigo-50 transition-all"
-                      title="Edit Log"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
                     <button 
                       onClick={() => handleDelete(issue.id)}
                       className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:text-red-600 hover:bg-red-50 transition-all"
-                      title="Delete Log"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
@@ -486,31 +513,54 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {showPendingModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
-            <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg font-black text-slate-900">Waiting for Out-Time</h2>
-              <button onClick={() => setShowPendingModal(false)} className="text-slate-400 font-black px-2">✕</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {incompleteRecords.map(a => (
-                <div key={a.sewadarId} className="bg-slate-50/50 p-4 rounded-2xl flex justify-between items-center">
-                  <div>
-                    <p className="font-black text-sm text-slate-800">{a.name}</p>
-                    <p className="text-[10px] text-slate-400 uppercase font-black">{a.group}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-emerald-600">IN: {a.inTime}</p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">{a.sewaPoint}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-6">
-              <button onClick={() => setShowPendingModal(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Close List</button>
-            </div>
-          </div>
+      {/* Profile Settings Modal */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-8 animate-fade-in relative">
+              <button onClick={() => setShowProfileModal(false)} className="absolute top-6 right-6 text-slate-300">✕</button>
+              
+              <div className="text-center space-y-2">
+                 <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner text-3xl font-black">
+                    {activeVolunteer?.name[0]}
+                 </div>
+                 <h2 className="text-2xl font-black text-slate-900">{activeVolunteer?.name}</h2>
+                 <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{activeVolunteer?.role} • {activeVolunteer?.assignedGroup} Group</p>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t border-slate-100">
+                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Change Security PIN / Password</h3>
+                 <div className="space-y-4">
+                    <input 
+                      type="password" 
+                      placeholder="New Password" 
+                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                    />
+                    <input 
+                      type="password" 
+                      placeholder="Confirm New Password" 
+                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                    />
+                 </div>
+                 
+                 {passwordFeedback && (
+                    <p className={`text-[10px] font-black text-center uppercase tracking-widest ${passwordFeedback.type === 'success' ? 'text-emerald-500' : 'text-red-500'}`}>
+                       {passwordFeedback.msg}
+                    </p>
+                 )}
+
+                 <button 
+                   disabled={isUpdatingPassword}
+                   onClick={handleUpdatePasswordClick}
+                   className="w-full py-4.5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                 >
+                   {isUpdatingPassword ? 'Updating...' : 'Save New Password'}
+                 </button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -519,11 +569,10 @@ const Dashboard: React.FC<Props> = ({
           <div className="bg-white w-full max-md rounded-[2.5rem] p-8 shadow-2xl space-y-8 relative text-center">
             <button 
               onClick={() => setShowReportConfirmModal(false)}
-              className="absolute top-6 right-6 text-slate-300 hover:text-slate-600"
+              className="absolute top-6 right-6 text-slate-300"
             >
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+               ✕
             </button>
-
             <div className="space-y-4">
               <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner ${isSessionCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
                  <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -535,34 +584,14 @@ const Dashboard: React.FC<Props> = ({
                   : "Is this duty complete? Choosing 'Yes' will finalize all entries and seal the roster for this session."}
               </p>
             </div>
-
             <div className="flex flex-col gap-3">
               {!isSessionCompleted ? (
                 <>
-                  <button 
-                    onClick={() => generatePDF(true)}
-                    className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-200 active:scale-95 transition-all flex flex-col items-center"
-                  >
-                    <span className="text-sm">Yes, Finalize & Export</span>
-                    <span className="text-[8px] opacity-70 mt-1">Saves status as COMPLETED</span>
-                  </button>
-                  
-                  <button 
-                    onClick={() => generatePDF(false)}
-                    className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 flex flex-col items-center"
-                  >
-                    <span className="text-[10px]">No, Just Export PDF</span>
-                    <span className="text-[7px] opacity-60 mt-1">Keep duty active for marking</span>
-                  </button>
+                  <button onClick={() => generatePDF(true)} className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg">Yes, Finalize & Export</button>
+                  <button onClick={() => generatePDF(false)} className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest">No, Just Export PDF</button>
                 </>
               ) : (
-                <button 
-                  onClick={() => generatePDF(false)}
-                  className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  <span>Download Final Report</span>
-                </button>
+                <button onClick={() => generatePDF(false)} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg">Download Final Report</button>
               )}
             </div>
           </div>

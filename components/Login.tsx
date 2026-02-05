@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Volunteer, GentsGroup } from '../types';
 import { VOLUNTEERS, GENTS_GROUPS } from '../constants';
+import { supabase } from '../supabase';
 
 interface Props {
   onLogin: (volunteer: Volunteer) => void;
@@ -15,6 +16,7 @@ const Login: React.FC<Props> = ({ onLogin }) => {
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const handlePortalSelect = (type: PortalType) => {
     setPortalType(type);
@@ -29,22 +31,46 @@ const Login: React.FC<Props> = ({ onLogin }) => {
 
   const availableIncharges = useMemo(() => {
     if (!selectedGroup) return [];
-    // Only return volunteers specifically assigned to this group, excluding Super Admin from the dropdown
     return VOLUNTEERS.filter(v => v.assignedGroup === selectedGroup && v.role !== 'Super Admin');
   }, [selectedGroup]);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedVolunteer && password === selectedVolunteer.password) {
-      onLogin(selectedVolunteer);
-    } else {
-      // Allow Super Admin login as a fallback if the correct password is provided
-      const superAdmin = VOLUNTEERS.find(v => v.id === 'sa');
-      if (superAdmin && password === superAdmin.password) {
-        onLogin(superAdmin);
+    if (!selectedVolunteer) return;
+
+    setIsAuthenticating(true);
+    setError('');
+
+    try {
+      // 1. Check Supabase for overridden password
+      const { data, error: dbError } = await supabase
+        .from('volunteers')
+        .select('password')
+        .eq('id', selectedVolunteer.id)
+        .single();
+      
+      const effectivePassword = data?.password || selectedVolunteer.password;
+
+      if (password === effectivePassword) {
+        onLogin({ ...selectedVolunteer, password: effectivePassword });
+      } else {
+        // Fallback check for Super Admin PIN
+        const superAdmin = VOLUNTEERS.find(v => v.id === 'sa');
+        if (superAdmin && password === superAdmin.password) {
+          onLogin(superAdmin);
+        } else {
+          setError('Incorrect password.');
+        }
+      }
+    } catch (err) {
+      // If error (like record not found), use hardcoded default
+      if (password === selectedVolunteer.password) {
+        onLogin(selectedVolunteer);
       } else {
         setError('Incorrect password.');
       }
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -126,7 +152,9 @@ const Login: React.FC<Props> = ({ onLogin }) => {
                 <input type="password" required className="w-full px-5 py-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500" placeholder="••••" value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-              <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Unlock Portal</button>
+              <button type="submit" disabled={isAuthenticating} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                {isAuthenticating ? 'Unlocking...' : 'Unlock Portal'}
+              </button>
             </form>
           </div>
         )}
