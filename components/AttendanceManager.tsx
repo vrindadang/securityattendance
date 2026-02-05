@@ -12,10 +12,9 @@ interface Props {
   workshopLocation: string | null;
   dutyStartTime: string;
   dutyEndTime: string;
+  isCompleted?: boolean;
   onChangeLocation?: () => void;
 }
-
-type PortalStep = 'GENDER' | 'GROUP' | 'LIST';
 
 const AttendanceManager: React.FC<Props> = ({ 
   sewadars, 
@@ -26,340 +25,225 @@ const AttendanceManager: React.FC<Props> = ({
   workshopLocation, 
   dutyStartTime,
   dutyEndTime,
+  isCompleted,
   onChangeLocation 
 }) => {
-  const [step, setStep] = useState<PortalStep>(() => 
-    activeVolunteer.assignedGroup ? 'LIST' : 'GENDER'
-  );
-  
-  const [selectedGender, setSelectedGender] = useState<Gender | null>(() => {
-    if (activeVolunteer.assignedGroup === 'Ladies') return 'Ladies';
-    if (activeVolunteer.assignedGroup) return 'Gents';
-    return null;
-  });
-  
-  const [selectedGroup, setSelectedGroup] = useState<GentsGroup | 'Ladies' | null>(() => 
-    activeVolunteer.assignedGroup || null
-  );
-
+  const [selectedGender, setSelectedGender] = useState<Gender | null>(activeVolunteer.assignedGroup === 'Ladies' ? 'Ladies' : (activeVolunteer.assignedGroup ? 'Gents' : null));
+  const [selectedGroup, setSelectedGroup] = useState<GentsGroup | 'Ladies' | null>(activeVolunteer.assignedGroup || null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newGender, setNewGender] = useState<Gender>(activeVolunteer.assignedGroup === 'Ladies' ? 'Ladies' : 'Gents');
   const [newGroup, setNewGroup] = useState<GentsGroup | 'Ladies'>(activeVolunteer.assignedGroup || 'Monday');
 
-  // Inline marking state
-  const [expandedSewadarId, setExpandedSewadarId] = useState<string | null>(null);
-  const [inTime, setInTime] = useState('');
-  const [outTime, setOutTime] = useState('');
-  const [sewaPoint, setSewaPoint] = useState<string>('');
-  const [individualLocation, setIndividualLocation] = useState<string>('');
-  const [isInTimeLocked, setIsInTimeLocked] = useState(false);
+  const [editInTime, setEditInTime] = useState('');
+  const [editOutTime, setEditOutTime] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editPoint, setEditPoint] = useState('');
 
   const today = new Date().toISOString().split('T')[0];
-  const formattedToday = today.split('-').reverse().join('-');
+  const availableLocs = useMemo(() => workshopLocation?.split(',').map(l => l.trim()).filter(Boolean) || [], [workshopLocation]);
 
-  // Format times for display in header
-  const formatTimeDisplay = (dtStr: string) => {
-    if (!dtStr) return '';
-    if (dtStr.includes(' ')) return dtStr.split(' ')[1];
-    return dtStr;
+  const hasConfig = !!workshopLocation;
+  const isLocked = isCompleted || !hasConfig;
+
+  const filtered = useMemo(() => {
+    return sewadars.filter(s => {
+      const matchGender = !selectedGender || s.gender === selectedGender;
+      const matchGroup = !selectedGroup || s.group === selectedGroup;
+      const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchGender && matchGroup && matchSearch;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [sewadars, selectedGender, selectedGroup, searchTerm]);
+
+  const formatTime = (iso: string) => {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch { return '-'; }
   };
 
-  const filteredSewadars = useMemo(() => {
-    if (step !== 'LIST') return [];
-    return sewadars
-      .filter(s => {
-        const matchesGender = s.gender === selectedGender;
-        const matchesGroup = s.group === selectedGroup || searchTerm;
-        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesGender && (searchTerm ? true : matchesGroup) && matchesSearch;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sewadars, selectedGender, selectedGroup, searchTerm, step]);
-
-  // Parse available locations for dropdown
-  const availableLocations = useMemo(() => {
-    if (!workshopLocation) return [];
-    return workshopLocation.split(',').map(l => l.trim()).filter(Boolean);
-  }, [workshopLocation]);
-
-  const getAttendanceRecord = (id: string) => attendance.find(a => a.sewadarId === id && a.date === today);
-
-  const resetPortal = () => {
-    if (activeVolunteer.assignedGroup) return;
-    setStep('GENDER');
-    setSelectedGender(null);
-    setSelectedGroup(null);
-    setSearchTerm('');
-    setExpandedSewadarId(null);
-  };
-
-  const handleGenderSelect = (g: Gender) => {
-    setSelectedGender(g);
-    if (g === 'Ladies') {
-      setSelectedGroup('Ladies');
-      setStep('LIST');
-    } else setStep('GROUP');
-  };
-
-  const toggleMarking = (s: Sewadar) => {
-    if (expandedSewadarId === s.id) {
-      setExpandedSewadarId(null);
+  const handleToggle = (s: Sewadar) => {
+    if (isLocked) return;
+    if (expandedId === s.id) {
+      setExpandedId(null);
       return;
     }
-
-    const record = getAttendanceRecord(s.id);
+    const record = attendance.find(a => a.sewadarId === s.id && a.date === today);
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    const defaultLocation = availableLocations.length > 0 ? availableLocations[0] : '';
     
-    setExpandedSewadarId(s.id);
-    if (record) {
-      setIsInTimeLocked(true);
-      setInTime(record.inTime || now);
-      setOutTime(record.outTime || now);
-      setSewaPoint(record.sewaPoint || '');
-      setIndividualLocation(record.workshopLocation || defaultLocation);
-    } else {
-      setIsInTimeLocked(false);
-      setInTime(now);
-      setOutTime('');
-      setSewaPoint('');
-      setIndividualLocation(defaultLocation);
-    }
+    setEditInTime(record?.inTime || now);
+    setEditOutTime(record?.outTime || '');
+    setEditLocation(record?.workshopLocation || (availableLocs[0] || ''));
+    setEditPoint(record?.sewaPoint || '');
+    setExpandedId(s.id);
   };
 
-  const handleSaveAttendance = (id: string) => {
-    onSaveAttendance(id, { 
-      inTime, 
-      outTime, 
-      sewaPoint, 
-      workshopLocation: individualLocation 
+  const handleSave = (id: string) => {
+    if (isLocked) return;
+    onSaveAttendance(id, {
+      inTime: editInTime,
+      outTime: editOutTime,
+      sewaPoint: editPoint,
+      workshopLocation: editLocation
     });
-    setExpandedSewadarId(null);
+    setExpandedId(null);
   };
 
-  const handleDeleteAttendance = (id: string, name: string) => {
-    if (window.confirm(`Remove attendance for ${name}?`)) {
-      onSaveAttendance(id, {}, true);
-      setExpandedSewadarId(null);
-    }
+  const handleAddNew = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || isLocked) return;
+    onAddSewadar(newName.trim(), newGender, newGroup);
+    setNewName('');
+    setShowAddForm(false);
   };
 
-  if (step === 'GENDER') return (
-    <div className="space-y-8 animate-fade-in py-6 max-w-2xl mx-auto">
-      <div className="text-center space-y-2 mb-8">
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Portal Selection</h2>
-        <p className="text-slate-500 font-medium text-sm">SKRM Security Sewa Management</p>
-      </div>
-      <div className="grid grid-cols-1 gap-4">
-        <button onClick={() => handleGenderSelect('Gents')} className="group bg-white p-8 rounded-[2rem] border-2 border-slate-100 hover:border-indigo-500 hover:shadow-2xl transition-all flex items-center gap-6 active:scale-[0.98]">
-          <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl group-hover:bg-indigo-600 transition-colors shadow-inner">👮‍♂️</div>
-          <div className="text-left"><span className="text-2xl font-black text-slate-800 group-hover:text-indigo-600 block">Gents</span><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Sewa Assignments</span></div>
-        </button>
-        <button onClick={() => handleGenderSelect('Ladies')} className="group bg-white p-8 rounded-[2rem] border-2 border-slate-100 hover:border-pink-500 hover:shadow-2xl transition-all flex items-center gap-6 active:scale-[0.98]">
-          <div className="w-16 h-16 bg-pink-50 rounded-2xl flex items-center justify-center text-3xl group-hover:bg-pink-600 transition-colors shadow-inner">👩</div>
-          <div className="text-left"><span className="text-2xl font-black text-slate-800 group-hover:text-pink-600 block">Ladies</span><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Sewa Assignments</span></div>
-        </button>
-      </div>
-    </div>
-  );
-
-  if (step === 'GROUP') return (
-    <div className="space-y-4 animate-fade-in py-2 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={resetPortal} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all active:scale-95">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-        </button>
-        <div><h2 className="text-2xl font-black text-slate-900 leading-none">Select Group</h2><p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-1">Gents Assignment List</p></div>
-      </div>
-      <div className="space-y-2">
-        {GENTS_GROUPS.map((day) => (
-          <button key={day} onClick={() => { setSelectedGroup(day); setStep('LIST'); }} className="w-full bg-white p-5 rounded-2xl border-2 border-slate-100 hover:border-indigo-500 hover:shadow-xl transition-all flex items-center justify-between group active:scale-[0.99]">
-            <div className="flex items-center gap-4"><div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-lg">📅</div><div><span className="text-lg font-black text-slate-800 group-hover:text-indigo-600 block">{day} Group</span></div></div>
-            <div className="text-slate-300 group-hover:text-indigo-400"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg></div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  const isIncharge = !!activeVolunteer.assignedGroup && activeVolunteer.role !== 'Super Admin';
 
   return (
-    <div className="space-y-4 animate-fade-in pb-20 max-w-2xl mx-auto">
-      {/* Sticky Header with Search */}
-      <div className="flex flex-col gap-3 sticky top-[3.5rem] md:top-20 z-10 bg-slate-50 pb-2 md:pb-4 pt-2">
-        <div className="flex items-start justify-between">
-           <div className="flex items-center gap-3">
-            {!activeVolunteer.assignedGroup && (
-              <button onClick={() => setStep(selectedGender === 'Ladies' ? 'GENDER' : 'GROUP')} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all active:scale-95">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-              </button>
-            )}
-            <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 leading-tight">
-                {selectedGender === 'Ladies' ? 'Ladies' : `${selectedGroup} Group`}
-              </h2>
-              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest truncate max-w-[150px] md:max-w-none">
-                {formatTimeDisplay(dutyStartTime)} - {formatTimeDisplay(dutyEndTime)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {availableLocations.length > 0 && (
-              <button onClick={onChangeLocation} className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-1.5 hover:bg-amber-100 transition-colors group active:scale-95">
-                <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">{availableLocations.length} Locs</span>
-                <svg className="w-3 h-3 text-amber-400 group-hover:text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-              </button>
-            )}
-            <button onClick={() => setShowAddForm(true)} className="p-3 bg-emerald-500 text-white rounded-xl shadow-lg hover:bg-emerald-600 active:scale-90 transition-all">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M12 4v16m8-8H4" /></svg>
-            </button>
-          </div>
+    <div className="space-y-4 font-sans max-w-2xl mx-auto">
+      <div className={`p-5 rounded-[2rem] shadow-sm border transition-all flex items-center justify-between ${isCompleted ? 'bg-indigo-50 border-indigo-200' : hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
+        <div className="space-y-1">
+          <p className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-indigo-600' : hasConfig ? 'text-indigo-500' : 'text-amber-600'}`}>
+            {isCompleted ? '✅ SESSION FINALIZED' : hasConfig ? 'Active Duty Config' : 'Configuration Pending'}
+          </p>
+          <h2 className={`text-sm font-black leading-tight ${isCompleted ? 'text-indigo-900' : hasConfig ? 'text-slate-800' : 'text-amber-900'}`}>
+            {workshopLocation || 'No Location Set'}
+          </h2>
+          <p className="text-[10px] font-bold text-slate-400">
+            {hasConfig ? `${formatTime(dutyStartTime)} - ${formatTime(dutyEndTime)}` : 'Set duty details to start marking'}
+          </p>
         </div>
-        <div className="relative">
-          <input 
-             type="text" 
-             inputMode="search"
-             placeholder={`Search in ${selectedGroup}...`} 
-             className="w-full px-5 py-3.5 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all text-base text-slate-900 placeholder:text-slate-400" 
-             value={searchTerm} 
-             onChange={(e) => setSearchTerm(e.target.value)} 
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
-             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          </div>
-        </div>
+        {!isCompleted && (
+          <button 
+            onClick={onChangeLocation}
+            className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm ${hasConfig ? 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600' : 'bg-amber-600 text-white hover:bg-amber-700'}`}
+          >
+            {hasConfig ? 'Change' : 'Configure Now'}
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-col gap-2">
-        {filteredSewadars.map((s, idx) => {
-          const record = getAttendanceRecord(s.id);
-          const isMarked = !!record;
-          const isDone = isMarked && !!record.outTime;
-          const isExpanded = expandedSewadarId === s.id;
-          
-          return (
-            <div key={s.id} className="flex flex-col gap-1">
-              <button onClick={() => toggleMarking(s)} className={`w-full bg-white px-5 py-4 rounded-3xl shadow-sm border-2 flex items-center justify-between transition-all text-left active:scale-[0.99] ${isMarked ? (isDone ? 'border-indigo-200 bg-indigo-50/10' : 'border-emerald-200 bg-emerald-50/10') : 'border-slate-100'} ${isExpanded ? 'ring-4 ring-indigo-50 border-indigo-300' : ''}`}>
-                <div className="flex items-center gap-4">
-                  <div className="text-[10px] font-black text-slate-300 w-5 text-center">{idx + 1}</div>
-                  <div className="flex flex-col">
-                    <span className={`font-black text-base md:text-lg leading-tight ${isMarked ? 'text-slate-900' : 'text-slate-600'}`}>{s.name}</span>
-                    {isMarked && (
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${isDone ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                          {isDone ? 'Duty Completed' : 'Present'}
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-400">
-                          In: {record.inTime} {record.outTime && `• Out: ${record.outTime}`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl border-2 flex items-center justify-center transition-all flex-shrink-0 ${isMarked ? (isDone ? 'bg-indigo-500 border-indigo-400' : 'bg-emerald-500 border-emerald-400') : 'bg-slate-50 border-slate-100'}`}>
-                  {isMarked ? <svg className="w-6 h-6 md:w-7 md:h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <div className="w-4 h-4 rounded-full border-2 border-slate-200"></div>}
-                </div>
+      <div className={`transition-all duration-500 ${isLocked && !isCompleted ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
+        <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 space-y-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input 
+                type="text" 
+                disabled={isLocked && !isCompleted}
+                placeholder={isCompleted ? 'Session finalized' : hasConfig ? `Search members...` : 'Configure session first...'} 
+                className={`w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 placeholder:text-slate-300 focus:border-indigo-500 transition-all text-sm ${isCompleted ? 'bg-slate-50 cursor-not-allowed' : ''}`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {!isCompleted && (
+              <button 
+                onClick={() => hasConfig && setShowAddForm(!showAddForm)}
+                disabled={!hasConfig}
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-md active:scale-90 ${showAddForm ? 'bg-slate-800 text-white' : 'bg-indigo-600 text-white'}`}
+              >
+                <span className="text-2xl font-black">{showAddForm ? '✕' : '+'}</span>
               </button>
+            )}
+          </div>
 
-              {/* Inline Marking Form */}
-              {isExpanded && (
-                <div className="bg-white border-2 border-indigo-100 rounded-[2rem] p-5 shadow-xl animate-in slide-in-from-top-2 duration-300 mx-1">
-                  <div className="space-y-4">
+          {showAddForm && hasConfig && !isCompleted && (
+            <div className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl animate-in slide-in-from-top-4 duration-300">
+              <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-4">Register New Sewadar</h3>
+              <form onSubmit={handleAddNew} className="space-y-4">
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Full Name"
+                  className="w-full px-5 py-3.5 bg-slate-50 rounded-xl font-bold"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
+                <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Add to Roster</button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {filtered.map((s, idx) => {
+            const record = attendance.find(a => a.sewadarId === s.id && a.date === today);
+            const isExpanded = expandedId === s.id;
+            const isMarked = !!record;
+            const isDone = isMarked && !!record.outTime;
+
+            return (
+              <div key={s.id} className="flex flex-col gap-1">
+                <button 
+                  onClick={() => handleToggle(s)} 
+                  disabled={isCompleted && !isMarked}
+                  className={`w-full bg-white px-5 py-5 rounded-[2rem] shadow-sm border-2 flex items-center justify-between transition-all active:scale-[0.98] ${isMarked ? (isDone ? 'border-indigo-100 bg-indigo-50/5' : 'border-emerald-100 bg-emerald-50/5') : 'border-slate-50'} ${isCompleted && !isMarked ? 'opacity-50 cursor-default grayscale' : ''}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
+                    <div className="text-left">
+                      <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                      {isMarked ? (
+                        <div className="flex items-center gap-4 mt-2">
+                           <div className="flex flex-col">
+                              <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">In Time</span>
+                              <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{record.inTime || '--:--'}</span>
+                           </div>
+                           <div className="flex flex-col">
+                              <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Out Time</span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${record.outTime ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-300 italic'}`}>
+                                {record.outTime || 'On Duty'}
+                              </span>
+                           </div>
+                           {record.sewaPoint && (
+                             <div className="flex flex-col">
+                                <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Spot</span>
+                                <span className="text-[10px] font-black text-slate-600">{record.sewaPoint}</span>
+                             </div>
+                           )}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{s.group} Group</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className={`w-14 h-14 rounded-[1.25rem] border-2 flex items-center justify-center transition-all ${isMarked ? (isDone ? 'bg-indigo-500 border-indigo-400' : 'bg-emerald-500 border-emerald-400') : 'bg-slate-50 border-slate-100'}`}>
+                    {isMarked ? <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <div className="w-5 h-5 rounded-full border-2 border-slate-200"></div>}
+                  </div>
+                </button>
+
+                {isExpanded && !isCompleted && (
+                  <div className="bg-white border-2 border-indigo-50 rounded-[2rem] p-6 shadow-xl animate-in slide-in-from-top-2 mx-2 space-y-4">
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                          In Time {isInTimeLocked && <svg className="w-2.5 h-2.5 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>}
-                        </label>
-                        <input 
-                          type="time" 
-                          disabled={isInTimeLocked}
-                          className={`w-full px-2 py-3 border-2 rounded-xl font-black text-sm text-center transition-all ${isInTimeLocked ? 'bg-slate-50 border-slate-50 text-slate-400' : 'bg-slate-50 border-slate-100 focus:border-indigo-500'}`} 
-                          value={inTime} 
-                          onChange={(e) => setInTime(e.target.value)} 
-                        />
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">In Time</label>
+                        <input type="time" className="w-full px-4 py-3 bg-slate-50 rounded-xl font-black text-sm text-center" value={editInTime} onChange={(e) => setEditInTime(e.target.value)} />
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Out Time</label>
-                        <input type="time" className="w-full px-2 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-sm text-center focus:border-indigo-500" value={outTime} onChange={(e) => setOutTime(e.target.value)} />
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Out Time</label>
+                        <input type="time" className="w-full px-4 py-3 bg-slate-50 rounded-xl font-black text-sm text-center" value={editOutTime} onChange={(e) => setEditOutTime(e.target.value)} />
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Location</label>
-                        <select 
-                          className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-indigo-400 text-slate-800"
-                          value={individualLocation}
-                          onChange={(e) => setIndividualLocation(e.target.value)}
-                        >
-                          <option value="">Select Location</option>
-                          {availableLocations.length > 0 ? (
-                            availableLocations.map(loc => (
-                              <option key={loc} value={loc}>{loc}</option>
-                            ))
-                          ) : (
-                             <>
-                               <option value="Kirpal Bagh">Kirpal Bagh</option>
-                               <option value="Kirpal Ashram">Kirpal Ashram</option>
-                               <option value="Sawan Ashram">Sawan Ashram</option>
-                               <option value="Burari">Burari</option>
-                             </>
-                          )}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sewa Point (Spot)</label>
-                        <input type="text" className="w-full px-4 py-3 bg-amber-50/20 border-2 border-amber-50 rounded-xl font-bold text-sm outline-none focus:border-amber-300 transition-all placeholder:text-amber-200/50 text-slate-800" placeholder="e.g. Main Gate" value={sewaPoint} onChange={(e) => setSewaPoint(e.target.value)} />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Duty Spot / Point</label>
+                      <input type="text" className="w-full px-4 py-3 bg-slate-50 rounded-xl font-bold text-xs" value={editPoint} onChange={(e) => setEditPoint(e.target.value)} placeholder="e.g. Main Gate" />
                     </div>
-
-                    <div className="pt-2 flex flex-col gap-3">
-                      <button onClick={() => handleSaveAttendance(s.id)} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">
-                        Save Changes
-                      </button>
-                      
-                      <div className="flex gap-3">
-                        <button onClick={() => setExpandedSewadarId(null)} className="flex-1 py-3 bg-slate-100 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 active:scale-95">
-                           Close
-                        </button>
-                        {isMarked && (
-                          <button onClick={() => handleDeleteAttendance(s.id, s.name)} className="flex-1 py-3 bg-red-50 text-red-500 border border-red-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-100 active:scale-95">
-                             Delete
-                          </button>
-                        )}
-                      </div>
+                    <div className="pt-2 flex flex-col gap-2">
+                      <button onClick={() => handleSave(s.id)} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95">Confirm Update</button>
+                      {isMarked && (
+                        <button onClick={() => { if(confirm("Remove attendance?")) onSaveAttendance(s.id, {}, true); setExpandedId(null); }} className="w-full py-3 text-red-500 font-black text-[10px] uppercase">Delete Entry</button>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {showAddForm && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in" onClick={() => setShowAddForm(false)}></div>
-          <form onSubmit={(e) => { e.preventDefault(); if (newName.trim()) { onAddSewadar(newName, newGender, newGender === 'Ladies' ? 'Ladies' : newGroup); setNewName(''); setShowAddForm(false); } }} className="relative bg-white w-full max-w-md rounded-[2.5rem] p-8 md:p-10 shadow-2xl animate-in slide-in-from-bottom-20 mb-safe-area">
-            <h3 className="text-2xl font-black text-slate-900 mb-6">Register New Sewadar</h3>
-            <div className="space-y-5">
-              <input autoFocus required type="text" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-900 placeholder:text-slate-400" placeholder="Full Name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-              <div className="grid grid-cols-2 gap-3">
-                {(['Gents', 'Ladies'] as Gender[]).map((g) => (
-                  <button key={g} type="button" onClick={() => { setNewGender(g); if (g === 'Ladies') setNewGroup('Ladies'); }} className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all active:scale-95 ${newGender === g ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl' : 'bg-white text-slate-400 border-slate-100'}`}>{g}</button>
-                ))}
+                )}
               </div>
-              {newGender === 'Gents' && (
-                <select className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800" value={newGroup} onChange={(e) => setNewGroup(e.target.value as GentsGroup)}>
-                  {GENTS_GROUPS.map(day => <option key={day} value={day}>{day} Group</option>)}
-                </select>
-              )}
-              <div className="pt-4 flex gap-3"><button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-xs uppercase active:scale-95">Cancel</button><button type="submit" className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase shadow-xl active:scale-95">Mark & Save</button></div>
-            </div>
-          </form>
+            );
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 };

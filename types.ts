@@ -16,6 +16,7 @@ export interface Sewadar {
   name: string;
   gender: Gender;
   group: GentsGroup | 'Ladies';
+  isCustom?: boolean;
 }
 
 export interface AttendanceRecord {
@@ -25,6 +26,7 @@ export interface AttendanceRecord {
   gender: Gender;
   date: string; // YYYY-MM-DD
   timestamp: number;
+  volunteer_id?: string; // Backend compat
   volunteerId: string;
   inTime?: string;
   outTime?: string;
@@ -32,7 +34,7 @@ export interface AttendanceRecord {
   workshopLocation?: string;
 }
 
-// Fix: Added missing ScoreRecord interface which is required by PointsManager and ParticipantView
+// Added ScoreRecord interface used for tracking workshop activity points
 export interface ScoreRecord {
   id: string;
   sewadarId: string;
@@ -41,6 +43,15 @@ export interface ScoreRecord {
   timestamp: number;
   volunteerId: string;
   isDeleted?: boolean;
+}
+
+export interface Issue {
+  id: string;
+  description: string;
+  photo?: string; // Base64 string
+  timestamp: number;
+  volunteerId: string;
+  volunteerName: string;
 }
 
 export type ViewState = 'Attendance' | 'Dashboard' | 'Login';
