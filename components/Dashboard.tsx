@@ -15,6 +15,8 @@ interface Props {
   isSessionCompleted: boolean;
   onSessionChange: (id: string) => void;
   onReportIssue: (desc: string, photo?: string) => void;
+  onUpdateIssue?: (id: string, desc: string, photo?: string) => void;
+  onDeleteIssue?: (id: string) => void;
   isLoading: boolean;
   dutyStartTime: string;
   dutyEndTime: string;
@@ -31,6 +33,8 @@ const Dashboard: React.FC<Props> = ({
   isSessionCompleted,
   onSessionChange,
   onReportIssue,
+  onUpdateIssue,
+  onDeleteIssue,
   isLoading, 
   dutyStartTime,
   dutyEndTime,
@@ -41,7 +45,9 @@ const Dashboard: React.FC<Props> = ({
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
   const [issueDesc, setIssueDesc] = useState('');
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
+  const [editingIssueId, setEditingIssueId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
 
   const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
   const assignedGroup = activeVolunteer?.assignedGroup;
@@ -89,7 +95,6 @@ const Dashboard: React.FC<Props> = ({
     const groupLabel = isSuperAdmin ? "Consolidated" : assignedGroup;
     const dateDisplay = dutyStartTime ? dutyStartTime.split('T')[0].split('-').reverse().join('/') : '-';
     
-    // 1. Title Section
     doc.setFont("helvetica", "bold");
     doc.setFontSize(24);
     doc.setTextColor(50, 60, 120);
@@ -101,7 +106,6 @@ const Dashboard: React.FC<Props> = ({
     doc.setDrawColor(230, 230, 230);
     doc.line(14, 32, 196, 32);
 
-    // 2. Section 1: Duty Overview
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
@@ -129,7 +133,6 @@ const Dashboard: React.FC<Props> = ({
       theme: 'grid'
     });
 
-    // 3. Section 2: Shift Distribution
     const shifts = [
       { slot: '07:00 AM - 07:00 PM', desc: 'Day Shift', count: 0 },
       { slot: '07:00 PM - 02:00 AM', desc: 'Evening/Late Shift', count: 0 },
@@ -154,7 +157,6 @@ const Dashboard: React.FC<Props> = ({
       theme: 'grid'
     });
 
-    // 4. Section 3: Sewa Point Deployment (Manpower Distribution) - Prepared Ashram Wise
     const ashramDeployments: Record<string, Record<string, number>> = {};
     attendance.forEach(a => {
       const loc = a.workshopLocation || 'General Ashram';
@@ -185,7 +187,6 @@ const Dashboard: React.FC<Props> = ({
       }
     });
 
-    // 5. Section 4: Reported Issues & Incidents
     doc.text("4. Reported Issues & Incidents", 14, (doc as any).lastAutoTable.finalY + 10);
     let currentY = (doc as any).lastAutoTable.finalY + 16;
 
@@ -194,7 +195,7 @@ const Dashboard: React.FC<Props> = ({
       
       const timeStr = new Date(issue.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(185, 28, 28); // Red
+      doc.setTextColor(185, 28, 28); 
       doc.setFontSize(9);
       doc.text(`Entry #${idx + 1} - Recorded at ${timeStr}`, 14, currentY);
       currentY += 5;
@@ -220,7 +221,6 @@ const Dashboard: React.FC<Props> = ({
       doc.text("No incidents reported during this session.", 14, currentY);
     }
 
-    // 6. Final Page: Detailed Attendance Log
     doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
@@ -278,9 +278,35 @@ const Dashboard: React.FC<Props> = ({
 
   const submitIssue = () => {
     if (!issueDesc.trim()) return;
-    onReportIssue(issueDesc.trim(), issuePhoto || undefined);
+    
+    if (editingIssueId && onUpdateIssue) {
+      onUpdateIssue(editingIssueId, issueDesc.trim(), issuePhoto || undefined);
+      setEditingIssueId(null);
+    } else {
+      onReportIssue(issueDesc.trim(), issuePhoto || undefined);
+    }
+    
     setIssueDesc('');
     setIssuePhoto(null);
+  };
+
+  const startEditIssue = (issue: Issue) => {
+    setEditingIssueId(issue.id);
+    setIssueDesc(issue.description);
+    setIssuePhoto(issue.photo || null);
+    topRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingIssueId(null);
+    setIssueDesc('');
+    setIssuePhoto(null);
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Delete this log entry permanently?")) {
+      onDeleteIssue?.(id);
+    }
   };
 
   const formatHeaderTime = (start: string, end: string) => {
@@ -290,7 +316,7 @@ const Dashboard: React.FC<Props> = ({
       const e = new Date(end);
       const sT = s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const eT = e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const d = s.toLocaleDateString('en-GB'); // dd/mm/yyyy
+      const d = s.toLocaleDateString('en-GB'); 
       return `(${d}) ${sT} - ${eT}`;
     } catch { return '-'; }
   };
@@ -355,7 +381,7 @@ const Dashboard: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div ref={topRef} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className={`p-8 rounded-[2.5rem] text-white relative overflow-hidden transition-all duration-500 ${isSessionCompleted ? 'bg-emerald-900' : 'bg-slate-900'}`}>
            <div className="relative z-10">
              <div className="flex items-center gap-2 mb-2">
@@ -375,7 +401,7 @@ const Dashboard: React.FC<Props> = ({
            <div className="absolute -bottom-6 -right-6 text-9xl opacity-10">{isSessionCompleted ? '✅' : '👮‍♂️'}</div>
         </div>
 
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative">
+        <div className={`bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative transition-all ${editingIssueId ? 'ring-4 ring-indigo-500/10 border-indigo-200' : ''}`}>
            {isSessionCompleted && (
               <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 rounded-[2.5rem] flex items-center justify-center p-6 text-center">
                  <div>
@@ -387,7 +413,10 @@ const Dashboard: React.FC<Props> = ({
                  </div>
               </div>
            )}
-           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Post Incident Log</h3>
+           <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{editingIssueId ? 'Updating Incident' : 'Post Incident Log'}</h3>
+              {editingIssueId && <button onClick={cancelEdit} className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded">Cancel Edit</button>}
+           </div>
            <textarea 
             disabled={isSessionCompleted}
             className="w-full bg-slate-50 rounded-2xl p-4 text-xs font-bold outline-none border border-transparent focus:border-indigo-500 h-24"
@@ -406,9 +435,9 @@ const Dashboard: React.FC<Props> = ({
               <button 
                 disabled={isSessionCompleted}
                 onClick={submitIssue} 
-                className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase"
+                className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${editingIssueId ? 'bg-indigo-700' : 'bg-indigo-600'} text-white shadow-lg`}
               >
-                Post Log
+                {editingIssueId ? 'Update Log' : 'Post Log'}
               </button>
            </div>
            <input type="file" hidden accept="image/*" ref={fileInputRef} onChange={handleFileChange} />
@@ -423,15 +452,34 @@ const Dashboard: React.FC<Props> = ({
           </div>
           <div className="grid grid-cols-1 gap-3">
             {issues.slice().reverse().map(issue => (
-              <div key={issue.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex gap-4 items-start transition-all hover:shadow-md">
+              <div key={issue.id} className={`bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex gap-4 items-start transition-all hover:shadow-md relative group ${editingIssueId === issue.id ? 'bg-indigo-50/50' : ''}`}>
                 {issue.photo && <img src={issue.photo} className="w-20 h-20 rounded-2xl object-cover shadow-sm border border-slate-50 flex-shrink-0" />}
-                <div className="flex-1">
+                <div className="flex-1 pr-12">
                   <p className="text-xs font-bold text-slate-800 leading-relaxed">{issue.description}</p>
                   <div className="mt-3 flex items-center gap-2">
                     <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                     <p className="text-[8px] text-slate-400 font-black uppercase">{issue.volunteerName} • {new Date(issue.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                   </div>
                 </div>
+                
+                {!isSessionCompleted && (
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => startEditIssue(issue)}
+                      className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                      title="Edit Log"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(issue.id)}
+                      className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:text-red-600 hover:bg-red-50 transition-all"
+                      title="Delete Log"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

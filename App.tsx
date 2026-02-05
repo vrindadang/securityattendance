@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
@@ -137,7 +136,7 @@ const App: React.FC = () => {
           outTime: a.out_time,
           sewaPoint: a.sewa_points,
           workshopLocation: a.workshop_location,
-          isProperUniform: a.is_proper_uniform // Backend mapping
+          isProperUniform: a.is_proper_uniform 
         })));
       }
 
@@ -227,8 +226,7 @@ const App: React.FC = () => {
       out_time: details.outTime,
       sewa_points: details.sewaPoint,
       workshop_location: details.workshopLocation,
-      // Fixed: details.is_proper_uniform does not exist in AttendanceRecord interface
-      is_proper_uniform: details.isProperUniform // New field
+      is_proper_uniform: details.isProperUniform 
     };
 
     setAttendance(prev => {
@@ -245,7 +243,6 @@ const App: React.FC = () => {
         outTime: details.outTime,
         sewaPoint: details.sewaPoint,
         workshopLocation: details.workshopLocation,
-        // Fixed: details.is_proper_uniform does not exist in AttendanceRecord interface
         isProperUniform: details.isProperUniform
       };
       return [...filtered, updatedRecord];
@@ -279,6 +276,26 @@ const App: React.FC = () => {
       volunteer_id: newIssue.volunteerId,
       volunteer_name: newIssue.volunteerName
     });
+  };
+
+  const handleUpdateIssue = async (id: string, description: string, photo?: string) => {
+    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    
+    setIssues(prev => prev.map(i => i.id === id ? { ...i, description, photo } : i));
+    
+    await supabase.from('issues')
+      .update({ description, photo })
+      .eq('id', id);
+  };
+
+  const handleDeleteIssue = async (id: string) => {
+    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    
+    setIssues(prev => prev.filter(i => i.id !== id));
+    
+    await supabase.from('issues')
+      .delete()
+      .eq('id', id);
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -466,6 +483,8 @@ const App: React.FC = () => {
             isSessionCompleted={!!selectedSession?.completed}
             onSessionChange={(id) => setSelectedSession(allSessions.find(s => s.id === id) || null)}
             onReportIssue={handleReportIssue}
+            onUpdateIssue={handleUpdateIssue}
+            onDeleteIssue={handleDeleteIssue}
             isLoading={loading}
             dutyStartTime={selectedSession?.start_time || ''}
             dutyEndTime={selectedSession?.end_time || ''}
