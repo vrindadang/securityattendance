@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, GentsGroup, Volunteer } from '../types';
+import { LOCATIONS_LIST, GENTS_GROUPS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -34,12 +35,24 @@ const AttendanceManager: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
+  // States for marking attendance
   const [editInTime, setEditInTime] = useState('');
   const [editOutTime, setEditOutTime] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editPoint, setEditPoint] = useState('');
+  const [editProperUniform, setEditProperUniform] = useState(true);
 
-  const availableLocs = useMemo(() => workshopLocation?.split(',').map(l => l.trim()).filter(Boolean) || [], [workshopLocation]);
+  // States for adding new sewadar
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newGender, setNewGender] = useState<Gender>(activeVolunteer.assignedGroup === 'Ladies' ? 'Ladies' : 'Gents');
+  const [newGroup, setNewGroup] = useState<GentsGroup | 'Ladies'>(activeVolunteer.assignedGroup || 'Monday');
+
+  const availableLocs = useMemo(() => {
+    const list = workshopLocation?.split(',').map(l => l.trim()).filter(Boolean) || [];
+    // Combine with global list for full selection if needed, or stick to configured ones
+    return list.length > 0 ? list : LOCATIONS_LIST;
+  }, [workshopLocation]);
 
   const hasConfig = !!workshopLocation;
   const isLocked = isCompleted || !hasConfig;
@@ -89,6 +102,7 @@ const AttendanceManager: React.FC<Props> = ({
     setEditOutTime(record?.outTime || '');
     setEditLocation(record?.workshopLocation || (availableLocs[0] || ''));
     setEditPoint(record?.sewaPoint || '');
+    setEditProperUniform(record?.isProperUniform !== undefined ? record.isProperUniform : true);
     setExpandedId(s.id);
   };
 
@@ -98,13 +112,61 @@ const AttendanceManager: React.FC<Props> = ({
       inTime: editInTime,
       outTime: editOutTime,
       sewaPoint: editPoint,
-      workshopLocation: editLocation
+      workshopLocation: editLocation,
+      isProperUniform: editProperUniform
     });
     setExpandedId(null);
   };
 
+  const handleCreateSewadar = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    onAddSewadar(newName.trim(), newGender, newGroup);
+    setNewName('');
+    setShowAddModal(false);
+  };
+
+  const canEditGroup = activeVolunteer.role === 'Super Admin';
+
   return (
     <div className="space-y-4 font-sans max-w-2xl mx-auto">
+      {/* Add Sewadar Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+              <h2 className="text-2xl font-black text-slate-900">Add New Sewadar</h2>
+              <form onSubmit={handleCreateSewadar} className="space-y-4">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+                    <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Enter name..." />
+                 </div>
+                 
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Group</label>
+                    <select 
+                      disabled={!canEditGroup}
+                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all appearance-none"
+                      value={newGroup}
+                      onChange={e => {
+                        const val = e.target.value as GentsGroup | 'Ladies';
+                        setNewGroup(val);
+                        setNewGender(val === 'Ladies' ? 'Ladies' : 'Gents');
+                      }}
+                    >
+                      {[...GENTS_GROUPS, 'Ladies'].map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                 </div>
+
+                 <div className="pt-4 flex gap-2">
+                    <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest">Cancel</button>
+                    <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Create</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* Header Card */}
       <div className={`p-6 rounded-[2.5rem] shadow-sm border transition-all flex items-center justify-between ${isCompleted ? 'bg-indigo-50 border-indigo-200' : hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
         <div className="space-y-1">
           <p className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-indigo-600' : hasConfig ? 'text-indigo-500' : 'text-amber-600'}`}>
@@ -125,16 +187,24 @@ const AttendanceManager: React.FC<Props> = ({
       </div>
 
       <div className={`transition-all duration-500 ${isLocked && !isCompleted ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
-        <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2">
+        <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 flex gap-2">
            <input 
             type="text" 
             placeholder={isCompleted ? 'Session finalized' : hasConfig ? `Search members...` : 'Configure session first...'} 
-            className={`w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 placeholder:text-slate-300 focus:border-indigo-500 transition-all text-sm`}
+            className={`flex-1 px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 placeholder:text-slate-300 focus:border-indigo-500 transition-all text-sm`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0"
+            title="Add New Sewadar"
+          >
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          </button>
         </div>
 
+        {/* List */}
         <div className="space-y-3">
           {filtered.map((s, idx) => {
             const record = attendance.find(a => a.sewadarId === s.id && a.date === sessionDate);
@@ -152,7 +222,12 @@ const AttendanceManager: React.FC<Props> = ({
                   <div className="flex items-center gap-5">
                     <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
                     <div className="text-left space-y-3">
-                      <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                      <div>
+                         <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                         {isMarked && record.isProperUniform === false && (
+                           <span className="inline-block mt-1 px-2 py-0.5 bg-red-100 text-red-600 text-[8px] font-black uppercase rounded">No Dress</span>
+                         )}
+                      </div>
                       {isMarked ? (
                         <div className="flex items-center gap-2">
                            <div className="bg-slate-900 text-white rounded-xl px-4 py-2 flex flex-col items-center min-w-[70px]">
@@ -187,10 +262,28 @@ const AttendanceManager: React.FC<Props> = ({
                         <input type="time" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-base text-center outline-none focus:border-indigo-400" value={editOutTime} onChange={(e) => setEditOutTime(e.target.value)} />
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Ashram / Location</label>
+                        <select className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-400 appearance-none" value={editLocation} onChange={e => setEditLocation(e.target.value)}>
+                           {availableLocs.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Proper Dress?</label>
+                        <div className="flex gap-2">
+                           <button type="button" onClick={() => setEditProperUniform(true)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editProperUniform ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>YES</button>
+                           <button type="button" onClick={() => setEditProperUniform(false)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${!editProperUniform ? 'bg-red-500 text-white border-red-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>NO</button>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Sewa Point / Spot</label>
                       <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:border-indigo-400" value={editPoint} onChange={(e) => setEditPoint(e.target.value)} placeholder="e.g. Main Gate, Parking, etc." />
                     </div>
+                    
                     <div className="pt-2 flex flex-col gap-3">
                       <button onClick={() => handleSave(s.id)} className="w-full py-4.5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95">
                         {isMarked ? 'Save Changes' : 'Confirm Attendance'}

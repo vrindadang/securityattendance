@@ -1,19 +1,14 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue } from './types';
-import { INITIAL_SEWADARS } from './constants';
+import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import { supabase } from './supabase';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
-const LOCATIONS_LIST = [
-  'Kirpal Bagh', 
-  'Kirpal Ashram', 
-  'Sawan Ashram', 
-  'Sant Darshan Singh Ji Dham'
-];
 
 export interface DutySession {
   id: string;
@@ -141,7 +136,8 @@ const App: React.FC = () => {
           inTime: a.in_time,
           outTime: a.out_time,
           sewaPoint: a.sewa_points,
-          workshopLocation: a.workshop_location
+          workshopLocation: a.workshop_location,
+          isProperUniform: a.is_proper_uniform // Backend mapping
         })));
       }
 
@@ -230,7 +226,9 @@ const App: React.FC = () => {
       in_time: details.inTime,
       out_time: details.outTime,
       sewa_points: details.sewaPoint,
-      workshop_location: details.workshopLocation
+      workshop_location: details.workshopLocation,
+      // Fixed: details.is_proper_uniform does not exist in AttendanceRecord interface
+      is_proper_uniform: details.isProperUniform // New field
     };
 
     setAttendance(prev => {
@@ -246,7 +244,9 @@ const App: React.FC = () => {
         inTime: details.inTime,
         outTime: details.outTime,
         sewaPoint: details.sewaPoint,
-        workshopLocation: details.workshopLocation
+        workshopLocation: details.workshopLocation,
+        // Fixed: details.is_proper_uniform does not exist in AttendanceRecord interface
+        isProperUniform: details.isProperUniform
       };
       return [...filtered, updatedRecord];
     });

@@ -32,6 +32,7 @@ export interface AttendanceRecord {
   outTime?: string;
   sewaPoint?: string;
   workshopLocation?: string;
+  isProperUniform?: boolean; // New property
 }
 
 // Added ScoreRecord interface used for tracking workshop activity points
