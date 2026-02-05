@@ -64,6 +64,26 @@ const Dashboard: React.FC<Props> = ({
     } catch { return '-'; }
   };
 
+  const formatDateTimeForReport = (dateTimeStr: string) => {
+    if (!dateTimeStr) return '-';
+    try {
+      const dateObj = new Date(dateTimeStr);
+      if (isNaN(dateObj.getTime())) return dateTimeStr;
+      
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const y = dateObj.getFullYear();
+      
+      let h = dateObj.getHours();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12; // the hour '0' should be '12'
+      const min = String(dateObj.getMinutes()).padStart(2, '0');
+      
+      return `${d}/${m}/${y} ${h}:${min} ${ampm}`;
+    } catch { return dateTimeStr; }
+  };
+
   const generatePDF = (isFinal: boolean = false) => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const groupLabel = isSuperAdmin ? "Consolidated" : assignedGroup;
@@ -87,8 +107,9 @@ const Dashboard: React.FC<Props> = ({
     doc.setTextColor(0, 0, 0);
     doc.text("1. Duty Overview", 14, 42);
     
-    const startT = dutyStartTime?.split('T')[1]?.substring(0, 5) || '-';
-    const endT = dutyEndTime?.split('T')[1]?.substring(0, 5) || '-';
+    // Updated to use the refined helper for full date and time
+    const startFormatted = formatDateTimeForReport(dutyStartTime);
+    const endFormatted = formatDateTimeForReport(dutyEndTime);
 
     autoTable(doc, {
       startY: 45,
@@ -96,9 +117,9 @@ const Dashboard: React.FC<Props> = ({
       body: [
         ['Reporting Security Group', groupLabel || '-'],
         ['Total Sewadars on Duty', totalPresent],
-        ['Ashram / Locations Covered', attendance[0]?.workshopLocation || 'Mission Ashram'],
-        ['Duty Start Timing', startT],
-        ['Duty End Timing', endT]
+        ['Ashram / Locations Covered', attendance[0]?.workshopLocation || (allSessions.find(s => s.id === selectedSessionId)?.location || 'Mission Ashram')],
+        ['Duty Start Timing', startFormatted],
+        ['Duty End Timing', endFormatted]
       ],
       headStyles: { fillColor: [50, 60, 120], textColor: 255, fontSize: 10, fontStyle: 'bold' },
       bodyStyles: { fontSize: 9, textColor: 80 },
@@ -191,7 +212,8 @@ const Dashboard: React.FC<Props> = ({
     doc.text(`Detailed Attendance Log`, 14, 20);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Period: ${startT} - ${endT}`, 14, 28);
+    const sessionTimes = `${startFormatted} - ${endFormatted}`;
+    doc.text(`Period: ${sessionTimes}`, 14, 28);
 
     autoTable(doc, {
       startY: 35,
