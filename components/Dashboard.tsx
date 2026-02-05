@@ -107,9 +107,11 @@ const Dashboard: React.FC<Props> = ({
     doc.setTextColor(0, 0, 0);
     doc.text("1. Duty Overview", 14, 42);
     
-    // Updated to use the refined helper for full date and time
     const startFormatted = formatDateTimeForReport(dutyStartTime);
     const endFormatted = formatDateTimeForReport(dutyEndTime);
+    
+    const currentSession = allSessions.find(s => s.id === selectedSessionId);
+    const configuredLocations = currentSession?.location || 'Mission Ashram';
 
     autoTable(doc, {
       startY: 45,
@@ -117,7 +119,7 @@ const Dashboard: React.FC<Props> = ({
       body: [
         ['Reporting Security Group', groupLabel || '-'],
         ['Total Sewadars on Duty', totalPresent],
-        ['Ashram / Locations Covered', attendance[0]?.workshopLocation || (allSessions.find(s => s.id === selectedSessionId)?.location || 'Mission Ashram')],
+        ['Ashram / Locations Covered', configuredLocations],
         ['Duty Start Timing', startFormatted],
         ['Duty End Timing', endFormatted]
       ],
@@ -129,16 +131,16 @@ const Dashboard: React.FC<Props> = ({
 
     // 3. Section 2: Shift Distribution
     const shifts = [
-      { slot: '07:00 AM - 05:00 PM', desc: 'Day Shift', count: 0 },
-      { slot: '05:00 PM - 02:00 AM', desc: 'Evening/Late Shift', count: 0 },
+      { slot: '07:00 AM - 07:00 PM', desc: 'Day Shift', count: 0 },
+      { slot: '07:00 PM - 02:00 AM', desc: 'Evening/Late Shift', count: 0 },
       { slot: '02:00 AM - 07:00 AM', desc: 'Night/Early Morning', count: 0 }
     ];
 
     attendance.forEach(a => {
       if (!a.inTime) return;
       const [h] = a.inTime.split(':').map(Number);
-      if (h >= 7 && h < 17) shifts[0].count++;
-      else if (h >= 17 || h < 2) shifts[1].count++;
+      if (h >= 7 && h < 19) shifts[0].count++;
+      else if (h >= 19 || h < 2) shifts[1].count++;
       else shifts[2].count++;
     });
 
@@ -152,21 +154,35 @@ const Dashboard: React.FC<Props> = ({
       theme: 'grid'
     });
 
-    // 4. Section 3: Sewa Point Deployment
-    const deployments: Record<string, number> = {};
+    // 4. Section 3: Sewa Point Deployment (Manpower Distribution) - Prepared Ashram Wise
+    const ashramDeployments: Record<string, Record<string, number>> = {};
     attendance.forEach(a => {
+      const loc = a.workshopLocation || 'General Ashram';
       const spot = a.sewaPoint || 'General Duty';
-      deployments[spot] = (deployments[spot] || 0) + 1;
+      if (!ashramDeployments[loc]) ashramDeployments[loc] = {};
+      ashramDeployments[loc][spot] = (ashramDeployments[loc][spot] || 0) + 1;
+    });
+
+    const deploymentRows: [string, string, string][] = [];
+    Object.entries(ashramDeployments).sort(([a], [b]) => a.localeCompare(b)).forEach(([loc, spots]) => {
+      Object.entries(spots).sort(([a], [b]) => a.localeCompare(b)).forEach(([spot, count]) => {
+        deploymentRows.push([loc, spot, count.toString()]);
+      });
     });
 
     doc.text("3. Sewa Point Deployment (Manpower Distribution)", 14, (doc as any).lastAutoTable.finalY + 10);
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 13,
-      head: [['Sewa Point / Spot', 'Number of Sewadars']],
-      body: Object.entries(deployments).map(([spot, count]) => [spot, count]),
+      head: [['Ashram / Location', 'Sewa Point / Spot', 'Number of Sewadars']],
+      body: deploymentRows,
       headStyles: { fillColor: [16, 185, 129], textColor: 255, fontSize: 10, fontStyle: 'bold' },
       bodyStyles: { fontSize: 9, textColor: 80 },
-      theme: 'grid'
+      theme: 'grid',
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 40, halign: 'center' }
+      }
     });
 
     // 5. Section 4: Reported Issues & Incidents
