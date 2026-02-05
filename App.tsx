@@ -116,6 +116,7 @@ const App: React.FC = () => {
       const startRange = new Date(selectedSession.start_time).getTime();
       const endRange = new Date(selectedSession.end_time).getTime();
 
+      // Shared Attendance - Visible to all incharges in the same group
       let attQuery = supabase
         .from('attendance')
         .select('*')
@@ -123,7 +124,7 @@ const App: React.FC = () => {
         .lte('timestamp', endRange);
 
       if (activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup) {
-        attQuery = attQuery.eq('"group"', activeVolunteer.assignedGroup);
+        attQuery = attQuery.eq('group', activeVolunteer.assignedGroup);
       }
 
       const { data: attData } = await attQuery;
@@ -151,11 +152,18 @@ const App: React.FC = () => {
         })));
       }
 
-      const { data: issuesData } = await supabase
+      // Shared Issues - Visible to all incharges in the same group
+      let issuesQuery = supabase
         .from('issues')
         .select('*')
         .gte('timestamp', startRange)
         .lte('timestamp', endRange);
+
+      if (activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup) {
+        issuesQuery = issuesQuery.eq('group', activeVolunteer.assignedGroup);
+      }
+
+      const { data: issuesData } = await issuesQuery;
 
       if (issuesData) {
         setIssues(issuesData.map((i: any) => ({
@@ -289,6 +297,7 @@ const App: React.FC = () => {
     await supabase.from('issues').insert({
       id: newIssue.id,
       date: today,
+      group: activeVolunteer.assignedGroup, // Ensure shared visibility by group
       description: newIssue.description,
       photo: newIssue.photo,
       timestamp: newIssue.timestamp,
@@ -299,9 +308,7 @@ const App: React.FC = () => {
 
   const handleUpdateIssue = async (id: string, description: string, photo?: string) => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
-    
     setIssues(prev => prev.map(i => i.id === id ? { ...i, description, photo } : i));
-    
     await supabase.from('issues')
       .update({ description, photo })
       .eq('id', id);
@@ -309,9 +316,7 @@ const App: React.FC = () => {
 
   const handleDeleteIssue = async (id: string) => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
-    
     setIssues(prev => prev.filter(i => i.id !== id));
-    
     await supabase.from('issues')
       .delete()
       .eq('id', id);
@@ -419,12 +424,6 @@ const App: React.FC = () => {
                     </button>
                   ))}
                 </div>
-                <div className="mt-4 pt-4 border-t border-slate-50">
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Other location..." className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none" value={customLocation} onChange={e => setCustomLocation(e.target.value)} />
-                    <button type="button" onClick={() => { if(customLocation) setConfigForm(p => ({...p, locations: [...p.locations, customLocation]})); setCustomLocation(''); }} className="bg-slate-800 text-white px-6 rounded-2xl font-black text-[10px] uppercase">ADD</button>
-                  </div>
-                </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-slate-100">
@@ -523,7 +522,7 @@ const App: React.FC = () => {
         </button>
         <button onClick={() => setActiveView('Dashboard')} className={`flex flex-col items-center gap-1 group transition-all ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}>
           <div className={`p-2 rounded-xl transition-all ${activeView === 'Dashboard' ? 'bg-indigo-50' : 'group-hover:bg-slate-50'}`}>
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
           </div>
           <span className="text-[10px] font-black uppercase tracking-widest">Reports</span>
         </button>
