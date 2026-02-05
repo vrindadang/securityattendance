@@ -64,24 +64,10 @@ const Dashboard: React.FC<Props> = ({
     } catch { return '-'; }
   };
 
-  const formatDateTimeForReport = (dateTimeStr: string) => {
-    if (!dateTimeStr) return '-';
-    try {
-      const parts = dateTimeStr.split('T');
-      if (parts.length < 2) return dateTimeStr;
-      const [datePart, timePart] = parts;
-      const [y, m, d] = datePart.split('-');
-      const [hRaw, min] = timePart.split(':').map(Number);
-      const ampm = hRaw >= 12 ? 'PM' : 'AM';
-      const h = hRaw % 12 || 12;
-      return `${d}-${m}-${y} ${h}:${min < 10 ? '0' + min : min} ${ampm}`;
-    } catch { return dateTimeStr; }
-  };
-
   const generatePDF = (isFinal: boolean = false) => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const groupLabel = isSuperAdmin ? "Consolidated" : assignedGroup;
-    const dateDisplay = dutyStartTime ? dutyStartTime.split('T')[0].split('-').reverse().join('-') : '-';
+    const dateDisplay = dutyStartTime ? dutyStartTime.split('T')[0].split('-').reverse().join('/') : '-';
     
     // 1. Title Section
     doc.setFont("helvetica", "bold");
@@ -259,6 +245,18 @@ const Dashboard: React.FC<Props> = ({
     setIssuePhoto(null);
   };
 
+  const formatHeaderTime = (start: string, end: string) => {
+    if (!start || !end) return '-';
+    try {
+      const s = new Date(start);
+      const e = new Date(end);
+      const sT = s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const eT = e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const d = s.toLocaleDateString('en-GB'); // dd/mm/yyyy
+      return `(${d}) ${sT} - ${eT}`;
+    } catch { return '-'; }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-20">
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
@@ -273,10 +271,12 @@ const Dashboard: React.FC<Props> = ({
               {allSessions.map(s => {
                 const now = new Date();
                 const isActive = now >= new Date(s.start_time) && now <= new Date(s.end_time) && !s.completed;
+                const dateParts = s.date.split('-');
+                const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
                 return (
                   <option key={s.id} value={s.id}>
                     {s.completed ? '✅ DONE: ' : (isActive ? '🔴 ACTIVE: ' : '')}
-                    {formatDateTimeForReport(s.start_time).split(' ')[0]} 
+                    {formattedDate}
                     {s.completed ? ' (Finalized)' : ''}
                   </option>
                 );
@@ -332,7 +332,7 @@ const Dashboard: React.FC<Props> = ({
              </div>
              <p className="text-indigo-300 text-[10px] font-black uppercase mb-2">Presence in Selected Duty</p>
              <p className="text-5xl font-black">{totalPresent}</p>
-             <p className="text-[10px] font-black text-white/40 uppercase mt-4 tracking-widest">{formatDateTimeForReport(dutyStartTime)} - {formatDateTimeForReport(dutyEndTime)}</p>
+             <p className="text-[10px] font-black text-white/40 uppercase mt-4 tracking-widest">{formatHeaderTime(dutyStartTime, dutyEndTime)}</p>
            </div>
            <div className="absolute -bottom-6 -right-6 text-9xl opacity-10">{isSessionCompleted ? '✅' : '👮‍♂️'}</div>
         </div>
@@ -430,7 +430,7 @@ const Dashboard: React.FC<Props> = ({
 
       {showReportConfirmModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-indigo-950/95 backdrop-blur-xl animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-8 relative text-center">
+          <div className="bg-white w-full max-md rounded-[2.5rem] p-8 shadow-2xl space-y-8 relative text-center">
             <button 
               onClick={() => setShowReportConfirmModal(false)}
               className="absolute top-6 right-6 text-slate-300 hover:text-slate-600"

@@ -97,6 +97,8 @@ const App: React.FC = () => {
             setSelectedSession(null);
             if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
           }
+        } else if (!selectedSession && activeOrFuture) {
+          setSelectedSession(activeOrFuture);
         }
       } else {
         setAllSessions([]);
@@ -106,7 +108,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Fetch Sessions Error:", err);
     }
-  }, [activeVolunteer]);
+  }, [activeVolunteer, selectedSession]);
 
   const fetchData = async () => {
     if (!activeVolunteer || !selectedSession) {
@@ -204,13 +206,13 @@ const App: React.FC = () => {
 
   const saveAttendance = async (id: string, details: Partial<AttendanceRecord>, isDelete: boolean = false) => {
     if (!selectedSession || selectedSession.completed) return;
-    const today = selectedSession.date;
+    const sessionDate = selectedSession.date;
     
     if (isDelete) {
       setAttendance(prev => prev.filter(a => a.sewadarId !== id));
       await supabase.from('attendance')
         .delete()
-        .match({ sewadar_id: id, date: today });
+        .match({ sewadar_id: id, date: sessionDate });
       return;
     }
 
@@ -222,7 +224,7 @@ const App: React.FC = () => {
       name: sewadar.name,
       group: sewadar.group,
       gender: sewadar.gender,
-      date: today,
+      date: sessionDate,
       timestamp: Date.now(),
       volunteer_id: activeVolunteer?.id,
       in_time: details.inTime,
@@ -238,7 +240,7 @@ const App: React.FC = () => {
         name: dbPayload.name!,
         group: dbPayload.group as GentsGroup | 'Ladies',
         gender: dbPayload.gender as Gender,
-        date: today,
+        date: sessionDate,
         timestamp: dbPayload.timestamp,
         volunteerId: activeVolunteer?.id || '',
         inTime: details.inTime,
@@ -249,7 +251,11 @@ const App: React.FC = () => {
       return [...filtered, updatedRecord];
     });
 
-    await supabase.from('attendance').upsert(dbPayload, { onConflict: 'sewadar_id,date' });
+    const { error } = await supabase.from('attendance').upsert(dbPayload, { onConflict: 'sewadar_id,date' });
+    if (error) {
+      console.error("Attendance Error:", error);
+      alert("Database Error: Could not save attendance.");
+    }
   };
 
   const handleReportIssue = async (description: string, photo?: string) => {
@@ -285,8 +291,8 @@ const App: React.FC = () => {
     setIsSavingSettings(true);
     try {
       const groupName = activeVolunteer?.assignedGroup || 'Global';
-      const startTS = `${configForm.startDate}T${configForm.startTime}:00`;
-      const endTS = `${configForm.endDate}T${configForm.endTime}:00`;
+      const startTS = new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString();
+      const endTS = new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString();
       
       const payload: any = {
         date: configForm.startDate, 
@@ -304,26 +310,22 @@ const App: React.FC = () => {
       
       if (error) throw error;
 
-      const savedSession: DutySession = (data && data.length > 0) ? data[0] : {
-        id: `session-${Date.now()}`,
-        ...payload
-      };
+      if (data && data.length > 0) {
+        const savedSession: DutySession = data[0];
+        setAllSessions(prev => [savedSession, ...prev]);
+        setSelectedSession(savedSession);
+        setSaveSuccess(true);
+        setIsSavingSettings(false);
 
-      setAllSessions(prev => [savedSession, ...prev]);
-      setSelectedSession(savedSession);
-      setIsSavingSettings(false);
-      setSaveSuccess(true);
-
-      setTimeout(() => {
-        setShowSettingsModal(false);
-        setSaveSuccess(false);
-        setActiveView('Attendance');
-        fetchSessions(false);
-      }, 800);
-      
+        setTimeout(() => {
+          setShowSettingsModal(false);
+          setSaveSuccess(false);
+          setActiveView('Attendance');
+        }, 600);
+      }
     } catch (err: any) {
-      console.error("Critical Duty Config Error:", err);
-      alert(`Could not save configuration: ${err.message || 'Check your internet'}.`);
+      console.error("Config Error:", err);
+      alert(`Could not save configuration: ${err.message}.`);
       setIsSavingSettings(false);
     }
   };
@@ -343,14 +345,12 @@ const App: React.FC = () => {
       setIssues([]); 
       
       await fetchSessions(false);
-      
       setActiveView('Attendance');
       resetConfigForm();
       setTimeout(() => setShowSettingsModal(true), 500);
-      
     } catch (err) {
       console.error("Complete Session Error:", err);
-      alert("Error finalizing duty. Please try again.");
+      alert("Error finalizing duty.");
     }
   };
 
@@ -361,14 +361,8 @@ const App: React.FC = () => {
       {showSettingsModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl animate-fade-in">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] no-scrollbar relative">
-            
-            <button 
-              onClick={() => setShowSettingsModal(false)}
-              className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100 hover:text-slate-600 transition-all active:scale-90"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100 transition-all active:scale-90">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
 
             <div className="text-center">
@@ -376,7 +370,7 @@ const App: React.FC = () => {
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
               </div>
               <h2 className="text-2xl font-black text-slate-900">New Duty Session</h2>
-              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-1">Configure next shift parameters</p>
+              <p className="text-[10px] font-black text-indigo-500 uppercase mt-1">Configure next shift parameters</p>
             </div>
             
             <form onSubmit={handleSaveSettings} className="space-y-6">
@@ -384,61 +378,43 @@ const App: React.FC = () => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Select Duty Locations</label>
                 <div className="grid grid-cols-1 gap-2">
                   {LOCATIONS_LIST.map(loc => (
-                    <button 
-                      type="button" 
-                      key={loc} 
-                      onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} 
-                      className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all flex justify-between items-center ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
-                    >
+                    <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all flex justify-between items-center ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
                       {loc}
                     </button>
                   ))}
                 </div>
-                
                 <div className="mt-4 pt-4 border-t border-slate-50">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Any other location?</label>
                   <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="Enter other location..." 
-                      className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500" 
-                      value={customLocation} 
-                      onChange={e => setCustomLocation(e.target.value)} 
-                    />
-                    <button 
-                      type="button" 
-                      onClick={() => { if(customLocation) setConfigForm(p => ({...p, locations: [...p.locations, customLocation]})); setCustomLocation(''); }} 
-                      className="bg-slate-800 text-white px-6 rounded-2xl font-black text-[10px] uppercase shadow-md active:scale-95"
-                    >
-                      ADD
-                    </button>
+                    <input type="text" placeholder="Other location..." className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none" value={customLocation} onChange={e => setCustomLocation(e.target.value)} />
+                    <button type="button" onClick={() => { if(customLocation) setConfigForm(p => ({...p, locations: [...p.locations, customLocation]})); setCustomLocation(''); }} className="bg-slate-800 text-white px-6 rounded-2xl font-black text-[10px] uppercase">ADD</button>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-slate-100">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1">2. Duty Start (Date & Time)</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="date" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-emerald-500" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
-                    <input type="time" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm text-center outline-none focus:border-emerald-500" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase">Start Date</label>
+                    <input type="date" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase">Start Time</label>
+                    <input type="time" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm text-center" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest ml-1">3. Duty End (Date & Time)</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="date" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-amber-500" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
-                    <input type="time" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm text-center outline-none focus:border-amber-500" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-amber-600 uppercase">End Date</label>
+                    <input type="date" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-amber-600 uppercase">End Time</label>
+                    <input type="time" required className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm text-center" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
                   </div>
                 </div>
               </div>
 
-              <button 
-                type="submit" 
-                disabled={!configForm.locations.length || isSavingSettings || saveSuccess} 
-                className={`w-full py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 disabled:opacity-80 ${saveSuccess ? 'bg-emerald-500' : 'bg-indigo-600'} text-white`}
-              >
+              <button type="submit" disabled={!configForm.locations.length || isSavingSettings || saveSuccess} className={`w-full py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 ${saveSuccess ? 'bg-emerald-500' : 'bg-indigo-600'} text-white`}>
                 {isSavingSettings ? 'Configuring...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty Session')}
               </button>
             </form>
@@ -446,13 +422,12 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Header / Nav */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-900 rounded-xl flex items-center justify-center text-xl shadow-lg">👮</div>
           <div>
             <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none">Security Sewa</h1>
-            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">SKRM Mission</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">SKRM Mission</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -460,16 +435,12 @@ const App: React.FC = () => {
             <p className="text-[10px] font-black text-slate-900 leading-none">{activeVolunteer.name}</p>
             <p className="text-[8px] font-bold text-indigo-500 uppercase mt-1">{activeVolunteer.role}</p>
           </div>
-          <button 
-            onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); setActiveVolunteer(null); }}
-            className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-red-500 transition-colors"
-          >
+          <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-red-500 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-6 pt-6 no-scrollbar pb-24">
         {activeView === 'Attendance' ? (
           <AttendanceManager 
@@ -479,6 +450,7 @@ const App: React.FC = () => {
             onAddSewadar={handleAddSewadarToDB}
             activeVolunteer={activeVolunteer}
             workshopLocation={selectedSession?.location || null}
+            sessionDate={selectedSession?.date || ''}
             dutyStartTime={selectedSession?.start_time || ''}
             dutyEndTime={selectedSession?.end_time || ''}
             isCompleted={selectedSession?.completed}
@@ -503,22 +475,14 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t border-slate-100 flex justify-around items-center p-3 pb-6">
-        <button 
-          onClick={() => setActiveView('Attendance')}
-          className={`flex flex-col items-center gap-1 group transition-all ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}
-        >
+        <button onClick={() => setActiveView('Attendance')} className={`flex flex-col items-center gap-1 group transition-all ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}>
           <div className={`p-2 rounded-xl transition-all ${activeView === 'Attendance' ? 'bg-indigo-50' : 'group-hover:bg-slate-50'}`}>
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
           </div>
           <span className="text-[10px] font-black uppercase tracking-widest">Mark Sewa</span>
         </button>
-
-        <button 
-          onClick={() => setActiveView('Dashboard')}
-          className={`flex flex-col items-center gap-1 group transition-all ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}
-        >
+        <button onClick={() => setActiveView('Dashboard')} className={`flex flex-col items-center gap-1 group transition-all ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}>
           <div className={`p-2 rounded-xl transition-all ${activeView === 'Dashboard' ? 'bg-indigo-50' : 'group-hover:bg-slate-50'}`}>
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
           </div>
