@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, GentsGroup, Volunteer } from '../types';
-import { LOCATIONS_LIST, GENTS_GROUPS } from '../constants';
+import { LOCATIONS_LIST, GENTS_GROUPS, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
   attendance: AttendanceRecord[];
-  onSaveAttendance: (id: string, details: Partial<AttendanceRecord>, isDelete?: boolean) => void;
+  onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onAddSewadar: (name: string, gender: Gender, group: GentsGroup | 'Ladies') => void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
@@ -35,7 +35,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
-  // States for marking attendance
+  // States for marking NEW duty assignment
   const [editInTime, setEditInTime] = useState('');
   const [editOutTime, setEditOutTime] = useState('');
   const [editLocation, setEditLocation] = useState('');
@@ -50,7 +50,6 @@ const AttendanceManager: React.FC<Props> = ({
 
   const availableLocs = useMemo(() => {
     const list = workshopLocation?.split(',').map(l => l.trim()).filter(Boolean) || [];
-    // Combine with global list for full selection if needed, or stick to configured ones
     return list.length > 0 ? list : LOCATIONS_LIST;
   }, [workshopLocation]);
 
@@ -66,27 +65,13 @@ const AttendanceManager: React.FC<Props> = ({
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [sewadars, selectedGender, selectedGroup, searchTerm]);
 
-  const formatTimeStr = (iso: string) => {
-    if (!iso) return '-';
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch { return '-'; }
-  };
-
-  const formatDateStr = (dateStr: string) => {
-    if (!dateStr) return '-';
-    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-    const [y, m, d] = cleanDate.split('-');
-    return `${d}/${m}/${y}`;
-  };
-
   const formatConfigHeader = () => {
     if (!dutyStartTime || !dutyEndTime || !sessionDate) return '-';
-    const datePart = formatDateStr(sessionDate);
-    const startPart = formatTimeStr(dutyStartTime);
-    const endPart = formatTimeStr(dutyEndTime);
-    return `(${datePart}) ${startPart} - ${endPart}`;
+    const d = new Date(sessionDate);
+    const dateStr = d.toLocaleDateString('en-GB');
+    const start = new Date(dutyStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const end = new Date(dutyEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `(${dateStr}) ${start} - ${end}`;
   };
 
   const handleToggle = (s: Sewadar) => {
@@ -95,20 +80,34 @@ const AttendanceManager: React.FC<Props> = ({
       setExpandedId(null);
       return;
     }
-    const record = attendance.find(a => a.sewadarId === s.id && a.date === sessionDate);
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    
-    setEditInTime(record?.inTime || now);
-    setEditOutTime(record?.outTime || '');
-    setEditLocation(record?.workshopLocation || (availableLocs[0] || ''));
-    setEditPoint(record?.sewaPoint || '');
-    setEditProperUniform(record?.isProperUniform !== undefined ? record.isProperUniform : true);
+    resetForm();
     setExpandedId(s.id);
   };
 
-  const handleSave = (id: string) => {
+  const resetForm = () => {
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    setEditInTime(now);
+    setEditOutTime('');
+    setEditLocation(availableLocs[0] || '');
+    setEditPoint('');
+    setEditProperUniform(true);
+  };
+
+  const handleSaveAndAnother = (sewadarId: string) => {
     if (isLocked) return;
-    onSaveAttendance(id, {
+    onSaveAttendance(sewadarId, {
+      inTime: editInTime,
+      outTime: editOutTime,
+      sewaPoint: editPoint,
+      workshopLocation: editLocation,
+      isProperUniform: editProperUniform
+    });
+    resetForm();
+  };
+
+  const handleSaveAndClose = (sewadarId: string) => {
+    if (isLocked) return;
+    onSaveAttendance(sewadarId, {
       inTime: editInTime,
       outTime: editOutTime,
       sewaPoint: editPoint,
@@ -126,174 +125,213 @@ const AttendanceManager: React.FC<Props> = ({
     setShowAddModal(false);
   };
 
-  const canEditGroup = activeVolunteer.role === 'Super Admin';
-
   return (
     <div className="space-y-4 font-sans max-w-2xl mx-auto">
       {/* Add Sewadar Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-              <h2 className="text-2xl font-black text-slate-900">Add New Sewadar</h2>
+              <h2 className="text-2xl font-black text-slate-900">Add New Member</h2>
               <form onSubmit={handleCreateSewadar} className="space-y-4">
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
-                    <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Enter name..." />
-                 </div>
-                 
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Group</label>
-                    <select 
-                      disabled={!canEditGroup}
-                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all appearance-none"
-                      value={newGroup}
-                      onChange={e => {
-                        const val = e.target.value as GentsGroup | 'Ladies';
-                        setNewGroup(val);
-                        setNewGender(val === 'Ladies' ? 'Ladies' : 'Gents');
-                      }}
-                    >
-                      {[...GENTS_GROUPS, 'Ladies'].map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                 </div>
-
-                 <div className="pt-4 flex gap-2">
-                    <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest">Cancel</button>
-                    <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Create</button>
+                 <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full Name" />
+                 <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
+                    <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
                  </div>
               </form>
            </div>
         </div>
       )}
 
-      {/* Header Card */}
-      <div className={`p-6 rounded-[2.5rem] shadow-sm border transition-all flex items-center justify-between ${isCompleted ? 'bg-indigo-50 border-indigo-200' : hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
+      {/* Session Config Card */}
+      <div className={`p-6 rounded-[2.5rem] shadow-sm border flex items-center justify-between ${isCompleted ? 'bg-indigo-50 border-indigo-200' : hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
         <div className="space-y-1">
-          <p className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-indigo-600' : hasConfig ? 'text-indigo-500' : 'text-amber-600'}`}>
-            {isCompleted ? '✅ SESSION FINALIZED' : hasConfig ? 'Active Duty Config' : 'Configuration Pending'}
+          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
+            {isCompleted ? '✅ FINALIZED' : hasConfig ? 'Active Session' : 'Pending Config'}
           </p>
-          <h2 className={`text-base font-black leading-tight ${isCompleted ? 'text-indigo-900' : hasConfig ? 'text-slate-800' : 'text-amber-900'}`}>
-            {workshopLocation || 'No Location Set'}
-          </h2>
-          <p className="text-[10px] font-bold text-slate-400">
-            {hasConfig ? formatConfigHeader() : 'Set duty details to start marking'}
-          </p>
+          <h2 className="text-base font-black text-slate-800">{workshopLocation || 'No Location Set'}</h2>
+          <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
         </div>
         {!isCompleted && (
-          <button onClick={onChangeLocation} className={`px-5 py-3 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm ${hasConfig ? 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-indigo-50' : 'bg-amber-600 text-white'}`}>
-            {hasConfig ? 'Change' : 'Configure Now'}
-          </button>
+          <button onClick={onChangeLocation} className="px-5 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600">Change</button>
         )}
       </div>
 
-      <div className={`transition-all duration-500 ${isLocked && !isCompleted ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
+      {/* Main Search & List */}
+      <div className={`${isLocked && !isCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
         <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 flex gap-2">
            <input 
             type="text" 
-            placeholder={isCompleted ? 'Session finalized' : hasConfig ? `Search members...` : 'Configure session first...'} 
-            className={`flex-1 px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 placeholder:text-slate-300 focus:border-indigo-500 transition-all text-sm`}
+            placeholder="Search Sewadars..." 
+            className="flex-1 px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 focus:border-indigo-500 transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0"
-            title="Add New Sewadar"
-          >
+          <button onClick={() => setShowAddModal(true)} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
           </button>
         </div>
 
-        {/* List */}
         <div className="space-y-3">
           {filtered.map((s, idx) => {
-            const record = attendance.find(a => a.sewadarId === s.id && a.date === sessionDate);
+            const records = attendance.filter(a => a.sewadarId === s.id && a.date === sessionDate);
             const isExpanded = expandedId === s.id;
-            const isMarked = !!record;
-            const isDone = isMarked && !!record.outTime;
+            const isMarked = records.length > 0;
 
             return (
               <div key={s.id} className="flex flex-col gap-1">
                 <button 
                   onClick={() => handleToggle(s)} 
-                  disabled={isCompleted && !isMarked}
-                  className={`w-full bg-white px-5 py-5 rounded-[2.5rem] shadow-sm border-2 flex items-center justify-between transition-all active:scale-[0.98] ${isMarked ? (isDone ? 'border-indigo-100 bg-indigo-50/5' : 'border-emerald-100 bg-emerald-50/5') : 'border-slate-50'}`}
+                  className={`w-full bg-white px-5 py-5 rounded-[2.5rem] shadow-sm border-2 flex items-center justify-between transition-all ${isMarked ? 'border-emerald-100 bg-emerald-50/5' : 'border-slate-50'}`}
                 >
                   <div className="flex items-center gap-5">
                     <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
-                    <div className="text-left space-y-3">
-                      <div>
-                         <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
-                         {isMarked && record.isProperUniform === false && (
-                           <span className="inline-block mt-1 px-2 py-0.5 bg-red-100 text-red-600 text-[8px] font-black uppercase rounded">No Dress</span>
-                         )}
-                      </div>
-                      {isMarked ? (
-                        <div className="flex items-center gap-2">
-                           <div className="bg-slate-900 text-white rounded-xl px-4 py-2 flex flex-col items-center min-w-[70px]">
-                              <span className="text-[7px] font-black uppercase opacity-60">In Time</span>
-                              <span className="text-xs font-black tracking-tight">{record.inTime || '--:--'}</span>
-                           </div>
-                           <div className={`rounded-xl px-4 py-2 flex flex-col items-center min-w-[70px] border-2 ${record.outTime ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-300 border-slate-100 italic'}`}>
-                              <span className="text-[7px] font-black uppercase opacity-60">Out Time</span>
-                              <span className="text-xs font-black tracking-tight">{record.outTime || 'On Duty'}</span>
-                           </div>
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Available to Mark</p>
-                      )}
+                    <div className="text-left">
+                       <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                       <div className="flex gap-2 mt-2">
+                          {isMarked ? (
+                            <span className="bg-emerald-500 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
+                              {records.length} Duty Point{records.length > 1 ? 's' : ''}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest">Available</span>
+                          )}
+                          {isMarked && records.some(r => !r.isProperUniform) && (
+                            <span className="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">No Dress</span>
+                          )}
+                       </div>
                     </div>
                   </div>
-                  
-                  <div className={`w-14 h-14 rounded-[1.25rem] border-2 flex items-center justify-center transition-all ${isMarked ? (isDone ? 'bg-indigo-500 border-indigo-400 shadow-lg' : 'bg-emerald-500 border-emerald-400 shadow-lg') : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center transition-all ${isMarked ? 'bg-emerald-500 border-emerald-400 shadow-md' : 'bg-slate-50 border-slate-100'}`}>
                     {isMarked ? <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <div className="w-5 h-5 rounded-full border-2 border-slate-200"></div>}
                   </div>
                 </button>
 
-                {isExpanded && !isCompleted && (
-                  <div className="bg-white border-2 border-indigo-50 rounded-[2.5rem] p-8 shadow-2xl mx-2 space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">In Time</label>
-                        <input type="time" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-base text-center outline-none focus:border-indigo-400" value={editInTime} onChange={(e) => setEditInTime(e.target.value)} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Out Time</label>
-                        <input type="time" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-base text-center outline-none focus:border-indigo-400" value={editOutTime} onChange={(e) => setEditOutTime(e.target.value)} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Ashram / Location</label>
-                        <select className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-400 appearance-none" value={editLocation} onChange={e => setEditLocation(e.target.value)}>
-                           {availableLocs.map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Proper Dress?</label>
-                        <div className="flex gap-2">
-                           <button type="button" onClick={() => setEditProperUniform(true)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editProperUniform ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>YES</button>
-                           <button type="button" onClick={() => setEditProperUniform(false)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${!editProperUniform ? 'bg-red-500 text-white border-red-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>NO</button>
+                {isExpanded && (
+                  <div className="bg-white border-2 border-indigo-50 rounded-[2.5rem] p-8 shadow-2xl mx-2 space-y-8 animate-in slide-in-from-top-4 duration-300">
+                    
+                    {/* List Existing assignments */}
+                    {records.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Assignments</h3>
+                        <div className="space-y-2">
+                          {records.map(rec => (
+                            <div key={rec.id} className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between border border-slate-100">
+                               <div className="space-y-1">
+                                  <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
+                                  <p className="text-[10px] font-bold text-slate-400">{rec.inTime} to {rec.outTime || 'On Duty'}</p>
+                               </div>
+                               <button onClick={() => onSaveAttendance(s.id, {}, rec.id, true)} className="p-2 text-red-300 hover:text-red-500 transition-colors">
+                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                               </button>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Sewa Point / Spot</label>
-                      <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:border-indigo-400" value={editPoint} onChange={(e) => setEditPoint(e.target.value)} placeholder="e.g. Main Gate, Parking, etc." />
-                    </div>
-                    
-                    <div className="pt-2 flex flex-col gap-3">
-                      <button onClick={() => handleSave(s.id)} className="w-full py-4.5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95">
-                        {isMarked ? 'Save Changes' : 'Confirm Attendance'}
-                      </button>
-                      <div className="flex gap-2">
-                        <button onClick={() => setExpandedId(null)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
-                        {isMarked && (
-                          <button onClick={() => { if(confirm("Remove entry?")) onSaveAttendance(s.id, {}, true); setExpandedId(null); }} className="flex-1 py-4 bg-red-50 text-red-500 rounded-2xl font-black text-[10px] uppercase">Delete</button>
-                        )}
-                      </div>
+                    {/* Form for new assignment */}
+                    <div className="space-y-6 pt-4 border-t-2 border-slate-50">
+                       <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1">Mark New Duty Point</h3>
+                       <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Ashram</label>
+                                <select 
+                                  className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none" 
+                                  value={editLocation} 
+                                  onChange={e => {
+                                    setEditLocation(e.target.value);
+                                    // Reset point if location changes
+                                    setEditPoint('');
+                                  }}
+                                >
+                                   {availableLocs.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                             </div>
+                             <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Point / Spot</label>
+                                {editLocation === 'Kirpal Bagh' ? (
+                                  <select 
+                                    className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                    value={editPoint}
+                                    onChange={e => setEditPoint(e.target.value)}
+                                  >
+                                    <option value="">-- Select Point --</option>
+                                    {KIRPAL_BAGH_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                    <option value="Other">Other Duty</option>
+                                  </select>
+                                ) : editLocation === 'Kirpal Ashram' ? (
+                                  <select 
+                                    className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                    value={editPoint}
+                                    onChange={e => setEditPoint(e.target.value)}
+                                  >
+                                    <option value="">-- Select Point --</option>
+                                    {KIRPAL_ASHRAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                    <option value="Other">Other Duty</option>
+                                  </select>
+                                ) : editLocation === 'Sawan Ashram' ? (
+                                  <select 
+                                    className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                    value={editPoint}
+                                    onChange={e => setEditPoint(e.target.value)}
+                                  >
+                                    <option value="">-- Select Point --</option>
+                                    {SAWAN_ASHRAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                    <option value="Other">Other Duty</option>
+                                  </select>
+                                ) : editLocation === 'Sant Darshan Singh Ji Dham' ? (
+                                  <select 
+                                    className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                    value={editPoint}
+                                    onChange={e => setEditPoint(e.target.value)}
+                                  >
+                                    <option value="">-- Select Point --</option>
+                                    {SDS_DHAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                    <option value="Other">Other Duty</option>
+                                  </select>
+                                ) : (
+                                  <input 
+                                    type="text" 
+                                    className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-bold text-sm outline-none" 
+                                    value={editPoint} 
+                                    onChange={e => setEditPoint(e.target.value)} 
+                                    placeholder="e.g. Main Gate..." 
+                                  />
+                                )}
+                             </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">In Time</label>
+                                <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editInTime} onChange={e => setEditInTime(e.target.value)} />
+                             </div>
+                             <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Out Time</label>
+                                <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editOutTime} onChange={e => setEditOutTime(e.target.value)} />
+                             </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Proper Dress Code?</label>
+                            <div className="flex gap-2">
+                               <button type="button" onClick={() => setEditProperUniform(true)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editProperUniform ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>YES</button>
+                               <button type="button" onClick={() => setEditProperUniform(false)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${!editProperUniform ? 'bg-red-500 text-white border-red-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>NO</button>
+                            </div>
+                          </div>
+                       </div>
+
+                       <div className="flex flex-col gap-3 pt-4">
+                          <button onClick={() => handleSaveAndAnother(s.id)} className="w-full py-5 bg-indigo-100 text-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm active:scale-95 transition-all">
+                             + Add Another Duty Point
+                          </button>
+                          <button onClick={() => handleSaveAndClose(s.id)} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                             Confirm & Done
+                          </button>
+                          <button onClick={() => setExpandedId(null)} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel / Close</button>
+                       </div>
                     </div>
                   </div>
                 )}

@@ -20,22 +20,22 @@ export interface Sewadar {
 }
 
 export interface AttendanceRecord {
+  id: string; // Unique ID for each duty point record
   sewadarId: string;
   name: string;
   group: GentsGroup | 'Ladies';
   gender: Gender;
   date: string; // YYYY-MM-DD
   timestamp: number;
-  volunteer_id?: string; // Backend compat
   volunteerId: string;
   inTime?: string;
   outTime?: string;
   sewaPoint?: string;
   workshopLocation?: string;
-  isProperUniform?: boolean; // New property
+  isProperUniform?: boolean;
 }
 
-// Added ScoreRecord interface used for tracking workshop activity points
+// Added missing ScoreRecord interface used for gamification features
 export interface ScoreRecord {
   id: string;
   sewadarId: string;
