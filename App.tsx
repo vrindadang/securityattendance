@@ -33,7 +33,6 @@ const App: React.FC = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [customLocation, setCustomLocation] = useState('');
   
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
   const [selectedSession, setSelectedSession] = useState<DutySession | null>(null);
@@ -91,8 +90,6 @@ const App: React.FC = () => {
             setSelectedSession(null);
             if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
           }
-        } else if (!selectedSession && activeOrFuture) {
-          setSelectedSession(activeOrFuture);
         }
       } else {
         setAllSessions([]);
@@ -102,9 +99,9 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Fetch Sessions Error:", err);
     }
-  }, [activeVolunteer, selectedSession]);
+  }, [activeVolunteer]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!activeVolunteer || !selectedSession) {
       setAttendance([]);
       setIssues([]);
@@ -116,7 +113,6 @@ const App: React.FC = () => {
       const startRange = new Date(selectedSession.start_time).getTime();
       const endRange = new Date(selectedSession.end_time).getTime();
 
-      // Shared Attendance - Visible to all incharges in the same group
       let attQuery = supabase
         .from('attendance')
         .select('*')
@@ -152,7 +148,6 @@ const App: React.FC = () => {
         })));
       }
 
-      // Shared Issues - Visible to all incharges in the same group
       let issuesQuery = supabase
         .from('issues')
         .select('*')
@@ -164,7 +159,6 @@ const App: React.FC = () => {
       }
 
       const { data: issuesData } = await issuesQuery;
-
       if (issuesData) {
         setIssues(issuesData.map((i: any) => ({
           id: i.id,
@@ -180,7 +174,7 @@ const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeVolunteer, selectedSession]);
 
   useEffect(() => {
     if (activeVolunteer) {
@@ -190,7 +184,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [selectedSession?.id, activeVolunteer]);
+  }, [selectedSession?.id, fetchData]);
 
   const allSewadars = [...INITIAL_SEWADARS, ...customSewadars];
 
@@ -213,9 +207,7 @@ const App: React.FC = () => {
       const { error } = await supabase
         .from('volunteers')
         .upsert({ id: activeVolunteer.id, password: newPassword });
-      
       if (error) throw error;
-      
       const updatedVolunteer = { ...activeVolunteer, password: newPassword };
       setActiveVolunteer(updatedVolunteer);
       localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(updatedVolunteer));
@@ -297,7 +289,7 @@ const App: React.FC = () => {
     await supabase.from('issues').insert({
       id: newIssue.id,
       date: today,
-      group: activeVolunteer.assignedGroup, // Ensure shared visibility by group
+      group: activeVolunteer.assignedGroup,
       description: newIssue.description,
       photo: newIssue.photo,
       timestamp: newIssue.timestamp,
@@ -309,17 +301,13 @@ const App: React.FC = () => {
   const handleUpdateIssue = async (id: string, description: string, photo?: string) => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
     setIssues(prev => prev.map(i => i.id === id ? { ...i, description, photo } : i));
-    await supabase.from('issues')
-      .update({ description, photo })
-      .eq('id', id);
+    await supabase.from('issues').update({ description, photo }).eq('id', id);
   };
 
   const handleDeleteIssue = async (id: string) => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
     setIssues(prev => prev.filter(i => i.id !== id));
-    await supabase.from('issues')
-      .delete()
-      .eq('id', id);
+    await supabase.from('issues').delete().eq('id', id);
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -357,7 +345,6 @@ const App: React.FC = () => {
         setSelectedSession(savedSession);
         setSaveSuccess(true);
         setIsSavingSettings(false);
-
         setTimeout(() => {
           setShowSettingsModal(false);
           setSaveSuccess(false);
@@ -380,15 +367,12 @@ const App: React.FC = () => {
       
       if (error) throw error;
       
+      // Update local state to reflect finalization immediately
       setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
-      setSelectedSession(null); 
-      setAttendance([]); 
-      setIssues([]); 
+      setSelectedSession(prev => prev?.id === sessionId ? { ...prev, completed: true } : prev);
       
-      await fetchSessions(false);
-      setActiveView('Attendance');
-      resetConfigForm();
-      setTimeout(() => setShowSettingsModal(true), 500);
+      // We do NOT call setSelectedSession(null) here anymore to keep the report downloadable
+      setActiveView('Dashboard');
     } catch (err) {
       console.error("Complete Session Error:", err);
       alert("Error finalizing duty.");
@@ -405,7 +389,6 @@ const App: React.FC = () => {
             <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100 transition-all active:scale-90">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-
             <div className="text-center">
               <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
@@ -413,7 +396,6 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-black text-slate-900">New Duty Session</h2>
               <p className="text-[10px] font-black text-indigo-500 uppercase mt-1">Configure next shift parameters</p>
             </div>
-            
             <form onSubmit={handleSaveSettings} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Select Duty Locations</label>
@@ -425,7 +407,6 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
-
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -448,7 +429,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               <button type="submit" disabled={!configForm.locations.length || isSavingSettings || saveSuccess} className={`w-full py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 ${saveSuccess ? 'bg-emerald-500' : 'bg-indigo-600'} text-white`}>
                 {isSavingSettings ? 'Configuring...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty Session')}
               </button>
