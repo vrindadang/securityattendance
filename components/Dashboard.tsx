@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { AttendanceRecord, Volunteer, Issue } from '../types';
 import { VOLUNTEERS } from '../constants';
@@ -43,6 +44,14 @@ const Dashboard: React.FC<Props> = ({
   const [issueDesc, setIssueDesc] = useState('');
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
 
+  const archivedSessions = useMemo(() => {
+    return allSessions.filter(s => s.completed);
+  }, [allSessions]);
+
+  const activeSessions = useMemo(() => {
+    return allSessions.filter(s => !s.completed);
+  }, [allSessions]);
+
   const formatDateTime = (iso: string) => {
     if (!iso) return '-';
     const d = new Date(iso);
@@ -68,7 +77,7 @@ const Dashboard: React.FC<Props> = ({
     const currentSession = allSessions.find(s => s.id === selectedSessionId);
     const dateDisplay = currentSession?.date?.split('-').reverse().join('/') || '-';
 
-    // 1. Header Section - Combined into one single italic line as requested
+    // 1. Header Section
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
@@ -295,10 +304,13 @@ const Dashboard: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
+      {/* Report Summary Card */}
       <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl">
         <div>
           <h2 className="text-2xl font-black mb-1">Reports & Issues</h2>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Shift Management</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+            {isSessionCompleted ? 'Finalized Shift Record' : 'Live Shift Management'}
+          </p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -329,13 +341,18 @@ const Dashboard: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* Session Toggle Section */}
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Duty Session</label>
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Active Session</label>
         <select 
           className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500"
           value={selectedSessionId || ''}
-          onChange={(e) => onSessionChange(e.target.value)}
+          onChange={(e) => {
+            onSessionChange(e.target.value);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         >
+          {allSessions.length === 0 && <option value="">No sessions found</option>}
           {allSessions.map(s => (
             <option key={s.id} value={s.id}>
               {s.date.split('-').reverse().join('/')} - {s.location} ({s.completed ? 'Finalized' : 'Active'})
@@ -364,6 +381,7 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
+      {/* Incident Logs */}
       <div className="space-y-3">
         <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Incident Logs</h3>
         {issues.length > 0 ? issues.map(issue => (
@@ -382,6 +400,56 @@ const Dashboard: React.FC<Props> = ({
           </div>
         )) : (
           <p className="text-center py-10 text-slate-300 italic text-sm">No incidents reported for this session.</p>
+        )}
+      </div>
+
+      {/* Archive Section at the Bottom */}
+      <div className="mt-12 pt-12 border-t-2 border-slate-100 space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Archive Reports</h3>
+          <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">{archivedSessions.length} RECORDS</span>
+        </div>
+        
+        {archivedSessions.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3">
+            {archivedSessions.map((session) => (
+              <button
+                key={session.id}
+                onClick={() => {
+                  onSessionChange(session.id);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className={`w-full text-left p-6 rounded-[2rem] border-2 transition-all flex items-center justify-between group ${
+                  selectedSessionId === session.id 
+                    ? 'bg-indigo-50 border-indigo-200' 
+                    : 'bg-white border-slate-50 hover:border-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-5">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs ${
+                    selectedSessionId === session.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-black text-slate-800 text-base">{session.date.split('-').reverse().join('/')}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{session.location}</p>
+                  </div>
+                </div>
+                <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                  selectedSessionId === session.id 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'bg-slate-50 text-slate-400 group-hover:bg-slate-900 group-hover:text-white'
+                }`}>
+                  {selectedSessionId === session.id ? 'VIEWING' : 'VIEW REPORT'}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-slate-50 p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
+            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No finalized reports found</p>
+          </div>
         )}
       </div>
 

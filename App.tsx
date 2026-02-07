@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
@@ -55,6 +54,29 @@ const App: React.FC = () => {
     endDate: getLocalDate(),
     endTime: '22:00'
   });
+
+  // Handle defaults when modal opens
+  useEffect(() => {
+    if (showSettingsModal && activeVolunteer) {
+      if (activeVolunteer.assignedGroup === 'Ladies') {
+        // Default to ALL locations for Ladies
+        setConfigForm(prev => ({
+          ...prev,
+          locations: [...LOCATIONS_LIST],
+          startDate: getLocalDate(),
+          startTime: getLocalTime()
+        }));
+      } else {
+        // Default to EMPTY locations for Gents
+        setConfigForm(prev => ({
+          ...prev,
+          locations: [],
+          startDate: getLocalDate(),
+          startTime: getLocalTime()
+        }));
+      }
+    }
+  }, [showSettingsModal, activeVolunteer]);
 
   const fetchSessions = useCallback(async (isInitial = false) => {
     if (!activeVolunteer) return;
@@ -188,25 +210,6 @@ const App: React.FC = () => {
     fetchData();
   }, [selectedSession?.id, fetchData]);
 
-  const handleCleanupGroup = async (groupName: string) => {
-    if (!confirm(`DANGER: This will PERMANENTLY DELETE all sessions, attendance records, and issue logs for the ${groupName} group. This cannot be undone. Are you sure?`)) return;
-    
-    setLoading(true);
-    try {
-      await supabase.from('attendance').delete().eq('group', groupName);
-      await supabase.from('issues').delete().eq('group', groupName);
-      await supabase.from('daily_settings').delete().eq('group', groupName);
-      
-      alert(`Cleanup successful for ${groupName} group.`);
-      fetchSessions(true);
-    } catch (err: any) {
-      console.error("Cleanup Error:", err);
-      alert(`Cleanup failed: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUpdatePassword = async (newPassword: string): Promise<boolean> => {
     if (!activeVolunteer) return false;
     try {
@@ -223,7 +226,6 @@ const App: React.FC = () => {
     const sessionDate = selectedSession.date;
     const sessionGroup = selectedSession.group;
 
-    // Handle Deletion of a specific record
     if (isDelete && recordId) {
       setAttendance(prev => prev.filter(a => a.id !== recordId));
       await supabase.from('attendance').delete().eq('id', recordId);
@@ -233,7 +235,6 @@ const App: React.FC = () => {
     const sewadar = [...INITIAL_SEWADARS, ...customSewadars].find(s => s.id === sewadarId);
     if (!sewadar) return;
 
-    // Generate or use existing record ID
     const finalRecordId = recordId || `att-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 
     const dbPayload = {
@@ -269,12 +270,10 @@ const App: React.FC = () => {
     };
 
     setAttendance(prev => {
-      // Filter out existing record if we're updating by ID
       const filtered = prev.filter(a => a.id !== finalRecordId);
       return [...filtered, newRecord];
     });
 
-    // Use 'id' for conflict resolution to allow multiple records per sewadar_id
     await supabase.from('attendance').upsert(dbPayload, { onConflict: 'id' });
   };
 
@@ -294,6 +293,10 @@ const App: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (configForm.locations.length === 0) {
+      alert("Please select at least one location.");
+      return;
+    }
     setIsSavingSettings(true);
     try {
       const payload = {
@@ -337,14 +340,32 @@ const App: React.FC = () => {
             </div>
             <form onSubmit={handleSaveSettings} className="space-y-6">
               <div className="grid grid-cols-1 gap-2">
-                {LOCATIONS_LIST.map(loc => (
-                  <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
-                ))}
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Locations</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {LOCATIONS_LIST.map(loc => (
+                    <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                 <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
-                 <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
+                    <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty End</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
+                    <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
+                  </div>
+                </div>
               </div>
+
               <button type="submit" disabled={isSavingSettings || saveSuccess} className="w-full py-5 rounded-[2rem] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-xl">{isSavingSettings ? 'Starting...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty')}</button>
             </form>
           </div>
@@ -366,7 +387,7 @@ const App: React.FC = () => {
         {activeView === 'Attendance' ? (
           <AttendanceManager sewadars={[...INITIAL_SEWADARS, ...customSewadars]} attendance={attendance} onSaveAttendance={saveAttendance} onAddSewadar={(n, g, grp) => {}} activeVolunteer={activeVolunteer} workshopLocation={selectedSession?.location || null} sessionDate={selectedSession?.date || ''} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} isCompleted={selectedSession?.completed} onChangeLocation={() => setShowSettingsModal(true)} />
         ) : (
-          <Dashboard attendance={attendance} issues={issues} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={id => setSelectedSession(allSessions.find(s => s.id === id) || null)} onReportIssue={handleReportIssue} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} onCleanupGroup={handleCleanupGroup} />
+          <Dashboard attendance={attendance} issues={issues} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={id => setSelectedSession(allSessions.find(s => s.id === id) || null)} onReportIssue={handleReportIssue} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} />
         )}
       </main>
 

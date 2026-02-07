@@ -120,7 +120,7 @@ const GROUP_INCHARGES: Record<string, string[]> = {
   'Friday': FRIDAY_LIST.slice(0, 3),
   'Saturday': SATURDAY_LIST.slice(0, 3),
   'Sunday': SUNDAY_LIST.slice(0, 3),
-  'Ladies': LADIES_LIST.slice(0, 3)
+  'Ladies': ['KIRAN BALA']
 };
 
 const generateVolunteers = (): Volunteer[] => {
@@ -137,7 +137,7 @@ const generateVolunteers = (): Volunteer[] => {
       });
     });
   });
-  const ladiesInchargeNames = GROUP_INCHARGES['Ladies'] || ['Ladies Incharge 1', 'Ladies Incharge 2', 'Ladies Incharge 3'];
+  const ladiesInchargeNames = GROUP_INCHARGES['Ladies'] || ['Ladies Incharge 1'];
   ladiesInchargeNames.forEach((name, i) => {
     vols.push({
       id: `v_ladies_${i + 1}`,
