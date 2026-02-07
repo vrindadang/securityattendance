@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue } from './types';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -55,11 +56,9 @@ const App: React.FC = () => {
     endTime: '22:00'
   });
 
-  // Handle defaults when modal opens
   useEffect(() => {
     if (showSettingsModal && activeVolunteer) {
       if (activeVolunteer.assignedGroup === 'Ladies') {
-        // Default to ALL locations for Ladies
         setConfigForm(prev => ({
           ...prev,
           locations: [...LOCATIONS_LIST],
@@ -67,7 +66,6 @@ const App: React.FC = () => {
           startTime: getLocalTime()
         }));
       } else {
-        // Default to EMPTY locations for Gents
         setConfigForm(prev => ({
           ...prev,
           locations: [],
@@ -119,6 +117,7 @@ const App: React.FC = () => {
     if (!activeVolunteer || !selectedSession) {
       setAttendance([]);
       setIssues([]);
+      setVehicles([]);
       return;
     }
     setLoading(true);
@@ -127,19 +126,11 @@ const App: React.FC = () => {
       const sessionDate = selectedSession.date;
       const sessionGroup = selectedSession.group;
 
-      let { data: attData } = await supabase
+      const { data: attData } = await supabase
         .from('attendance')
         .select('*')
         .eq('date', sessionDate)
         .eq('group', sessionGroup);
-
-      if ((!attData || attData.length === 0) && sessionDate) {
-        const { data: fallbackData } = await supabase
-          .from('attendance')
-          .select('*')
-          .eq('date', sessionDate);
-        if (fallbackData && fallbackData.length > 0) attData = fallbackData;
-      }
 
       if (attData) {
         setAttendance(attData.map((a: any) => ({
@@ -167,19 +158,11 @@ const App: React.FC = () => {
         })));
       }
 
-      let { data: issuesData } = await supabase
+      const { data: issuesData } = await supabase
         .from('issues')
         .select('*')
         .eq('date', sessionDate)
         .eq('group', sessionGroup);
-
-      if ((!issuesData || issuesData.length === 0) && sessionDate) {
-        const { data: fallbackIssues } = await supabase
-          .from('issues')
-          .select('*')
-          .eq('date', sessionDate);
-        if (fallbackIssues) issuesData = fallbackIssues;
-      }
 
       if (issuesData) {
         setIssues(issuesData.map((i: any) => ({
@@ -193,6 +176,28 @@ const App: React.FC = () => {
       } else {
         setIssues([]);
       }
+
+      const { data: vData } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('date', sessionDate)
+        .eq('group', sessionGroup);
+
+      if (vData) {
+        setVehicles(vData.map((v: any) => ({
+          id: v.id,
+          type: v.type,
+          plateNumber: v.plate_number,
+          model: v.model,
+          remarks: v.remarks,
+          timestamp: v.timestamp,
+          volunteerId: v.volunteer_id,
+          volunteerName: v.volunteer_name
+        })));
+      } else {
+        setVehicles([]);
+      }
+
     } catch (err) {
       console.error("Fetch Data Error:", err);
     } finally {
@@ -209,17 +214,6 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [selectedSession?.id, fetchData]);
-
-  const handleUpdatePassword = async (newPassword: string): Promise<boolean> => {
-    if (!activeVolunteer) return false;
-    try {
-      await supabase.from('volunteers').upsert({ id: activeVolunteer.id, password: newPassword });
-      const updatedVolunteer = { ...activeVolunteer, password: newPassword };
-      setActiveVolunteer(updatedVolunteer);
-      localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(updatedVolunteer));
-      return true;
-    } catch (err) { return false; }
-  };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
     if (!selectedSession || selectedSession.completed) return;
@@ -288,6 +282,24 @@ const App: React.FC = () => {
       id: newIssue.id, date: selectedSession.date, group: selectedSession.group,
       description: newIssue.description, timestamp: newIssue.timestamp,
       volunteer_id: newIssue.volunteerId, volunteer_name: newIssue.volunteerName
+    });
+  };
+
+  const handleSaveVehicle = async (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => {
+    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    const newV: VehicleRecord = {
+      ...v,
+      id: `v-${Date.now()}`,
+      timestamp: Date.now(),
+      volunteerId: activeVolunteer.id,
+      volunteerName: activeVolunteer.name
+    };
+    setVehicles(prev => [...prev, newV]);
+    await supabase.from('vehicles').insert({
+      id: newV.id, date: selectedSession.date, group: selectedSession.group,
+      type: newV.type, plate_number: newV.plateNumber, model: newV.model,
+      remarks: newV.remarks, timestamp: newV.timestamp,
+      volunteer_id: newV.volunteerId, volunteer_name: newV.volunteerName
     });
   };
 
@@ -387,7 +399,7 @@ const App: React.FC = () => {
         {activeView === 'Attendance' ? (
           <AttendanceManager sewadars={[...INITIAL_SEWADARS, ...customSewadars]} attendance={attendance} onSaveAttendance={saveAttendance} onAddSewadar={(n, g, grp) => {}} activeVolunteer={activeVolunteer} workshopLocation={selectedSession?.location || null} sessionDate={selectedSession?.date || ''} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} isCompleted={selectedSession?.completed} onChangeLocation={() => setShowSettingsModal(true)} />
         ) : (
-          <Dashboard attendance={attendance} issues={issues} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={id => setSelectedSession(allSessions.find(s => s.id === id) || null)} onReportIssue={handleReportIssue} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} />
+          <Dashboard attendance={attendance} issues={issues} vehicles={vehicles} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={id => setSelectedSession(allSessions.find(s => s.id === id) || null)} onReportIssue={handleReportIssue} onSaveVehicle={handleSaveVehicle} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} />
         )}
       </main>
 

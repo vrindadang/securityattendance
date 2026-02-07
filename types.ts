@@ -20,12 +20,12 @@ export interface Sewadar {
 }
 
 export interface AttendanceRecord {
-  id: string; // Unique ID for each duty point record
+  id: string; 
   sewadarId: string;
   name: string;
   group: GentsGroup | 'Ladies';
   gender: Gender;
-  date: string; // YYYY-MM-DD
+  date: string; 
   timestamp: number;
   volunteerId: string;
   inTime?: string;
@@ -35,7 +35,17 @@ export interface AttendanceRecord {
   isProperUniform?: boolean;
 }
 
-// Added missing ScoreRecord interface used for gamification features
+export interface VehicleRecord {
+  id: string;
+  type: '2-wheeler' | '4-wheeler';
+  plateNumber: string;
+  model: string;
+  remarks: string;
+  timestamp: number;
+  volunteerId: string;
+  volunteerName: string;
+}
+
 export interface ScoreRecord {
   id: string;
   sewadarId: string;
@@ -49,7 +59,7 @@ export interface ScoreRecord {
 export interface Issue {
   id: string;
   description: string;
-  photo?: string; // Base64 string
+  photo?: string; 
   timestamp: number;
   volunteerId: string;
   volunteerName: string;
