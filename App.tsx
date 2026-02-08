@@ -27,17 +27,25 @@ const App: React.FC = () => {
   });
 
   const [activeView, setActiveView] = useState<ViewState>('Attendance');
+  
+  // States for Dashboard View (Reports)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
+  const [dashboardSelectedSession, setDashboardSelectedSession] = useState<DutySession | null>(null);
+
+  // States for Active Attendance View (Mark Sewa)
+  const [activeSession, setActiveSession] = useState<DutySession | null>(null);
+  const [activeAttendance, setActiveAttendance] = useState<AttendanceRecord[]>([]);
+  const [activeIssues, setActiveIssues] = useState<Issue[]>([]);
+  const [activeVehicles, setActiveVehicles] = useState<VehicleRecord[]>([]);
+
+  const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
-  const [selectedSession, setSelectedSession] = useState<DutySession | null>(null);
 
   const getLocalDate = () => {
     const d = new Date();
@@ -104,24 +112,27 @@ const App: React.FC = () => {
         const mappedSessions = data.map(s => ({ ...s, id: String(s.id) }));
         setAllSessions(mappedSessions);
         
+        const activeOrFuture = mappedSessions.find(s => !s.completed);
+        setActiveSession(activeOrFuture || null);
+
         if (isInitial) {
           const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
-          const activeOrFuture = mappedSessions.find(s => !s.completed);
           const savedSession = mappedSessions.find(s => s.id === savedSessionId);
           
           if (savedSession) {
-            setSelectedSession(savedSession);
+            setDashboardSelectedSession(savedSession);
           } else if (activeOrFuture) {
-            setSelectedSession(activeOrFuture);
+            setDashboardSelectedSession(activeOrFuture);
             localStorage.setItem(STORAGE_KEY_SESSION_ID, activeOrFuture.id);
           } else {
-            setSelectedSession(null);
+            setDashboardSelectedSession(null);
             if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
           }
         }
       } else {
         setAllSessions([]);
-        setSelectedSession(null);
+        setActiveSession(null);
+        setDashboardSelectedSession(null);
         if (isInitial && activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
       }
     } catch (err) {
@@ -129,41 +140,84 @@ const App: React.FC = () => {
     }
   }, [activeVolunteer]);
 
-  const fetchData = useCallback(async () => {
-    if (!activeVolunteer || !selectedSession) {
-      setAttendance([]);
-      setIssues([]);
-      setVehicles([]);
+  const fetchData = useCallback(async (session: DutySession | null, target: 'active' | 'dashboard') => {
+    if (!activeVolunteer || !session) {
+      if (target === 'active') {
+        setActiveAttendance([]);
+        setActiveIssues([]);
+        setActiveVehicles([]);
+      } else {
+        setAttendance([]);
+        setIssues([]);
+        setVehicles([]);
+      }
       return;
     }
-    setLoading(true);
+    
+    if (target === 'dashboard') setLoading(true);
     
     try {
-      const sessionDate = selectedSession.date;
-      const sessionGroup = selectedSession.group;
-
       const { data: attData } = await supabase
         .from('attendance')
         .select('*')
-        .eq('date', sessionDate)
-        .eq('group', sessionGroup);
+        .eq('date', session.date)
+        .eq('group', session.group);
 
-      if (attData) {
-        setAttendance(attData.map((a: any) => ({
-          ...a,
-          id: String(a.id),
-          sewadarId: a.sewadar_id,
-          volunteerId: a.volunteer_id,
-          inTime: a.in_time,
-          outTime: a.out_time,
-          sewaPoint: a.sewa_points,
-          workshopLocation: a.workshop_location,
-          isProperUniform: a.is_proper_uniform 
-        })));
+      const mappedAtt = attData ? attData.map((a: any) => ({
+        ...a,
+        id: String(a.id),
+        sewadarId: a.sewadar_id,
+        volunteerId: a.volunteer_id,
+        inTime: a.in_time,
+        outTime: a.out_time,
+        sewaPoint: a.sewa_points,
+        workshopLocation: a.workshop_location,
+        isProperUniform: a.is_proper_uniform 
+      })) : [];
+
+      const { data: issuesData } = await supabase
+        .from('issues')
+        .select('*')
+        .eq('date', session.date)
+        .eq('group', session.group);
+
+      const mappedIssues = issuesData ? issuesData.map((i: any) => ({
+        id: String(i.id),
+        description: i.description,
+        photo: i.photo,
+        timestamp: i.timestamp,
+        volunteerId: i.volunteer_id,
+        volunteerName: i.volunteer_name
+      })) : [];
+
+      const { data: vData } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('date', session.date)
+        .eq('group', session.group);
+
+      const mappedVehicles = vData ? vData.map((v: any) => ({
+        id: String(v.id),
+        type: v.type,
+        plateNumber: v.plate_number,
+        model: v.model,
+        remarks: v.remarks,
+        timestamp: v.timestamp,
+        volunteerId: v.volunteer_id,
+        volunteerName: v.volunteer_name
+      })) : [];
+
+      if (target === 'active') {
+        setActiveAttendance(mappedAtt);
+        setActiveIssues(mappedIssues);
+        setActiveVehicles(mappedVehicles);
       } else {
-        setAttendance([]);
+        setAttendance(mappedAtt);
+        setIssues(mappedIssues);
+        setVehicles(mappedVehicles);
       }
 
+      // Custom sewadars are global
       const { data: customData } = await supabase.from('custom_sewadars').select('*');
       if (customData) {
         setCustomSewadars(customData.map((s: any) => ({
@@ -175,52 +229,12 @@ const App: React.FC = () => {
         })));
       }
 
-      const { data: issuesData } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('date', sessionDate)
-        .eq('group', sessionGroup);
-
-      if (issuesData) {
-        setIssues(issuesData.map((i: any) => ({
-          id: String(i.id),
-          description: i.description,
-          photo: i.photo,
-          timestamp: i.timestamp,
-          volunteerId: i.volunteer_id,
-          volunteerName: i.volunteer_name
-        })));
-      } else {
-        setIssues([]);
-      }
-
-      const { data: vData } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('date', sessionDate)
-        .eq('group', sessionGroup);
-
-      if (vData) {
-        setVehicles(vData.map((v: any) => ({
-          id: String(v.id),
-          type: v.type,
-          plateNumber: v.plate_number,
-          model: v.model,
-          remarks: v.remarks,
-          timestamp: v.timestamp,
-          volunteerId: v.volunteer_id,
-          volunteerName: v.volunteer_name
-        })));
-      } else {
-        setVehicles([]);
-      }
-
     } catch (err) {
       console.error("Fetch Data Error:", err);
     } finally {
-      setLoading(false);
+      if (target === 'dashboard') setLoading(false);
     }
-  }, [activeVolunteer, selectedSession]);
+  }, [activeVolunteer]);
 
   useEffect(() => {
     if (activeVolunteer) {
@@ -229,26 +243,32 @@ const App: React.FC = () => {
   }, [activeVolunteer, fetchSessions]);
 
   useEffect(() => {
-    fetchData();
-  }, [selectedSession?.id, fetchData]);
+    fetchData(activeSession, 'active');
+  }, [activeSession?.id, fetchData]);
+
+  useEffect(() => {
+    fetchData(dashboardSelectedSession, 'dashboard');
+  }, [dashboardSelectedSession?.id, fetchData]);
 
   const generateNumericId = () => {
     return Date.now().toString() + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
   };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
-    if (!selectedSession || selectedSession.completed) return;
-    const sessionDate = selectedSession.date;
-    const sessionGroup = selectedSession.group;
+    if (!activeSession || activeSession.completed) return;
+    const sessionDate = activeSession.date;
+    const sessionGroup = activeSession.group;
 
     if (isDelete && recordId) {
       try {
         const { error } = await supabase.from('attendance').delete().eq('id', recordId);
         if (error) throw error;
-        setAttendance(prev => prev.filter(a => a.id !== recordId));
+        setActiveAttendance(prev => prev.filter(a => a.id !== recordId));
+        if (dashboardSelectedSession?.id === activeSession.id) {
+           setAttendance(prev => prev.filter(a => a.id !== recordId));
+        }
       } catch (error) {
         console.error('Failed to delete attendance:', error);
-        alert('Failed to delete attendance. Please try again.');
       }
       return;
     }
@@ -301,18 +321,23 @@ const App: React.FC = () => {
 
       if (result.error) throw result.error;
       
-      setAttendance(prev => {
+      setActiveAttendance(prev => {
         const filtered = prev.filter(a => a.id !== finalRecordId);
         return [...filtered, newRecord];
       });
+      if (dashboardSelectedSession?.id === activeSession.id) {
+        setAttendance(prev => {
+          const filtered = prev.filter(a => a.id !== finalRecordId);
+          return [...filtered, newRecord];
+        });
+      }
     } catch (error) {
       console.error('Failed to save attendance:', error);
-      alert('Failed to save attendance. Please try again.');
     }
   };
 
   const handleReportIssue = async (description: string) => {
-    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    if (!activeVolunteer || !activeSession || activeSession.completed) return;
     const newIssue: Issue = {
       id: generateNumericId(), 
       description, 
@@ -320,20 +345,21 @@ const App: React.FC = () => {
       volunteerId: activeVolunteer.id, 
       volunteerName: activeVolunteer.name
     };
-    setIssues(prev => [...prev, newIssue]);
+    setActiveIssues(prev => [...prev, newIssue]);
+    if (dashboardSelectedSession?.id === activeSession.id) {
+      setIssues(prev => [...prev, newIssue]);
+    }
     await supabase.from('issues').insert({
-      id: newIssue.id, date: selectedSession.date, group: selectedSession.group,
+      id: newIssue.id, date: activeSession.date, group: activeSession.group,
       description: newIssue.description, timestamp: newIssue.timestamp,
       volunteer_id: newIssue.volunteerId, volunteer_name: newIssue.volunteerName
     });
   };
 
   const handleSaveVehicle = async (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => {
-    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    if (!activeVolunteer || !activeSession || activeSession.completed) return;
     
-    // Normalize plate number to uppercase
     const cleanPlate = v.plateNumber.toUpperCase().trim();
-    
     const newV: VehicleRecord = {
       ...v,
       plateNumber: cleanPlate,
@@ -344,13 +370,15 @@ const App: React.FC = () => {
     };
 
     try {
-      // Optimistic update
-      setVehicles(prev => [...prev, newV]);
+      setActiveVehicles(prev => [...prev, newV]);
+      if (dashboardSelectedSession?.id === activeSession.id) {
+        setVehicles(prev => [...prev, newV]);
+      }
 
       const { error } = await supabase.from('vehicles').insert({
         id: newV.id, 
-        date: selectedSession.date, 
-        group: selectedSession.group,
+        date: activeSession.date, 
+        group: activeSession.group,
         type: newV.type, 
         plate_number: cleanPlate, 
         model: newV.model,
@@ -363,13 +391,9 @@ const App: React.FC = () => {
       if (error) throw error;
     } catch (err: any) {
       console.error("Failed to save vehicle log:", err);
-      // Revert optimistic update
-      setVehicles(prev => prev.filter(item => item.id !== newV.id));
-      
-      if (err.message && err.message.includes('cache')) {
-        alert("Database Error: The 'vehicles' table is missing in your Supabase project. Please run the SQL setup script.");
-      } else {
-        alert("Database Error: Failed to save vehicle record. Please check your connection.");
+      setActiveVehicles(prev => prev.filter(item => item.id !== newV.id));
+      if (dashboardSelectedSession?.id === activeSession.id) {
+        setVehicles(prev => prev.filter(item => item.id !== newV.id));
       }
     }
   };
@@ -393,7 +417,8 @@ const App: React.FC = () => {
       if (data && data.length > 0) {
         const mappedSession = { ...data[0], id: String(data[0].id) };
         setAllSessions(prev => [mappedSession, ...prev]);
-        setSelectedSession(mappedSession);
+        setActiveSession(mappedSession);
+        setDashboardSelectedSession(mappedSession);
         localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
         setSaveSuccess(true);
         setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
@@ -405,15 +430,17 @@ const App: React.FC = () => {
     try {
       await supabase.from('daily_settings').update({ completed: true }).eq('id', sessionId);
       setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
-      setSelectedSession(null);
-      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+      if (activeSession?.id === sessionId) setActiveSession(null);
+      if (dashboardSelectedSession?.id === sessionId) {
+         setDashboardSelectedSession(prev => prev ? { ...prev, completed: true } : null);
+      }
       setActiveView('Attendance');
     } catch (err) { alert("Error finalizing duty."); }
   };
 
   const handleSessionChange = (id: string) => {
     const session = allSessions.find(s => s.id === id) || null;
-    setSelectedSession(session);
+    setDashboardSelectedSession(session);
     if (session) {
       localStorage.setItem(STORAGE_KEY_SESSION_ID, id);
     } else {
@@ -422,16 +449,12 @@ const App: React.FC = () => {
   };
 
   const handleResetAllData = useCallback(async () => {
-    console.log("App: Reset process starting...");
-    if (!window.confirm("☢️ NUCLEAR RESET WARNING: This will permanently delete ALL sessions, attendance records, issues, and vehicles. This action cannot be undone. Are you absolutely sure?")) {
+    if (!window.confirm("☢️ NUCLEAR RESET WARNING: This will permanently delete ALL data. Are you sure?")) {
       return;
     }
 
     setLoading(true);
     try {
-      // Clear all related tables using string comparison filter '.neq'
-      // This matches all rows because no ID will be exactly '0' string
-      console.log("App: Deleting from database...");
       await Promise.all([
         supabase.from('attendance').delete().neq('id', '0'),
         supabase.from('issues').delete().neq('id', '0'),
@@ -439,22 +462,22 @@ const App: React.FC = () => {
         supabase.from('daily_settings').delete().neq('id', '0')
       ]);
 
-      console.log("App: Database calls finished. Updating local state...");
-      
-      // Update local state IMMEDIATELY
+      setActiveAttendance([]);
+      setActiveIssues([]);
+      setActiveVehicles([]);
       setAttendance([]);
       setIssues([]);
       setVehicles([]);
       setAllSessions([]);
-      setSelectedSession(null);
+      setActiveSession(null);
+      setDashboardSelectedSession(null);
       localStorage.removeItem(STORAGE_KEY_SESSION_ID);
       
-      alert("Database wiped successfully. Starting fresh...");
+      alert("Database wiped successfully.");
       setShowSettingsModal(true);
       setActiveView('Attendance');
     } catch (error) {
       console.error("Reset Error:", error);
-      alert("Failed to reset database. Check browser console for details.");
     } finally {
       setLoading(false);
     }
@@ -482,7 +505,6 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
-
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
@@ -491,7 +513,6 @@ const App: React.FC = () => {
                     <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty End</label>
                   <div className="grid grid-cols-2 gap-3">
@@ -500,7 +521,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               <button type="submit" disabled={isSavingSettings || saveSuccess} className="w-full py-5 rounded-[2rem] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-xl">{isSavingSettings ? 'Starting...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty')}</button>
             </form>
           </div>
@@ -522,44 +542,44 @@ const App: React.FC = () => {
         {activeView === 'Attendance' ? (
           <AttendanceManager 
             sewadars={[...INITIAL_SEWADARS, ...customSewadars]} 
-            attendance={attendance} 
+            attendance={activeAttendance} 
             onSaveAttendance={saveAttendance} 
             onSaveVehicle={handleSaveVehicle}
-            vehicles={vehicles}
+            vehicles={activeVehicles}
             onAddSewadar={async (n, g, grp) => {
-              const newSewadar = {
-                id: generateNumericId(),
-                name: n,
-                gender: g,
-                group: grp
-              };
-              
+              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp };
               try {
-                const { error } = await supabase.from('custom_sewadars').insert({
-                  id: newSewadar.id,
-                  name: newSewadar.name,
-                  gender: newSewadar.gender,
-                  group: newSewadar.group
-                });
-                
-                if (error) throw error;
-                
+                await supabase.from('custom_sewadars').insert({ id: newSewadar.id, name: newSewadar.name, gender: newSewadar.gender, group: newSewadar.group });
                 setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
-              } catch (error) {
-                console.error('Failed to add sewadar:', error);
-                alert('Failed to add new member. Please try again.');
-              }
+              } catch (error) { console.error('Failed to add sewadar:', error); }
             }} 
             activeVolunteer={activeVolunteer} 
-            workshopLocation={selectedSession?.location || null} 
-            sessionDate={selectedSession?.date || ''} 
-            dutyStartTime={selectedSession?.start_time || ''} 
-            dutyEndTime={selectedSession?.end_time || ''} 
-            isCompleted={selectedSession?.completed} 
+            workshopLocation={activeSession?.location || null} 
+            sessionDate={activeSession?.date || ''} 
+            dutyStartTime={activeSession?.start_time || ''} 
+            dutyEndTime={activeSession?.end_time || ''} 
+            isCompleted={activeSession?.completed} 
             onChangeLocation={() => setShowSettingsModal(true)} 
           />
         ) : (
-          <Dashboard attendance={attendance} issues={issues} vehicles={vehicles} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={handleSessionChange} onReportIssue={handleReportIssue} onSaveVehicle={handleSaveVehicle} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} onResetAllData={handleResetAllData} />
+          <Dashboard 
+            attendance={attendance} 
+            issues={issues} 
+            vehicles={vehicles} 
+            activeVolunteer={activeVolunteer} 
+            allSessions={allSessions} 
+            selectedSessionId={dashboardSelectedSession?.id || null} 
+            isSessionCompleted={!!dashboardSelectedSession?.completed} 
+            onSessionChange={handleSessionChange} 
+            onReportIssue={handleReportIssue} 
+            onSaveVehicle={handleSaveVehicle} 
+            isLoading={loading} 
+            dutyStartTime={dashboardSelectedSession?.start_time || ''} 
+            dutyEndTime={dashboardSelectedSession?.end_time || ''} 
+            onOpenSettings={() => setShowSettingsModal(true)} 
+            onCompleteSession={handleCompleteSession} 
+            onResetAllData={handleResetAllData} 
+          />
         )}
       </main>
 
