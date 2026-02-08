@@ -148,6 +148,22 @@ const AttendanceManager: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 font-sans max-w-2xl mx-auto">
+      {/* Add Sewadar Modal - Moved out of animated/transformed container for fixed positioning to work correctly */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+              <h2 className="text-2xl font-black text-slate-900">Add New Member</h2>
+              <form onSubmit={handleCreateSewadar} className="space-y-4">
+                 <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full Name" />
+                 <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
+                    <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
       {/* ⚠️ TOGGLE BAR - High Performance UI */}
       <div className="bg-slate-200/50 p-1.5 rounded-[2.5rem] flex items-center shadow-inner gap-1">
         <button 
@@ -176,22 +192,6 @@ const AttendanceManager: React.FC<Props> = ({
 
       {mode === 'ATTENDANCE' ? (
         <div className="space-y-4 animate-fade-in">
-          {/* Add Sewadar Modal */}
-          {showAddModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
-               <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-                  <h2 className="text-2xl font-black text-slate-900">Add New Member</h2>
-                  <form onSubmit={handleCreateSewadar} className="space-y-4">
-                     <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full Name" />
-                     <div className="flex gap-2">
-                        <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
-                        <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
-                     </div>
-                  </form>
-               </div>
-            </div>
-          )}
-
           {/* Session Config Card */}
           <div className={`p-6 rounded-[2.5rem] shadow-sm border flex items-center justify-between ${isCompleted ? 'bg-indigo-50 border-indigo-200' : hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
             <div className="space-y-1">
