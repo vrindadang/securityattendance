@@ -25,6 +25,7 @@ interface Props {
   dutyEndTime: string;
   onOpenSettings: () => void;
   onCompleteSession: (sessionId: string) => void;
+  onResetAllData?: () => void;
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -42,10 +43,12 @@ const Dashboard: React.FC<Props> = ({
   isLoading, 
   dutyStartTime,
   dutyEndTime,
-  onCompleteSession
+  onCompleteSession,
+  onResetAllData
 }) => {
   const [issueDesc, setIssueDesc] = useState('');
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
+  const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
   
   // Vehicle Form state
   const [vType, setVType] = useState<'2-wheeler' | '4-wheeler'>('4-wheeler');
@@ -55,10 +58,6 @@ const Dashboard: React.FC<Props> = ({
 
   const archivedSessions = useMemo(() => {
     return allSessions.filter(s => s.completed);
-  }, [allSessions]);
-
-  const activeSessions = useMemo(() => {
-    return allSessions.filter(s => !s.completed);
   }, [allSessions]);
 
   const formatDateTime = (iso: string) => {
@@ -226,7 +225,7 @@ const Dashboard: React.FC<Props> = ({
         [
           { content: 'Ashram / Location', rowSpan: 2, styles: { valign: 'middle' } },
           { content: 'Sewa Point / Spot', rowSpan: 2, styles: { valign: 'middle' } },
-          { content: 'Number of Sewadars', colSpan: 3, styles: { halign: 'center' } }
+          { content: 'Sewadars per Shift', colSpan: 3, styles: { halign: 'center' } }
         ],
         [
           { content: 'Day', styles: { halign: 'center' } },
@@ -241,9 +240,10 @@ const Dashboard: React.FC<Props> = ({
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // 5. Reported Issues & Incidents
+    // 5. Reported Issues & Incidents (Use autoTable to ensure Y calculation is accurate)
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(0,0,0);
     doc.text("4. Reported Issues & Incidents", 14, currentY);
     
     if (issues.length === 0) {
@@ -255,7 +255,7 @@ const Dashboard: React.FC<Props> = ({
     } else {
       autoTable(doc, {
         startY: currentY + 3,
-        head: [['#', 'Incident Description', 'Time', 'Reported By']],
+        head: [['#', 'Description', 'Time', 'Reported By']],
         body: issues.map((issue, idx) => [
           idx + 1,
           issue.description,
@@ -264,15 +264,12 @@ const Dashboard: React.FC<Props> = ({
         ]),
         headStyles: { fillColor: [180, 0, 0], textColor: 255, fontStyle: 'bold' },
         bodyStyles: { fontSize: 9 },
-        columnStyles: {
-          1: { cellWidth: 100 }
-        },
         theme: 'grid'
       });
       currentY = (doc as any).lastAutoTable.finalY + 12;
     }
 
-    // 6. Vehicle Report Table (Gents Only) - Right below Issues
+    // 6. Vehicle Report Table (Gents Only)
     if (!isLadies) {
       if (currentY > 260) { doc.addPage(); currentY = 20; }
       doc.setFontSize(11);
@@ -292,7 +289,7 @@ const Dashboard: React.FC<Props> = ({
           head: [['S.No', 'Type', 'Vehicle Number', 'Car Model', 'Remarks']],
           body: vehicles.map((v, i) => [
             i + 1, 
-            v.type === '4-wheeler' ? '4-Wheeler' : '2-Wheeler', 
+            v.type === '4-wheeler' ? '4-W' : '2-W', 
             v.plateNumber.toUpperCase(), 
             v.model || '-', 
             v.remarks || '-'
@@ -380,7 +377,6 @@ const Dashboard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Vehicle Form - Gents Only */}
       {activeVolunteer?.assignedGroup !== 'Ladies' && !isSessionCompleted && (
         <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2">
@@ -467,7 +463,7 @@ const Dashboard: React.FC<Props> = ({
             </div>
             {onDeleteIssue && !isSessionCompleted && (
               <button onClick={() => onDeleteIssue(issue.id)} className="text-red-400 hover:text-red-600 p-2">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-11v3M4 7h16" /></svg>
               </button>
             )}
           </div>
@@ -525,9 +521,27 @@ const Dashboard: React.FC<Props> = ({
         )}
       </div>
 
+      {isSuperAdmin && (
+        <div className="mt-12 bg-red-50 p-8 rounded-[2rem] border-2 border-dashed border-red-200">
+          <h3 className="text-red-700 font-black text-sm uppercase mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.268 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            Incharge Controls
+          </h3>
+          <div className="grid grid-cols-1 gap-4">
+            <button 
+              onClick={() => onResetAllData && onResetAllData()} 
+              className="w-full bg-red-600 py-5 rounded-2xl text-white font-black text-[10px] uppercase shadow-xl hover:bg-red-700 transition-all active:scale-95"
+            >
+              Reset System Data (Delete All Sessions)
+            </button>
+          </div>
+          <p className="text-center mt-4 text-[9px] font-bold text-red-400 uppercase tracking-widest">Caution: This deletes all historical records permanentely</p>
+        </div>
+      )}
+
       {showReportConfirmModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 text-center">
+          <div className="bg-white w-full max-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 text-center">
              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-3xl">⚠️</div>
              <h3 className="text-xl font-black text-slate-900">Submit Report?</h3>
              <p className="text-slate-500 text-sm">This incident will be logged in the permanent shift record.</p>

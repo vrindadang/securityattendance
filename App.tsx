@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
@@ -7,6 +8,7 @@ import Login from './components/Login';
 import { supabase } from './supabase';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
+const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
 
 export interface DutySession {
   id: string;
@@ -43,17 +45,19 @@ const App: React.FC = () => {
     return d.toISOString().split('T')[0];
   };
 
-  const getLocalTime = () => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const getTomorrowDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
   };
 
   const [configForm, setConfigForm] = useState({
     locations: [] as string[],
     startDate: getLocalDate(),
-    startTime: getLocalTime(),
-    endDate: getLocalDate(),
-    endTime: '22:00'
+    startTime: '07:00',
+    endDate: getTomorrowDate(),
+    endTime: '07:00'
   });
 
   useEffect(() => {
@@ -63,14 +67,18 @@ const App: React.FC = () => {
           ...prev,
           locations: [...LOCATIONS_LIST],
           startDate: getLocalDate(),
-          startTime: getLocalTime()
+          startTime: '07:00',
+          endDate: getTomorrowDate(),
+          endTime: '07:00'
         }));
       } else {
         setConfigForm(prev => ({
           ...prev,
           locations: [],
           startDate: getLocalDate(),
-          startTime: getLocalTime()
+          startTime: '07:00',
+          endDate: getTomorrowDate(),
+          endTime: '07:00'
         }));
       }
     }
@@ -93,11 +101,19 @@ const App: React.FC = () => {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        setAllSessions(data);
+        const mappedSessions = data.map(s => ({ ...s, id: String(s.id) }));
+        setAllSessions(mappedSessions);
+        
         if (isInitial) {
-          const activeOrFuture = data.find(s => !s.completed);
-          if (activeOrFuture) {
+          const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
+          const activeOrFuture = mappedSessions.find(s => !s.completed);
+          const savedSession = mappedSessions.find(s => s.id === savedSessionId);
+          
+          if (savedSession) {
+            setSelectedSession(savedSession);
+          } else if (activeOrFuture) {
             setSelectedSession(activeOrFuture);
+            localStorage.setItem(STORAGE_KEY_SESSION_ID, activeOrFuture.id);
           } else {
             setSelectedSession(null);
             if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
@@ -135,6 +151,7 @@ const App: React.FC = () => {
       if (attData) {
         setAttendance(attData.map((a: any) => ({
           ...a,
+          id: String(a.id),
           sewadarId: a.sewadar_id,
           volunteerId: a.volunteer_id,
           inTime: a.in_time,
@@ -150,7 +167,7 @@ const App: React.FC = () => {
       const { data: customData } = await supabase.from('custom_sewadars').select('*');
       if (customData) {
         setCustomSewadars(customData.map((s: any) => ({
-          id: s.id,
+          id: String(s.id),
           name: s.name,
           gender: s.gender as Gender,
           group: s.group as GentsGroup | 'Ladies',
@@ -166,7 +183,7 @@ const App: React.FC = () => {
 
       if (issuesData) {
         setIssues(issuesData.map((i: any) => ({
-          id: i.id,
+          id: String(i.id),
           description: i.description,
           photo: i.photo,
           timestamp: i.timestamp,
@@ -185,7 +202,7 @@ const App: React.FC = () => {
 
       if (vData) {
         setVehicles(vData.map((v: any) => ({
-          id: v.id,
+          id: String(v.id),
           type: v.type,
           plateNumber: v.plate_number,
           model: v.model,
@@ -215,21 +232,32 @@ const App: React.FC = () => {
     fetchData();
   }, [selectedSession?.id, fetchData]);
 
+  const generateNumericId = () => {
+    return Date.now().toString() + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  };
+
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
     if (!selectedSession || selectedSession.completed) return;
     const sessionDate = selectedSession.date;
     const sessionGroup = selectedSession.group;
 
     if (isDelete && recordId) {
-      setAttendance(prev => prev.filter(a => a.id !== recordId));
-      await supabase.from('attendance').delete().eq('id', recordId);
+      try {
+        const { error } = await supabase.from('attendance').delete().eq('id', recordId);
+        if (error) throw error;
+        setAttendance(prev => prev.filter(a => a.id !== recordId));
+      } catch (error) {
+        console.error('Failed to delete attendance:', error);
+        alert('Failed to delete attendance. Please try again.');
+      }
       return;
     }
 
     const sewadar = [...INITIAL_SEWADARS, ...customSewadars].find(s => s.id === sewadarId);
     if (!sewadar) return;
 
-    const finalRecordId = recordId || `att-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const isExisting = !!recordId;
+    const finalRecordId = recordId || generateNumericId();
 
     const dbPayload = {
       id: finalRecordId,
@@ -239,12 +267,12 @@ const App: React.FC = () => {
       gender: sewadar.gender,
       date: sessionDate, 
       timestamp: Date.now(), 
-      volunteer_id: activeVolunteer?.id,
-      in_time: details.inTime, 
-      out_time: details.outTime, 
-      sewa_points: details.sewaPoint,
-      workshop_location: details.workshopLocation, 
-      is_proper_uniform: details.isProperUniform 
+      volunteer_id: activeVolunteer?.id || '',
+      in_time: details.inTime || '', 
+      out_time: details.outTime || '', 
+      sewa_points: details.sewaPoint || '',
+      workshop_location: details.workshopLocation || '', 
+      is_proper_uniform: details.isProperUniform ?? true 
     };
 
     const newRecord: AttendanceRecord = {
@@ -256,26 +284,41 @@ const App: React.FC = () => {
       date: sessionDate, 
       timestamp: dbPayload.timestamp,
       volunteerId: activeVolunteer?.id || '', 
-      inTime: details.inTime, 
-      outTime: details.outTime,
-      sewaPoint: details.sewaPoint, 
-      workshopLocation: details.workshopLocation, 
-      isProperUniform: details.isProperUniform
+      inTime: details.inTime || '', 
+      outTime: details.outTime || '',
+      sewaPoint: details.sewaPoint || '', 
+      workshopLocation: details.workshopLocation || '', 
+      isProperUniform: details.isProperUniform ?? true
     };
 
-    setAttendance(prev => {
-      const filtered = prev.filter(a => a.id !== finalRecordId);
-      return [...filtered, newRecord];
-    });
+    try {
+      let result;
+      if (isExisting) {
+        result = await supabase.from('attendance').update(dbPayload).eq('id', finalRecordId);
+      } else {
+        result = await supabase.from('attendance').insert(dbPayload);
+      }
 
-    await supabase.from('attendance').upsert(dbPayload, { onConflict: 'id' });
+      if (result.error) throw result.error;
+      
+      setAttendance(prev => {
+        const filtered = prev.filter(a => a.id !== finalRecordId);
+        return [...filtered, newRecord];
+      });
+    } catch (error) {
+      console.error('Failed to save attendance:', error);
+      alert('Failed to save attendance. Please try again.');
+    }
   };
 
   const handleReportIssue = async (description: string) => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
     const newIssue: Issue = {
-      id: `issue-${Date.now()}`, description, timestamp: Date.now(),
-      volunteerId: activeVolunteer.id, volunteerName: activeVolunteer.name
+      id: generateNumericId(), 
+      description, 
+      timestamp: Date.now(),
+      volunteerId: activeVolunteer.id, 
+      volunteerName: activeVolunteer.name
     };
     setIssues(prev => [...prev, newIssue]);
     await supabase.from('issues').insert({
@@ -289,7 +332,7 @@ const App: React.FC = () => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
     const newV: VehicleRecord = {
       ...v,
-      id: `v-${Date.now()}`,
+      id: generateNumericId(),
       timestamp: Date.now(),
       volunteerId: activeVolunteer.id,
       volunteerName: activeVolunteer.name
@@ -320,8 +363,10 @@ const App: React.FC = () => {
       };
       const { data } = await supabase.from('daily_settings').insert(payload).select('*');
       if (data && data.length > 0) {
-        setAllSessions(prev => [data[0], ...prev]);
-        setSelectedSession(data[0]);
+        const mappedSession = { ...data[0], id: String(data[0].id) };
+        setAllSessions(prev => [mappedSession, ...prev]);
+        setSelectedSession(mappedSession);
+        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
         setSaveSuccess(true);
         setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       }
@@ -333,9 +378,59 @@ const App: React.FC = () => {
       await supabase.from('daily_settings').update({ completed: true }).eq('id', sessionId);
       setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
       setSelectedSession(null);
+      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
       setActiveView('Attendance');
     } catch (err) { alert("Error finalizing duty."); }
   };
+
+  const handleSessionChange = (id: string) => {
+    const session = allSessions.find(s => s.id === id) || null;
+    setSelectedSession(session);
+    if (session) {
+      localStorage.setItem(STORAGE_KEY_SESSION_ID, id);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+    }
+  };
+
+  const handleResetAllData = useCallback(async () => {
+    console.log("App: Reset process starting...");
+    if (!window.confirm("☢️ NUCLEAR RESET WARNING: This will permanently delete ALL sessions, attendance records, issues, and vehicles. This action cannot be undone. Are you absolutely sure?")) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Clear all related tables using string comparison filter '.neq'
+      // This matches all rows because no ID will be exactly '0' string
+      console.log("App: Deleting from database...");
+      await Promise.all([
+        supabase.from('attendance').delete().neq('id', '0'),
+        supabase.from('issues').delete().neq('id', '0'),
+        supabase.from('vehicles').delete().neq('id', '0'),
+        supabase.from('daily_settings').delete().neq('id', '0')
+      ]);
+
+      console.log("App: Database calls finished. Updating local state...");
+      
+      // Update local state IMMEDIATELY
+      setAttendance([]);
+      setIssues([]);
+      setVehicles([]);
+      setAllSessions([]);
+      setSelectedSession(null);
+      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+      
+      alert("Database wiped successfully. Starting fresh...");
+      setShowSettingsModal(true);
+      setActiveView('Attendance');
+    } catch (error) {
+      console.error("Reset Error:", error);
+      alert("Failed to reset database. Check browser console for details.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   if (!activeVolunteer) return <Login onLogin={v => { setActiveVolunteer(v); localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); }} />;
 
@@ -391,15 +486,50 @@ const App: React.FC = () => {
             <p className="text-[10px] font-black text-slate-900">{activeVolunteer.name}</p>
             <p className="text-[8px] font-bold text-indigo-500 uppercase">{activeVolunteer.role}</p>
           </div>
-          <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
+          <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); localStorage.removeItem(STORAGE_KEY_SESSION_ID); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto px-6 pt-6 pb-24 no-scrollbar">
         {activeView === 'Attendance' ? (
-          <AttendanceManager sewadars={[...INITIAL_SEWADARS, ...customSewadars]} attendance={attendance} onSaveAttendance={saveAttendance} onAddSewadar={(n, g, grp) => {}} activeVolunteer={activeVolunteer} workshopLocation={selectedSession?.location || null} sessionDate={selectedSession?.date || ''} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} isCompleted={selectedSession?.completed} onChangeLocation={() => setShowSettingsModal(true)} />
+          <AttendanceManager 
+            sewadars={[...INITIAL_SEWADARS, ...customSewadars]} 
+            attendance={attendance} 
+            onSaveAttendance={saveAttendance} 
+            onAddSewadar={async (n, g, grp) => {
+              const newSewadar = {
+                id: generateNumericId(),
+                name: n,
+                gender: g,
+                group: grp
+              };
+              
+              try {
+                const { error } = await supabase.from('custom_sewadars').insert({
+                  id: newSewadar.id,
+                  name: newSewadar.name,
+                  gender: newSewadar.gender,
+                  group: newSewadar.group
+                });
+                
+                if (error) throw error;
+                
+                setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
+              } catch (error) {
+                console.error('Failed to add sewadar:', error);
+                alert('Failed to add new member. Please try again.');
+              }
+            }} 
+            activeVolunteer={activeVolunteer} 
+            workshopLocation={selectedSession?.location || null} 
+            sessionDate={selectedSession?.date || ''} 
+            dutyStartTime={selectedSession?.start_time || ''} 
+            dutyEndTime={selectedSession?.end_time || ''} 
+            isCompleted={selectedSession?.completed} 
+            onChangeLocation={() => setShowSettingsModal(true)} 
+          />
         ) : (
-          <Dashboard attendance={attendance} issues={issues} vehicles={vehicles} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={id => setSelectedSession(allSessions.find(s => s.id === id) || null)} onReportIssue={handleReportIssue} onSaveVehicle={handleSaveVehicle} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} />
+          <Dashboard attendance={attendance} issues={issues} vehicles={vehicles} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={handleSessionChange} onReportIssue={handleReportIssue} onSaveVehicle={handleSaveVehicle} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} onResetAllData={handleResetAllData} />
         )}
       </main>
 
