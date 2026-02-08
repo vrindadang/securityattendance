@@ -336,11 +336,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleReportIssue = async (description: string) => {
+  const handleReportIssue = async (description: string, photo?: string) => {
     if (!activeVolunteer || !activeSession || activeSession.completed) return;
     const newIssue: Issue = {
       id: generateNumericId(), 
       description, 
+      photo,
       timestamp: Date.now(),
       volunteerId: activeVolunteer.id, 
       volunteerName: activeVolunteer.name
@@ -351,7 +352,7 @@ const App: React.FC = () => {
     }
     await supabase.from('issues').insert({
       id: newIssue.id, date: activeSession.date, group: activeSession.group,
-      description: newIssue.description, timestamp: newIssue.timestamp,
+      description: newIssue.description, photo: newIssue.photo, timestamp: newIssue.timestamp,
       volunteer_id: newIssue.volunteerId, volunteer_name: newIssue.volunteerName
     });
   };
