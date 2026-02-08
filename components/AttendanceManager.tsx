@@ -46,6 +46,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [editLocation, setEditLocation] = useState('');
   const [editPoint, setEditPoint] = useState('');
   const [editProperUniform, setEditProperUniform] = useState(true);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
 
   // States for adding new sewadar
   const [showAddModal, setShowAddModal] = useState(false);
@@ -89,9 +90,26 @@ const AttendanceManager: React.FC<Props> = ({
     if (isLocked) return;
     if (expandedId === s.id) {
       setExpandedId(null);
+      setEditingRecordId(null);
       return;
     }
-    resetForm();
+    
+    // Check for an incomplete record (missing out-time) for today
+    const recordsForToday = attendance.filter(a => a.sewadarId === s.id && a.date === sessionDate);
+    const incomplete = recordsForToday.find(r => !r.outTime);
+
+    if (incomplete) {
+      // Auto-load incomplete record for editing
+      setEditInTime(incomplete.inTime || '');
+      setEditOutTime(incomplete.outTime || '');
+      setEditLocation(incomplete.workshopLocation || '');
+      setEditPoint(incomplete.sewaPoint || '');
+      setEditProperUniform(incomplete.isProperUniform ?? true);
+      setEditingRecordId(incomplete.id);
+    } else {
+      resetForm();
+    }
+    
     setExpandedId(s.id);
   };
 
@@ -102,29 +120,30 @@ const AttendanceManager: React.FC<Props> = ({
     setEditLocation(availableLocs[0] || '');
     setEditPoint('');
     setEditProperUniform(true);
+    setEditingRecordId(null);
   };
 
   const handleSaveAndAnother = (sewadarId: string) => {
-    if (isLocked) return;
+    if (isLocked || !editInTime || !editOutTime) return;
     onSaveAttendance(sewadarId, {
       inTime: editInTime,
       outTime: editOutTime,
       sewaPoint: editPoint,
       workshopLocation: editLocation,
       isProperUniform: editProperUniform
-    });
+    }, editingRecordId || undefined);
     resetForm();
   };
 
   const handleSaveAndClose = (sewadarId: string) => {
-    if (isLocked) return;
+    if (isLocked || !editInTime) return;
     onSaveAttendance(sewadarId, {
       inTime: editInTime,
       outTime: editOutTime,
       sewaPoint: editPoint,
       workshopLocation: editLocation,
       isProperUniform: editProperUniform
-    });
+    }, editingRecordId || undefined);
     setExpandedId(null);
   };
 
@@ -264,13 +283,28 @@ const AttendanceManager: React.FC<Props> = ({
                             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Assignments</h3>
                             <div className="space-y-2">
                               {records.map(rec => (
-                                <div key={rec.id} className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between border border-slate-100">
+                                <div 
+                                  key={rec.id} 
+                                  onClick={() => {
+                                    if (isLocked) return;
+                                    setEditInTime(rec.inTime || '');
+                                    setEditOutTime(rec.outTime || '');
+                                    setEditLocation(rec.workshopLocation || '');
+                                    setEditPoint(rec.sewaPoint || '');
+                                    setEditProperUniform(rec.isProperUniform ?? true);
+                                    setEditingRecordId(rec.id);
+                                  }}
+                                  className={`p-4 rounded-2xl flex items-center justify-between border cursor-pointer transition-all ${editingRecordId === rec.id ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-slate-50 border-slate-100 hover:bg-white'}`}
+                                >
                                    <div className="space-y-1">
                                       <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
                                       <p className="text-[10px] font-bold text-slate-400">{rec.inTime} to {rec.outTime || 'On Duty'}</p>
                                    </div>
-                                   <button onClick={() => onSaveAttendance(s.id, {}, rec.id, true)} className="p-2 text-red-300 hover:text-red-500 transition-colors">
-                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                                   <button 
+                                     onClick={(e) => { e.stopPropagation(); onSaveAttendance(s.id, {}, rec.id, true); }} 
+                                     className="p-2 text-red-300 hover:text-red-500 transition-colors"
+                                   >
+                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
                                    </button>
                                 </div>
                               ))}
@@ -280,7 +314,9 @@ const AttendanceManager: React.FC<Props> = ({
 
                         {/* Form for new assignment */}
                         <div className="space-y-6 pt-4 border-t-2 border-slate-50">
-                           <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1">Mark New Duty Point</h3>
+                           <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1">
+                             {editingRecordId ? 'Update Duty Point' : 'Mark New Duty Point'}
+                           </h3>
                            <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">
                                  <div className="space-y-1.5">
@@ -372,13 +408,21 @@ const AttendanceManager: React.FC<Props> = ({
                            </div>
 
                            <div className="flex flex-col gap-3 pt-4">
-                              <button onClick={() => handleSaveAndAnother(s.id)} className="w-full py-5 bg-indigo-100 text-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm active:scale-95 transition-all">
-                                 + Add Another Duty Point
+                              <button 
+                                disabled={!editInTime || !editOutTime}
+                                onClick={() => handleSaveAndAnother(s.id)} 
+                                className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${(!editInTime || !editOutTime) ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-100 text-indigo-600 shadow-sm active:scale-95'}`}
+                              >
+                                 {editingRecordId ? 'Update & Add Another' : '+ Add Another Duty Point'}
                               </button>
-                              <button onClick={() => handleSaveAndClose(s.id)} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                                 Confirm & Done
+                              <button 
+                                disabled={!editInTime}
+                                onClick={() => handleSaveAndClose(s.id)} 
+                                className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${!editInTime ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-600 text-white shadow-xl active:scale-95'}`}
+                              >
+                                 {editingRecordId ? 'Update & Close' : 'Confirm & Done'}
                               </button>
-                              <button onClick={() => setExpandedId(null)} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel / Close</button>
+                              <button onClick={() => { setExpandedId(null); setEditingRecordId(null); }} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel / Close</button>
                            </div>
                         </div>
                       </div>
