@@ -167,7 +167,7 @@ const AttendanceManager: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 font-sans max-w-2xl mx-auto">
-      {/* Add Sewadar Modal - Moved out of animated/transformed container for fixed positioning to work correctly */}
+      {/* Add Sewadar Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
@@ -183,7 +183,7 @@ const AttendanceManager: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ⚠️ TOGGLE BAR - High Performance UI */}
+      {/* Toggle Bar */}
       <div className="bg-slate-200/50 p-1.5 rounded-[2.5rem] flex items-center shadow-inner gap-1">
         <button 
           onClick={() => setMode('ATTENDANCE')}
@@ -436,78 +436,68 @@ const AttendanceManager: React.FC<Props> = ({
       ) : (
         /* VEHICLE REPORTING VIEW */
         <div className="space-y-6 animate-fade-in pb-12">
-          {activeVolunteer?.assignedGroup !== 'Ladies' ? (
-            <>
-              {!isCompleted && (
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Flag Vehicle Report</h3>
-                  </div>
-
-                  <form onSubmit={handleVehicleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-3">
-                      <button type="button" onClick={() => setVType('4-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '4-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🚗 4-Wheeler</button>
-                      <button type="button" onClick={() => setVType('2-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '2-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🏍️ 2-Wheeler</button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Vehicle Number</label>
-                        <input type="text" placeholder="e.g. DL12JU7485" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm uppercase outline-none focus:border-indigo-500 transition-all" value={vPlate} onChange={e => setVPlate(e.target.value)} required />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Car / Bike Model</label>
-                        <input type="text" placeholder="e.g. Maruti Swift..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-500 transition-all" value={vModel} onChange={e => setVModel(e.target.value)} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Observations / Remarks</label>
-                      <textarea placeholder="Observations / Reason for flagging..." className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all" value={vRemarks} onChange={e => setVRemarks(e.target.value)} rows={3} />
-                    </div>
-
-                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                      Log Vehicle Entry
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {/* Session Vehicle Logs - FIXED Display logic */}
-              <div className="space-y-3">
-                <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Logged entries for this session
-                </h3>
-                {vehicles.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3">
-                    {vehicles.slice().reverse().map((v, i) => (
-                      <div key={v.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all">
-                         <div className="space-y-1">
-                           <p className="font-black text-slate-900 text-sm">{vehicles.length - i}. {v.plateNumber} ({v.type === '4-wheeler' ? '4-W' : '2-W'})</p>
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{v.model || 'Unknown Model'}</p>
-                           {v.remarks && <p className="text-xs text-slate-500 mt-2 italic">"{v.remarks}"</p>}
-                         </div>
-                         <div className="text-right">
-                           <p className="text-[10px] font-black text-slate-300 uppercase">{new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No vehicle incidents logged for this session</p>
-                  </div>
-                )}
+          {!isCompleted && (
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Flag Vehicle Report</h3>
               </div>
-            </>
-          ) : (
-            <div className="bg-white p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
-              <div className="text-4xl mb-4">🚫</div>
-              <h3 className="text-xl font-black text-slate-900">Restricted Section</h3>
-              <p className="text-slate-400 text-xs font-bold uppercase mt-2 tracking-widest">Vehicle reports are not active for Ladies portal</p>
+
+              <form onSubmit={handleVehicleSubmit} className="space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setVType('4-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '4-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🚗 4-Wheeler</button>
+                  <button type="button" onClick={() => setVType('2-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '2-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🏍️ 2-Wheeler</button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Vehicle Number</label>
+                    <input type="text" placeholder="e.g. DL12JU7485" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm uppercase outline-none focus:border-indigo-500 transition-all" value={vPlate} onChange={e => setVPlate(e.target.value)} required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Car / Bike Model</label>
+                    <input type="text" placeholder="e.g. Maruti Swift..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-500 transition-all" value={vModel} onChange={e => setVModel(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Observations / Remarks</label>
+                  <textarea placeholder="Observations / Reason for flagging..." className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all" value={vRemarks} onChange={e => setVRemarks(e.target.value)} rows={3} />
+                </div>
+
+                <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                  Log Vehicle Entry
+                </button>
+              </form>
             </div>
           )}
+
+          {/* Session Vehicle Logs */}
+          <div className="space-y-3">
+            <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Logged entries for this session
+            </h3>
+            {vehicles.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3">
+                {vehicles.slice().reverse().map((v, i) => (
+                  <div key={v.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all">
+                     <div className="space-y-1">
+                       <p className="font-black text-slate-900 text-sm">{vehicles.length - i}. {v.plateNumber} ({v.type === '4-wheeler' ? '4-W' : '2-W'})</p>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{v.model || 'Unknown Model'}</p>
+                       {v.remarks && <p className="text-xs text-slate-500 mt-2 italic">"{v.remarks}"</p>}
+                     </div>
+                     <div className="text-right">
+                       <p className="text-[10px] font-black text-slate-300 uppercase">{new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                     </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-50 p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
+                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No vehicle incidents logged for this session</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
