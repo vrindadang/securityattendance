@@ -38,9 +38,7 @@ const Dashboard: React.FC<Props> = ({
   isSessionCompleted,
   onSessionChange,
   onReportIssue,
-  onSaveVehicle,
   onDeleteIssue,
-  isLoading, 
   dutyStartTime,
   dutyEndTime,
   onCompleteSession,
@@ -50,12 +48,6 @@ const Dashboard: React.FC<Props> = ({
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
   const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
   
-  // Vehicle Form state
-  const [vType, setVType] = useState<'2-wheeler' | '4-wheeler'>('4-wheeler');
-  const [vPlate, setVPlate] = useState('');
-  const [vModel, setVModel] = useState('');
-  const [vRemarks, setVRemarks] = useState('');
-
   const archivedSessions = useMemo(() => {
     return allSessions.filter(s => s.completed);
   }, [allSessions]);
@@ -340,15 +332,6 @@ const Dashboard: React.FC<Props> = ({
     setShowReportConfirmModal(false);
   };
 
-  const handleVehicleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!vPlate.trim()) return;
-    onSaveVehicle({ type: vType, plateNumber: vPlate, model: vModel, remarks: vRemarks });
-    setVPlate('');
-    setVModel('');
-    setVRemarks('');
-  };
-
   return (
     <div className="space-y-6 animate-fade-in pb-24">
       <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl">
@@ -376,41 +359,6 @@ const Dashboard: React.FC<Props> = ({
           <p className="text-4xl font-black text-amber-600">{issues.length}</p>
         </div>
       </div>
-
-      {activeVolunteer?.assignedGroup !== 'Ladies' && !isSessionCompleted && (
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-lg">🚔</div>
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Flag Vehicle Report</h3>
-          </div>
-          <form onSubmit={handleVehicleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <button type="button" onClick={() => setVType('4-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '4-wheeler' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🚗 4-Wheeler</button>
-              <button type="button" onClick={() => setVType('2-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '2-wheeler' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🏍️ 2-Wheeler</button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <input type="text" placeholder="Vehicle Number" className="px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm uppercase outline-none focus:border-indigo-500" value={vPlate} onChange={e => setVPlate(e.target.value)} required />
-              <input type="text" placeholder="Car/Bike Model" className="px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-500" value={vModel} onChange={e => setVModel(e.target.value)} />
-            </div>
-            <textarea placeholder="Observations / Reason for flagging..." className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500" value={vRemarks} onChange={e => setVRemarks(e.target.value)} rows={2} />
-            <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Log Vehicle Entry</button>
-          </form>
-          
-          {vehicles.length > 0 && (
-            <div className="space-y-2 mt-4 pt-4 border-t border-slate-50">
-               {vehicles.map((v, i) => (
-                 <div key={v.id} className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between border border-slate-100">
-                    <div>
-                      <p className="font-black text-xs text-slate-900">{i+1}. {v.plateNumber.toUpperCase()} ({v.type === '4-wheeler' ? '4-W' : '2-W'})</p>
-                      <p className="text-[10px] font-bold text-slate-400">{v.model || 'Unknown Model'} • {v.remarks}</p>
-                    </div>
-                    <div className="text-[10px] font-black text-slate-300">LOGGED</div>
-                 </div>
-               ))}
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Active Session</label>
@@ -463,7 +411,7 @@ const Dashboard: React.FC<Props> = ({
             </div>
             {onDeleteIssue && !isSessionCompleted && (
               <button onClick={() => onDeleteIssue(issue.id)} className="text-red-400 hover:text-red-600 p-2">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-11v3M4 7h16" /></svg>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
               </button>
             )}
           </div>

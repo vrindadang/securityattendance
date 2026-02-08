@@ -496,6 +496,8 @@ const App: React.FC = () => {
             sewadars={[...INITIAL_SEWADARS, ...customSewadars]} 
             attendance={attendance} 
             onSaveAttendance={saveAttendance} 
+            onSaveVehicle={handleSaveVehicle}
+            vehicles={vehicles}
             onAddSewadar={async (n, g, grp) => {
               const newSewadar = {
                 id: generateNumericId(),
