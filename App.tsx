@@ -330,20 +330,48 @@ const App: React.FC = () => {
 
   const handleSaveVehicle = async (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => {
     if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    
+    // Normalize plate number to uppercase
+    const cleanPlate = v.plateNumber.toUpperCase().trim();
+    
     const newV: VehicleRecord = {
       ...v,
+      plateNumber: cleanPlate,
       id: generateNumericId(),
       timestamp: Date.now(),
       volunteerId: activeVolunteer.id,
       volunteerName: activeVolunteer.name
     };
-    setVehicles(prev => [...prev, newV]);
-    await supabase.from('vehicles').insert({
-      id: newV.id, date: selectedSession.date, group: selectedSession.group,
-      type: newV.type, plate_number: newV.plateNumber, model: newV.model,
-      remarks: newV.remarks, timestamp: newV.timestamp,
-      volunteer_id: newV.volunteerId, volunteer_name: newV.volunteerName
-    });
+
+    try {
+      // Optimistic update
+      setVehicles(prev => [...prev, newV]);
+
+      const { error } = await supabase.from('vehicles').insert({
+        id: newV.id, 
+        date: selectedSession.date, 
+        group: selectedSession.group,
+        type: newV.type, 
+        plate_number: cleanPlate, 
+        model: newV.model,
+        remarks: newV.remarks, 
+        timestamp: newV.timestamp,
+        volunteer_id: newV.volunteerId, 
+        volunteer_name: newV.volunteerName
+      });
+
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Failed to save vehicle log:", err);
+      // Revert optimistic update
+      setVehicles(prev => prev.filter(item => item.id !== newV.id));
+      
+      if (err.message && err.message.includes('cache')) {
+        alert("Database Error: The 'vehicles' table is missing in your Supabase project. Please run the SQL setup script.");
+      } else {
+        alert("Database Error: Failed to save vehicle record. Please check your connection.");
+      }
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {

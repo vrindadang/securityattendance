@@ -394,43 +394,47 @@ const AttendanceManager: React.FC<Props> = ({
         <div className="space-y-6 animate-fade-in pb-12">
           {activeVolunteer?.assignedGroup !== 'Ladies' ? (
             <>
-              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Flag Vehicle Report</h3>
+              {!isCompleted && (
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Flag Vehicle Report</h3>
+                  </div>
+
+                  <form onSubmit={handleVehicleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-2 gap-3">
+                      <button type="button" onClick={() => setVType('4-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '4-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🚗 4-Wheeler</button>
+                      <button type="button" onClick={() => setVType('2-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '2-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🏍️ 2-Wheeler</button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Vehicle Number</label>
+                        <input type="text" placeholder="e.g. DL12JU7485" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm uppercase outline-none focus:border-indigo-500 transition-all" value={vPlate} onChange={e => setVPlate(e.target.value)} required />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Car / Bike Model</label>
+                        <input type="text" placeholder="e.g. Maruti Swift..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-500 transition-all" value={vModel} onChange={e => setVModel(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Observations / Remarks</label>
+                      <textarea placeholder="Observations / Reason for flagging..." className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all" value={vRemarks} onChange={e => setVRemarks(e.target.value)} rows={3} />
+                    </div>
+
+                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                      Log Vehicle Entry
+                    </button>
+                  </form>
                 </div>
+              )}
 
-                <form onSubmit={handleVehicleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-3">
-                    <button type="button" onClick={() => setVType('4-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '4-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🚗 4-Wheeler</button>
-                    <button type="button" onClick={() => setVType('2-wheeler')} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${vType === '2-wheeler' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>🏍️ 2-Wheeler</button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Vehicle Number</label>
-                      <input type="text" placeholder="e.g. DL12JU7485" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm uppercase outline-none focus:border-indigo-500 transition-all" value={vPlate} onChange={e => setVPlate(e.target.value)} required />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Car / Bike Model</label>
-                      <input type="text" placeholder="e.g. Maruti Swift..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none focus:border-indigo-500 transition-all" value={vModel} onChange={e => setVModel(e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Observations / Remarks</label>
-                    <textarea placeholder="Observations / Reason for flagging..." className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all" value={vRemarks} onChange={e => setVRemarks(e.target.value)} rows={3} />
-                  </div>
-
-                  <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                    Log Vehicle Entry
-                  </button>
-                </form>
-              </div>
-
-              {/* Today's Vehicle Logs */}
+              {/* Session Vehicle Logs - FIXED Display logic */}
               <div className="space-y-3">
-                <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Incident Logs (Today)</h3>
+                <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Logged entries for this session
+                </h3>
                 {vehicles.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
                     {vehicles.slice().reverse().map((v, i) => (
@@ -448,7 +452,7 @@ const AttendanceManager: React.FC<Props> = ({
                   </div>
                 ) : (
                   <div className="bg-slate-50 p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200">
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No vehicle incidents logged</p>
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">No vehicle incidents logged for this session</p>
                   </div>
                 )}
               </div>
