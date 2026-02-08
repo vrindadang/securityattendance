@@ -8,7 +8,7 @@ import Login from './components/Login';
 import { supabase } from './supabase';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
-const STORAGE_KEY_VIEW_SESSION_ID = 'skrm_view_session_id';
+const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
 
 export interface DutySession {
   id: string;
@@ -27,26 +27,17 @@ const App: React.FC = () => {
   });
 
   const [activeView, setActiveView] = useState<ViewState>('Attendance');
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
-  // SESSIONS
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
-  const [activeSession, setActiveSession] = useState<DutySession | null>(null);
-  const [viewSession, setViewSession] = useState<DutySession | null>(null);
-
-  // DATA BUCKETS
-  const [activeAttendance, setActiveAttendance] = useState<AttendanceRecord[]>([]);
-  const [activeIssues, setActiveIssues] = useState<Issue[]>([]);
-  const [activeVehicles, setActiveVehicles] = useState<VehicleRecord[]>([]);
-
-  const [viewAttendance, setViewAttendance] = useState<AttendanceRecord[]>([]);
-  const [viewIssues, setViewIssues] = useState<Issue[]>([]);
-  const [viewVehicles, setViewVehicles] = useState<VehicleRecord[]>([]);
-
-  const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
+  const [selectedSession, setSelectedSession] = useState<DutySession | null>(null);
 
   const getLocalDate = () => {
     const d = new Date();
@@ -69,7 +60,31 @@ const App: React.FC = () => {
     endTime: '07:00'
   });
 
-  const fetchSessions = useCallback(async () => {
+  useEffect(() => {
+    if (showSettingsModal && activeVolunteer) {
+      if (activeVolunteer.assignedGroup === 'Ladies') {
+        setConfigForm(prev => ({
+          ...prev,
+          locations: [...LOCATIONS_LIST],
+          startDate: getLocalDate(),
+          startTime: '07:00',
+          endDate: getTomorrowDate(),
+          endTime: '07:00'
+        }));
+      } else {
+        setConfigForm(prev => ({
+          ...prev,
+          locations: [],
+          startDate: getLocalDate(),
+          startTime: '07:00',
+          endDate: getTomorrowDate(),
+          endTime: '07:00'
+        }));
+      }
+    }
+  }, [showSettingsModal, activeVolunteer]);
+
+  const fetchSessions = useCallback(async (isInitial = false) => {
     if (!activeVolunteer) return;
     
     try {
@@ -82,146 +97,289 @@ const App: React.FC = () => {
       }
       
       const { data, error } = await query.order('start_time', { ascending: false });
+      
       if (error) throw error;
       
-      if (data) {
-        const mapped = data.map(s => ({ ...s, id: String(s.id) }));
-        setAllSessions(mapped);
+      if (data && data.length > 0) {
+        const mappedSessions = data.map(s => ({ ...s, id: String(s.id) }));
+        setAllSessions(mappedSessions);
         
-        // Find the single uncompleted active session
-        const active = mapped.find(s => !s.completed) || null;
-        setActiveSession(active);
-
-        // Dashboard View Session (defaults to active or most recent)
-        const savedViewId = localStorage.getItem(STORAGE_KEY_VIEW_SESSION_ID);
-        const savedView = mapped.find(s => s.id === savedViewId);
-        setViewSession(savedView || active || mapped[0] || null);
+        if (isInitial) {
+          const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
+          const activeOrFuture = mappedSessions.find(s => !s.completed);
+          const savedSession = mappedSessions.find(s => s.id === savedSessionId);
+          
+          if (savedSession) {
+            setSelectedSession(savedSession);
+          } else if (activeOrFuture) {
+            setSelectedSession(activeOrFuture);
+            localStorage.setItem(STORAGE_KEY_SESSION_ID, activeOrFuture.id);
+          } else {
+            setSelectedSession(null);
+            if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
+          }
+        }
+      } else {
+        setAllSessions([]);
+        setSelectedSession(null);
+        if (isInitial && activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
       }
     } catch (err) {
       console.error("Fetch Sessions Error:", err);
     }
   }, [activeVolunteer]);
 
-  const fetchSessionData = async (session: DutySession | null, setAtt: any, setIss: any, setVeh: any) => {
-    if (!session) {
-      setAtt([]); setIss([]); setVeh([]);
+  const fetchData = useCallback(async () => {
+    if (!activeVolunteer || !selectedSession) {
+      setAttendance([]);
+      setIssues([]);
+      setVehicles([]);
       return;
     }
+    setLoading(true);
+    
     try {
-      const { data: att } = await supabase.from('attendance').select('*').eq('date', session.date).eq('group', session.group);
-      if (att) {
-        setAtt(att.map((a: any) => ({
-          ...a, id: String(a.id), sewadarId: a.sewadar_id, volunteerId: a.volunteer_id,
-          inTime: a.in_time, outTime: a.out_time, sewaPoint: a.sewa_points,
-          workshopLocation: a.workshop_location, isProperUniform: a.is_proper_uniform 
+      const sessionDate = selectedSession.date;
+      const sessionGroup = selectedSession.group;
+
+      const { data: attData } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('date', sessionDate)
+        .eq('group', sessionGroup);
+
+      if (attData) {
+        setAttendance(attData.map((a: any) => ({
+          ...a,
+          id: String(a.id),
+          sewadarId: a.sewadar_id,
+          volunteerId: a.volunteer_id,
+          inTime: a.in_time,
+          outTime: a.out_time,
+          sewaPoint: a.sewa_points,
+          workshopLocation: a.workshop_location,
+          isProperUniform: a.is_proper_uniform 
+        })));
+      } else {
+        setAttendance([]);
+      }
+
+      const { data: customData } = await supabase.from('custom_sewadars').select('*');
+      if (customData) {
+        setCustomSewadars(customData.map((s: any) => ({
+          id: String(s.id),
+          name: s.name,
+          gender: s.gender as Gender,
+          group: s.group as GentsGroup | 'Ladies',
+          isCustom: true
         })));
       }
 
-      const { data: iss } = await supabase.from('issues').select('*').eq('date', session.date).eq('group', session.group);
-      if (iss) {
-        setIss(iss.map((i: any) => ({
-          id: String(i.id), description: i.description, photo: i.photo, timestamp: i.timestamp,
-          volunteerId: i.volunteer_id, volunteerName: i.volunteer_name
+      const { data: issuesData } = await supabase
+        .from('issues')
+        .select('*')
+        .eq('date', sessionDate)
+        .eq('group', sessionGroup);
+
+      if (issuesData) {
+        setIssues(issuesData.map((i: any) => ({
+          id: String(i.id),
+          description: i.description,
+          photo: i.photo,
+          timestamp: i.timestamp,
+          volunteerId: i.volunteer_id,
+          volunteerName: i.volunteer_name
         })));
+      } else {
+        setIssues([]);
       }
 
-      const { data: veh } = await supabase.from('vehicles').select('*').eq('date', session.date).eq('group', session.group);
-      if (veh) {
-        setVeh(veh.map((v: any) => ({
-          id: String(v.id), type: v.type, plateNumber: v.plate_number, model: v.model,
-          remarks: v.remarks, timestamp: v.timestamp, volunteerId: v.volunteer_id, volunteerName: v.volunteer_name
+      const { data: vData } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('date', sessionDate)
+        .eq('group', sessionGroup);
+
+      if (vData) {
+        setVehicles(vData.map((v: any) => ({
+          id: String(v.id),
+          type: v.type,
+          plateNumber: v.plate_number,
+          model: v.model,
+          remarks: v.remarks,
+          timestamp: v.timestamp,
+          volunteerId: v.volunteer_id,
+          volunteerName: v.volunteer_name
         })));
+      } else {
+        setVehicles([]);
       }
+
     } catch (err) {
       console.error("Fetch Data Error:", err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [activeVolunteer, selectedSession]);
 
   useEffect(() => {
-    if (activeVolunteer) fetchSessions();
+    if (activeVolunteer) {
+      fetchSessions(true);
+    }
   }, [activeVolunteer, fetchSessions]);
 
   useEffect(() => {
-    fetchSessionData(activeSession, setActiveAttendance, setActiveIssues, setActiveVehicles);
-  }, [activeSession]);
+    fetchData();
+  }, [selectedSession?.id, fetchData]);
 
-  useEffect(() => {
-    fetchSessionData(viewSession, setViewAttendance, setViewIssues, setViewVehicles);
-  }, [viewSession]);
-
-  useEffect(() => {
-    const fetchCustom = async () => {
-      const { data } = await supabase.from('custom_sewadars').select('*');
-      if (data) setCustomSewadars(data.map((s: any) => ({
-        id: String(s.id), name: s.name, gender: s.gender as Gender,
-        group: s.group as GentsGroup | 'Ladies', isCustom: true
-      })));
-    };
-    fetchCustom();
-  }, []);
-
-  const generateNumericId = () => Date.now().toString() + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const generateNumericId = () => {
+    return Date.now().toString() + Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
-    if (!activeSession) return;
-    
+    if (!selectedSession || selectedSession.completed) return;
+    const sessionDate = selectedSession.date;
+    const sessionGroup = selectedSession.group;
+
     if (isDelete && recordId) {
-      await supabase.from('attendance').delete().eq('id', recordId);
-      setActiveAttendance(prev => prev.filter(a => a.id !== recordId));
+      try {
+        const { error } = await supabase.from('attendance').delete().eq('id', recordId);
+        if (error) throw error;
+        setAttendance(prev => prev.filter(a => a.id !== recordId));
+      } catch (error) {
+        console.error('Failed to delete attendance:', error);
+        alert('Failed to delete attendance. Please try again.');
+      }
       return;
     }
 
     const sewadar = [...INITIAL_SEWADARS, ...customSewadars].find(s => s.id === sewadarId);
     if (!sewadar) return;
 
+    const isExisting = !!recordId;
     const finalRecordId = recordId || generateNumericId();
-    const payload = {
-      id: finalRecordId, sewadar_id: sewadarId, name: sewadar.name, group: activeSession.group,
-      gender: sewadar.gender, date: activeSession.date, timestamp: Date.now(), 
-      volunteer_id: activeVolunteer?.id || '', in_time: details.inTime || '', out_time: details.outTime || '', 
-      sewa_points: details.sewaPoint || '', workshop_location: details.workshopLocation || '', 
+
+    const dbPayload = {
+      id: finalRecordId,
+      sewadar_id: sewadarId, 
+      name: sewadar.name, 
+      group: sessionGroup, 
+      gender: sewadar.gender,
+      date: sessionDate, 
+      timestamp: Date.now(), 
+      volunteer_id: activeVolunteer?.id || '',
+      in_time: details.inTime || '', 
+      out_time: details.outTime || '', 
+      sewa_points: details.sewaPoint || '',
+      workshop_location: details.workshopLocation || '', 
       is_proper_uniform: details.isProperUniform ?? true 
     };
 
-    if (recordId) await supabase.from('attendance').update(payload).eq('id', recordId);
-    else await supabase.from('attendance').insert(payload);
-    
-    fetchSessionData(activeSession, setActiveAttendance, setActiveIssues, setActiveVehicles);
+    const newRecord: AttendanceRecord = {
+      id: finalRecordId,
+      sewadarId: sewadarId, 
+      name: sewadar.name, 
+      group: sessionGroup as GentsGroup | 'Ladies',
+      gender: sewadar.gender as Gender, 
+      date: sessionDate, 
+      timestamp: dbPayload.timestamp,
+      volunteerId: activeVolunteer?.id || '', 
+      inTime: details.inTime || '', 
+      outTime: details.outTime || '',
+      sewaPoint: details.sewaPoint || '', 
+      workshopLocation: details.workshopLocation || '', 
+      isProperUniform: details.isProperUniform ?? true
+    };
+
+    try {
+      let result;
+      if (isExisting) {
+        result = await supabase.from('attendance').update(dbPayload).eq('id', finalRecordId);
+      } else {
+        result = await supabase.from('attendance').insert(dbPayload);
+      }
+
+      if (result.error) throw result.error;
+      
+      setAttendance(prev => {
+        const filtered = prev.filter(a => a.id !== finalRecordId);
+        return [...filtered, newRecord];
+      });
+    } catch (error) {
+      console.error('Failed to save attendance:', error);
+      alert('Failed to save attendance. Please try again.');
+    }
   };
 
   const handleReportIssue = async (description: string) => {
-    if (!activeVolunteer || !activeSession) return;
-    const id = generateNumericId();
-    const ts = Date.now();
+    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    const newIssue: Issue = {
+      id: generateNumericId(), 
+      description, 
+      timestamp: Date.now(),
+      volunteerId: activeVolunteer.id, 
+      volunteerName: activeVolunteer.name
+    };
+    setIssues(prev => [...prev, newIssue]);
     await supabase.from('issues').insert({
-      id, date: activeSession.date, group: activeSession.group,
-      description, timestamp: ts, volunteer_id: activeVolunteer.id, volunteer_name: activeVolunteer.name
+      id: newIssue.id, date: selectedSession.date, group: selectedSession.group,
+      description: newIssue.description, timestamp: newIssue.timestamp,
+      volunteer_id: newIssue.volunteerId, volunteer_name: newIssue.volunteerName
     });
-    fetchSessionData(activeSession, setActiveAttendance, setActiveIssues, setActiveVehicles);
   };
 
   const handleSaveVehicle = async (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => {
-    if (!activeVolunteer || !activeSession) return;
+    if (!activeVolunteer || !selectedSession || selectedSession.completed) return;
+    
+    // Normalize plate number to uppercase
     const cleanPlate = v.plateNumber.toUpperCase().trim();
-    const id = generateNumericId();
-    const ts = Date.now();
+    
+    const newV: VehicleRecord = {
+      ...v,
+      plateNumber: cleanPlate,
+      id: generateNumericId(),
+      timestamp: Date.now(),
+      volunteerId: activeVolunteer.id,
+      volunteerName: activeVolunteer.name
+    };
 
     try {
+      // Optimistic update
+      setVehicles(prev => [...prev, newV]);
+
       const { error } = await supabase.from('vehicles').insert({
-        id, date: activeSession.date, group: activeSession.group, type: v.type, 
-        plate_number: cleanPlate, model: v.model, remarks: v.remarks, timestamp: ts,
-        volunteer_id: activeVolunteer.id, volunteer_name: activeVolunteer.name
+        id: newV.id, 
+        date: selectedSession.date, 
+        group: selectedSession.group,
+        type: newV.type, 
+        plate_number: cleanPlate, 
+        model: newV.model,
+        remarks: newV.remarks, 
+        timestamp: newV.timestamp,
+        volunteer_id: newV.volunteerId, 
+        volunteer_name: newV.volunteerName
       });
+
       if (error) throw error;
-      fetchSessionData(activeSession, setActiveAttendance, setActiveIssues, setActiveVehicles);
     } catch (err: any) {
-      alert("Error saving vehicle. Ensure the database table exists.");
+      console.error("Failed to save vehicle log:", err);
+      // Revert optimistic update
+      setVehicles(prev => prev.filter(item => item.id !== newV.id));
+      
+      if (err.message && err.message.includes('cache')) {
+        alert("Database Error: The 'vehicles' table is missing in your Supabase project. Please run the SQL setup script.");
+      } else {
+        alert("Database Error: Failed to save vehicle record. Please check your connection.");
+      }
     }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (configForm.locations.length === 0) return alert("Select location.");
+    if (configForm.locations.length === 0) {
+      alert("Please select at least one location.");
+      return;
+    }
     setIsSavingSettings(true);
     try {
       const payload = {
@@ -233,9 +391,10 @@ const App: React.FC = () => {
       };
       const { data } = await supabase.from('daily_settings').insert(payload).select('*');
       if (data && data.length > 0) {
-        const mapped = { ...data[0], id: String(data[0].id) };
-        setActiveSession(mapped);
-        setAllSessions(prev => [mapped, ...prev]);
+        const mappedSession = { ...data[0], id: String(data[0].id) };
+        setAllSessions(prev => [mappedSession, ...prev]);
+        setSelectedSession(mappedSession);
+        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
         setSaveSuccess(true);
         setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       }
@@ -243,26 +402,62 @@ const App: React.FC = () => {
   };
 
   const handleCompleteSession = async (sessionId: string) => {
-    await supabase.from('daily_settings').update({ completed: true }).eq('id', sessionId);
-    setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
-    if (activeSession?.id === sessionId) setActiveSession(null);
-    fetchSessions();
+    try {
+      await supabase.from('daily_settings').update({ completed: true }).eq('id', sessionId);
+      setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
+      setSelectedSession(null);
+      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+      setActiveView('Attendance');
+    } catch (err) { alert("Error finalizing duty."); }
+  };
+
+  const handleSessionChange = (id: string) => {
+    const session = allSessions.find(s => s.id === id) || null;
+    setSelectedSession(session);
+    if (session) {
+      localStorage.setItem(STORAGE_KEY_SESSION_ID, id);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+    }
   };
 
   const handleResetAllData = useCallback(async () => {
-    if (!window.confirm("☢️ NUCLEAR RESET: Delete all data?")) return;
+    console.log("App: Reset process starting...");
+    if (!window.confirm("☢️ NUCLEAR RESET WARNING: This will permanently delete ALL sessions, attendance records, issues, and vehicles. This action cannot be undone. Are you absolutely sure?")) {
+      return;
+    }
+
     setLoading(true);
-    await Promise.all([
-      supabase.from('attendance').delete().neq('id', '0'),
-      supabase.from('issues').delete().neq('id', '0'),
-      supabase.from('vehicles').delete().neq('id', '0'),
-      supabase.from('daily_settings').delete().neq('id', '0')
-    ]);
-    setActiveAttendance([]); setActiveIssues([]); setActiveVehicles([]);
-    setAllSessions([]); setActiveSession(null); setViewSession(null);
-    localStorage.removeItem(STORAGE_KEY_VIEW_SESSION_ID);
-    setLoading(false);
-    setShowSettingsModal(true);
+    try {
+      // Clear all related tables using string comparison filter '.neq'
+      // This matches all rows because no ID will be exactly '0' string
+      console.log("App: Deleting from database...");
+      await Promise.all([
+        supabase.from('attendance').delete().neq('id', '0'),
+        supabase.from('issues').delete().neq('id', '0'),
+        supabase.from('vehicles').delete().neq('id', '0'),
+        supabase.from('daily_settings').delete().neq('id', '0')
+      ]);
+
+      console.log("App: Database calls finished. Updating local state...");
+      
+      // Update local state IMMEDIATELY
+      setAttendance([]);
+      setIssues([]);
+      setVehicles([]);
+      setAllSessions([]);
+      setSelectedSession(null);
+      localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+      
+      alert("Database wiped successfully. Starting fresh...");
+      setShowSettingsModal(true);
+      setActiveView('Attendance');
+    } catch (error) {
+      console.error("Reset Error:", error);
+      alert("Failed to reset database. Check browser console for details.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   if (!activeVolunteer) return <Login onLogin={v => { setActiveVolunteer(v); localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); }} />;
@@ -272,75 +467,104 @@ const App: React.FC = () => {
       {showSettingsModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
-            <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center">✕</button>
-            <h2 className="text-2xl font-black text-center">New Duty Session</h2>
+            <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-slate-900">New Duty Session</h2>
+            </div>
             <form onSubmit={handleSaveSettings} className="space-y-6">
               <div className="grid grid-cols-1 gap-2">
-                {LOCATIONS_LIST.map(loc => (
-                  <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 rounded-2xl font-black text-xs uppercase border-2 ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
-                ))}
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Locations</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {LOCATIONS_LIST.map(loc => (
+                    <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
-                <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
+                    <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty End</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
+                    <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
+                  </div>
+                </div>
               </div>
-              <button type="submit" disabled={isSavingSettings} className="w-full py-5 rounded-[2rem] font-black uppercase bg-indigo-600 text-white">{isSavingSettings ? 'Starting...' : 'Start Duty'}</button>
+
+              <button type="submit" disabled={isSavingSettings || saveSuccess} className="w-full py-5 rounded-[2rem] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-xl">{isSavingSettings ? 'Starting...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty')}</button>
             </form>
           </div>
         </div>
       )}
 
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b px-6 py-4 flex items-center justify-between">
-        <h1 className="text-sm font-black text-slate-900 uppercase">Security Portal</h1>
-        <button onClick={() => { localStorage.clear(); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl">Logout</button>
+        <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Security Sewa</h1>
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-[10px] font-black text-slate-900">{activeVolunteer.name}</p>
+            <p className="text-[8px] font-bold text-indigo-500 uppercase">{activeVolunteer.role}</p>
+          </div>
+          <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); localStorage.removeItem(STORAGE_KEY_SESSION_ID); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
+        </div>
       </header>
 
-      <main className="flex-1 px-6 pt-6 pb-24 no-scrollbar">
+      <main className="flex-1 overflow-y-auto px-6 pt-6 pb-24 no-scrollbar">
         {activeView === 'Attendance' ? (
           <AttendanceManager 
             sewadars={[...INITIAL_SEWADARS, ...customSewadars]} 
-            attendance={activeAttendance} 
+            attendance={attendance} 
             onSaveAttendance={saveAttendance} 
             onSaveVehicle={handleSaveVehicle}
-            vehicles={activeVehicles}
+            vehicles={vehicles}
             onAddSewadar={async (n, g, grp) => {
-              const id = generateNumericId();
-              await supabase.from('custom_sewadars').insert({ id, name: n, gender: g, group: grp });
-              setCustomSewadars(prev => [...prev, { id, name: n, gender: g, group: grp, isCustom: true }]);
+              const newSewadar = {
+                id: generateNumericId(),
+                name: n,
+                gender: g,
+                group: grp
+              };
+              
+              try {
+                const { error } = await supabase.from('custom_sewadars').insert({
+                  id: newSewadar.id,
+                  name: newSewadar.name,
+                  gender: newSewadar.gender,
+                  group: newSewadar.group
+                });
+                
+                if (error) throw error;
+                
+                setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
+              } catch (error) {
+                console.error('Failed to add sewadar:', error);
+                alert('Failed to add new member. Please try again.');
+              }
             }} 
             activeVolunteer={activeVolunteer} 
-            workshopLocation={activeSession?.location || null} 
-            sessionDate={activeSession?.date || ''} 
-            dutyStartTime={activeSession?.start_time || ''} 
-            dutyEndTime={activeSession?.end_time || ''} 
-            isCompleted={false} 
+            workshopLocation={selectedSession?.location || null} 
+            sessionDate={selectedSession?.date || ''} 
+            dutyStartTime={selectedSession?.start_time || ''} 
+            dutyEndTime={selectedSession?.end_time || ''} 
+            isCompleted={selectedSession?.completed} 
             onChangeLocation={() => setShowSettingsModal(true)} 
           />
         ) : (
-          <Dashboard 
-            attendance={viewAttendance} issues={viewIssues} vehicles={viewVehicles} 
-            activeVolunteer={activeVolunteer} allSessions={allSessions} 
-            selectedSessionId={viewSession?.id || null} 
-            isSessionCompleted={!!viewSession?.completed} 
-            onSessionChange={id => {
-              const s = allSessions.find(x => x.id === id) || null;
-              setViewSession(s);
-              if (s) localStorage.setItem(STORAGE_KEY_VIEW_SESSION_ID, s.id);
-            }} 
-            onReportIssue={handleReportIssue} 
-            onSaveVehicle={handleSaveVehicle} 
-            isLoading={loading} 
-            dutyStartTime={viewSession?.start_time || ''} 
-            dutyEndTime={viewSession?.end_time || ''} 
-            onOpenSettings={() => setShowSettingsModal(true)} 
-            onCompleteSession={handleCompleteSession} 
-            onResetAllData={handleResetAllData} 
-          />
+          <Dashboard attendance={attendance} issues={issues} vehicles={vehicles} activeVolunteer={activeVolunteer} allSessions={allSessions} selectedSessionId={selectedSession?.id || null} isSessionCompleted={!!selectedSession?.completed} onSessionChange={handleSessionChange} onReportIssue={handleReportIssue} onSaveVehicle={handleSaveVehicle} isLoading={loading} dutyStartTime={selectedSession?.start_time || ''} dutyEndTime={selectedSession?.end_time || ''} onOpenSettings={() => setShowSettingsModal(true)} onCompleteSession={handleCompleteSession} onResetAllData={handleResetAllData} />
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t flex justify-around p-3 pb-6">
-        <button onClick={() => setActiveView('Attendance')} className={`flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[10px] font-black uppercase">Attendance</span></button>
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t flex justify-around items-center p-3 pb-6">
+        <button onClick={() => setActiveView('Attendance')} className={`flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[10px] font-black uppercase">Mark Sewa</span></button>
         <button onClick={() => setActiveView('Dashboard')} className={`flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[10px] font-black uppercase">Reports</span></button>
       </nav>
     </div>
