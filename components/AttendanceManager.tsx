@@ -408,13 +408,15 @@ const AttendanceManager: React.FC<Props> = ({
                            </div>
 
                            <div className="flex flex-col gap-3 pt-4">
-                              <button 
-                                disabled={!editInTime || !editOutTime}
-                                onClick={() => handleSaveAndAnother(s.id)} 
-                                className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${(!editInTime || !editOutTime) ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-100 text-indigo-600 shadow-sm active:scale-95'}`}
-                              >
-                                 {editingRecordId ? 'Update & Add Another' : '+ Add Another Duty Point'}
-                              </button>
+                              {(!editingRecordId || editOutTime) && (
+                                <button 
+                                  disabled={!editInTime || !editOutTime}
+                                  onClick={() => handleSaveAndAnother(s.id)} 
+                                  className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${(!editInTime || !editOutTime) ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-100 text-indigo-600 shadow-sm active:scale-95'}`}
+                                >
+                                   {editingRecordId ? 'Update & Add Another' : '+ Add Another Duty Point'}
+                                </button>
+                              )}
                               <button 
                                 disabled={!editInTime}
                                 onClick={() => handleSaveAndClose(s.id)} 

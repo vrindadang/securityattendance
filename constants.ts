@@ -58,7 +58,8 @@ export const KIRPAL_ASHRAM_POINTS = [
 
 export const SAWAN_ASHRAM_POINTS = [
   'Main Gate',
-  'Round'
+  'Round',
+  'Kothi'
 ];
 
 export const SDS_DHAM_POINTS = [
@@ -106,7 +107,7 @@ export const FRIDAY_LIST = [
   "Bijender Singh", "Sushil Ahuja", "Sachin Kumar", "Rajender Singh", "Rahul Girdhar", "Akash Thakral", "Anil Sehgal", "Ashish K Sardana", "Ashok Kr Sharma", "Bhola Shankar", 
   "Deepak Seghal", "Devender Kumar", "Hari Chand Bajaj", "Himanshu Sachdeva", "Jeet Singh Juneja", "Neeraj Sachdeva", "Puneet Chachra", "Rajesh Malhotra", "Rajinder Jindal", "Rakesh Arora", 
   "Sarabjeet Singh Bedi", "Rampal", "Shyam Sunder", "Sunil Kumar", "Vijender Solanki", "Krishan Kumar", "H.S.Rana", "Ram Nivas", "Sonu Kumar", "Gurjot Singh", 
-  "Umesh Kumar", "Ajay Malik", "Rajiv Arora", "Lokesh Kumar", "Raj Kumar Sharma", "Lakshaya Saraswat", "D L Kapoor", "Sandeep Saraswat", "Bhagwat Prasad", "Harish Sethi", 
+  "Umesh Kumar", "Ajay Malik", "Rajiv Arora", "Lokesh Kumar", "Raj Kumar Sharma", "Lakshaya Saraswat", "D L Kapoor", "S संदीप सरस्वती", "Sandeep Saraswat", "Bhagwat Prasad", "Harish Sethi", 
   "Jitender Arora", "Nanak Chand", "Rajinder Khurana", "Gulab Prasad", "Prem Lal", "Jitender Solanki", "Shiv Ram", "Anil Kumar", "Amit Verma", "Mohan Lal Gumber", "Sunil Nagpal"
 ];
 const SATURDAY_LIST = ["Harbans Lal Gumber", "Rajan Nagpal", "Naresh Chhabra", "O.P.Batra", "Ajit Singh", "Akash Kheterpal", "Amar Singh", "Amar Singh Yadav", "Amit Bhutani", "Amrit Lal", "Anil Chawla", "Anil Kumar", "Ankit Khetarpal", "Ankur Bhutani", "Arjun Singh", "Arun Kumar", "Ashok Kumar Sharma", "Ashok Sindal", "Avinash Madan", "Bhushan Lal Thukral", "Dara Singh", "Deepak Chhabra", "Deepak Saini", "Devki Nandan", "Dharam Pal", "Dharamveer Gupta", "Dilip Singh", "Gajender Chauhan", "Gulshan Rajpal", "Gurdarshan", "Gurmeet Singh", "H.L Batra", "Harish", "Hemant", "Himanshu Ahuja", "Hitesh Bhatia", "Jatin Batia", "Jitender Kr", "Jitender Singh", "Joginder Pal", "Joginder Singh", "K.K. Kalra", "K P Singh", "K.R Bhatia", "Kapil Khetarpal", "Kishan Lal Ahuja", "Kunal Bhatia", "L K Nagpal", "Madan Mohan", "Manish Kumar", "Manmohan Ahuja", "Naresh Kumar", "Nirmal Kumar Singh", "Pitamber", "Piyush Anand", "Praveen Malik", "Prem Saluja", "Puneet Ahuja", "Rajesh Gandhi", "Raj Bhadur Singh", "Raj Kumar Sikka", "Rajender Kumar", "Rajinder Gulati", "Rakesh Munjal", "Ram Kumar", "Ram Niwas", "Ramesh Chand", "Ramesh Sharma", "Ranjeet Singh", "Ravinder Singh", "Rishikesh", "Roshan Lal", "Sachin Arora", "Sahil Arora", "Sanjeev Dhawan", "Satish Kr", "Shankar Lal Bhatia", "Shri Krishan", "Shubham Virmani", "Shunty Nagpal", "Som Datt", "Subhash Rathor", "Sudesh Yadav", "Sumit Gambhir", "Surender Singh (Ii)", "Surender Verma", "Surinder Singh", "Sushil Malik", "Tara Chand", "Umed Singh", "Vijay Kumar", "Vijay Singh", "Vipul Bhatia", "Yadvinder Singh", "Yogesh Kumar", "Yogesh Matta"];
