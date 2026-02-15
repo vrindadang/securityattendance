@@ -54,80 +54,82 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto animate-fade-in pb-12">
-      <div className="bg-indigo-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-2xl font-black mb-1">Member Directory</h2>
-          <p className="text-indigo-300 text-[10px] font-black uppercase tracking-widest">
-            {activeVolunteer.role === 'Super Admin' ? 'Master Records' : `${activeVolunteer.assignedGroup} Group Profiles`}
-          </p>
-        </div>
-        <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="sticky top-0 z-20 bg-slate-50/80 backdrop-blur-sm pb-4 pt-2">
-        <input 
-          type="text" 
-          placeholder="Search by name..." 
-          className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 focus:border-indigo-500 transition-all text-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-3">
-        {filtered.map((s, idx) => {
-          const sDetails = details[s.id];
-          const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone);
-
-          return (
-            <div key={s.id} className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-indigo-100 transition-all">
-              <div className="flex items-center gap-5">
-                <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
-                <div className="flex-1">
-                  <h3 className="font-black text-slate-900 text-base">{s.name}</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.group} • {s.gender}</p>
-                  
-                  {hasDetails && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {sDetails.phone && (
-                        <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
-                          📞 {sDetails.phone}
-                        </span>
-                      )}
-                      {sDetails.dob && (
-                        <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
-                          🎂 {new Date(sDetails.dob).toLocaleDateString('en-GB')}
-                        </span>
-                      )}
-                      {sDetails.address && (
-                        <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 max-w-[150px] truncate shadow-sm">
-                          🏠 {sDetails.address}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button 
-                onClick={() => handleEdit(s)}
-                className="px-6 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600 hover:bg-indigo-600 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
-              >
-                {hasDetails ? 'Edit Info' : '+ Add Info'}
-              </button>
-            </div>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="py-20 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No matching members found</p>
+    <>
+      <div className="space-y-6 max-w-2xl mx-auto animate-fade-in pb-12">
+        <div className="bg-indigo-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+          <div className="relative z-10">
+            <h2 className="text-2xl font-black mb-1">Member Directory</h2>
+            <p className="text-indigo-300 text-[10px] font-black uppercase tracking-widest">
+              {activeVolunteer.role === 'Super Admin' ? 'Master Records' : `${activeVolunteer.assignedGroup} Group Profiles`}
+            </p>
           </div>
-        )}
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="sticky top-0 z-20 bg-slate-50/80 backdrop-blur-sm pb-4 pt-2">
+          <input 
+            type="text" 
+            placeholder="Search by name..." 
+            className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 focus:border-indigo-500 transition-all text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-3">
+          {filtered.map((s, idx) => {
+            const sDetails = details[s.id];
+            const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone);
+
+            return (
+              <div key={s.id} className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-indigo-100 transition-all">
+                <div className="flex items-center gap-5">
+                  <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
+                  <div className="flex-1">
+                    <h3 className="font-black text-slate-900 text-base">{s.name}</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.group} • {s.gender}</p>
+                    
+                    {hasDetails && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {sDetails.phone && (
+                          <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
+                            📞 {sDetails.phone}
+                          </span>
+                        )}
+                        {sDetails.dob && (
+                          <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
+                            🎂 {new Date(sDetails.dob).toLocaleDateString('en-GB')}
+                          </span>
+                        )}
+                        {sDetails.address && (
+                          <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 max-w-[150px] truncate shadow-sm">
+                            🏠 {sDetails.address}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleEdit(s)}
+                  className="px-6 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600 hover:bg-indigo-600 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
+                >
+                  {hasDetails ? 'Edit Info' : '+ Add Info'}
+                </button>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="py-20 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No matching members found</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {editingSewadar && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 relative overflow-y-auto max-h-[90vh]">
             <button onClick={() => setEditingSewadar(null)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -190,7 +192,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
