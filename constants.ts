@@ -33,7 +33,8 @@ export const KIRPAL_BAGH_POINTS = [
   'Piao',
   'Round',
   'Gate No. 2 Terrace',
-  'Joda Ghar'
+  'Joda Ghar',
+  'Parking'
 ];
 
 export const KIRPAL_ASHRAM_POINTS = [
