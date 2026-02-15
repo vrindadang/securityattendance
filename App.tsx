@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord } from './types';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord, SewadarDetails } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
+import VolunteerDetails from './components/VolunteerDetails';
 import { supabase } from './supabase';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
@@ -28,19 +29,18 @@ const App: React.FC = () => {
 
   const [activeView, setActiveView] = useState<ViewState>('Attendance');
   
-  // States for Dashboard View (Reports)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [dashboardSelectedSession, setDashboardSelectedSession] = useState<DutySession | null>(null);
 
-  // States for Active Attendance View (Mark Sewa)
   const [activeSession, setActiveSession] = useState<DutySession | null>(null);
   const [activeAttendance, setActiveAttendance] = useState<AttendanceRecord[]>([]);
   const [activeIssues, setActiveIssues] = useState<Issue[]>([]);
   const [activeVehicles, setActiveVehicles] = useState<VehicleRecord[]>([]);
 
   const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
+  const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>({});
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -140,6 +140,27 @@ const App: React.FC = () => {
     }
   }, [activeVolunteer]);
 
+  const fetchSewadarDetails = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('sewadar_details').select('*');
+      if (error) throw error;
+      if (data) {
+        const map: Record<string, SewadarDetails> = {};
+        data.forEach((d: any) => {
+          map[d.sewadar_id] = {
+            sewadar_id: d.sewadar_id,
+            address: d.address || '',
+            dob: d.dob || '',
+            phone: d.phone || ''
+          };
+        });
+        setSewadarDetailsMap(map);
+      }
+    } catch (err) {
+      console.error("Fetch Details Error:", err);
+    }
+  }, []);
+
   const fetchData = useCallback(async (session: DutySession | null, target: 'active' | 'dashboard') => {
     if (!activeVolunteer || !session) {
       if (target === 'active') {
@@ -217,7 +238,6 @@ const App: React.FC = () => {
         setVehicles(mappedVehicles);
       }
 
-      // Custom sewadars are global
       const { data: customData } = await supabase.from('custom_sewadars').select('*');
       if (customData) {
         setCustomSewadars(customData.map((s: any) => ({
@@ -239,8 +259,9 @@ const App: React.FC = () => {
   useEffect(() => {
     if (activeVolunteer) {
       fetchSessions(true);
+      fetchSewadarDetails();
     }
-  }, [activeVolunteer, fetchSessions]);
+  }, [activeVolunteer, fetchSessions, fetchSewadarDetails]);
 
   useEffect(() => {
     fetchData(activeSession, 'active');
@@ -292,7 +313,6 @@ const App: React.FC = () => {
       out_time: details.outTime || '', 
       sewa_points: details.sewaPoint || '',
       workshop_location: details.workshopLocation || '', 
-      is_proper_uniform: details.isProperUniform ?? true 
     };
 
     const newRecord: AttendanceRecord = {
@@ -308,7 +328,6 @@ const App: React.FC = () => {
       outTime: details.outTime || '',
       sewaPoint: details.sewaPoint || '', 
       workshopLocation: details.workshopLocation || '', 
-      isProperUniform: details.isProperUniform ?? true
     };
 
     try {
@@ -333,6 +352,22 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to save attendance:', error);
+    }
+  };
+
+  const handleSaveSewadarDetails = async (details: SewadarDetails) => {
+    try {
+      const { error } = await supabase.from('sewadar_details').upsert({
+        sewadar_id: details.sewadar_id,
+        address: details.address,
+        dob: details.dob,
+        phone: details.phone
+      });
+      if (error) throw error;
+      setSewadarDetailsMap(prev => ({ ...prev, [details.sewadar_id]: details }));
+    } catch (err) {
+      console.error("Save Details Error:", err);
+      throw err;
     }
   };
 
@@ -380,10 +415,10 @@ const App: React.FC = () => {
         id: newV.id, 
         date: activeSession.date, 
         group: activeSession.group,
-        type: newV.type, 
+        type: v.type, 
         plate_number: cleanPlate, 
-        model: newV.model,
-        remarks: newV.remarks, 
+        model: v.model,
+        remarks: v.remarks, 
         timestamp: newV.timestamp,
         volunteer_id: newV.volunteerId, 
         volunteer_name: newV.volunteerName
@@ -562,6 +597,13 @@ const App: React.FC = () => {
             isCompleted={activeSession?.completed} 
             onChangeLocation={() => setShowSettingsModal(true)} 
           />
+        ) : activeView === 'VolunteerDetails' ? (
+          <VolunteerDetails
+            sewadars={[...INITIAL_SEWADARS, ...customSewadars]}
+            details={sewadarDetailsMap}
+            activeVolunteer={activeVolunteer}
+            onSaveDetails={handleSaveSewadarDetails}
+          />
         ) : (
           <Dashboard 
             attendance={attendance} 
@@ -585,8 +627,9 @@ const App: React.FC = () => {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t flex justify-around items-center p-3 pb-6">
-        <button onClick={() => setActiveView('Attendance')} className={`flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[10px] font-black uppercase">Mark Sewa</span></button>
-        <button onClick={() => setActiveView('Dashboard')} className={`flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[10px] font-black uppercase">Reports</span></button>
+        <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Mark Sewa</span></button>
+        <button onClick={() => setActiveView('VolunteerDetails')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'VolunteerDetails' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span className="text-[8px] font-black uppercase">Details</span></button>
+        <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
       </nav>
     </div>
   );

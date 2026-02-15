@@ -19,6 +19,14 @@ export interface Sewadar {
   isCustom?: boolean;
 }
 
+export interface SewadarDetails {
+  sewadar_id: string;
+  address: string;
+  dob: string;
+  phone: string;
+  updated_at?: string;
+}
+
 export interface AttendanceRecord {
   id: string; 
   sewadarId: string;
@@ -32,7 +40,6 @@ export interface AttendanceRecord {
   outTime?: string;
   sewaPoint?: string;
   workshopLocation?: string;
-  isProperUniform?: boolean;
 }
 
 export interface VehicleRecord {
@@ -65,4 +72,4 @@ export interface Issue {
   volunteerName: string;
 }
 
-export type ViewState = 'Attendance' | 'Dashboard' | 'Login';
+export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails';
