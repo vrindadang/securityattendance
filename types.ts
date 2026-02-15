@@ -53,14 +53,14 @@ export interface VehicleRecord {
   volunteerName: string;
 }
 
-export interface ScoreRecord {
+export interface Requirement {
   id: string;
-  sewadarId: string;
-  game: string;
-  points: number;
+  group_name: string;
+  description: string;
   timestamp: number;
-  volunteerId: string;
-  isDeleted?: boolean;
+  volunteer_id: string;
+  volunteer_name: string;
+  status: 'Pending' | 'Closed' | 'Not Required';
 }
 
 export interface Issue {
@@ -72,4 +72,15 @@ export interface Issue {
   volunteerName: string;
 }
 
-export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails';
+// Added ScoreRecord interface to fix missing import errors
+export interface ScoreRecord {
+  id: string;
+  sewadarId: string;
+  game: string;
+  points: number;
+  timestamp: number;
+  volunteerId: string;
+  isDeleted?: boolean;
+}
+
+export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements';

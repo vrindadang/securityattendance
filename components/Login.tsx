@@ -8,7 +8,7 @@ interface Props {
   onLogin: (volunteer: Volunteer) => void;
 }
 
-type PortalType = 'GENTS' | 'LADIES' | null;
+type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | null;
 
 const Login: React.FC<Props> = ({ onLogin }) => {
   const [portalType, setPortalType] = useState<PortalType>(null);
@@ -22,6 +22,11 @@ const Login: React.FC<Props> = ({ onLogin }) => {
     setPortalType(type);
     if (type === 'LADIES') {
       setSelectedGroup('Ladies');
+    } else if (type === 'BACKOFFICE') {
+      setSelectedGroup(null);
+      // Pre-select Super Admin for Back Office portal
+      const sa = VOLUNTEERS.find(v => v.id === 'sa');
+      if (sa) setSelectedVolunteer(sa);
     }
   };
 
@@ -30,9 +35,12 @@ const Login: React.FC<Props> = ({ onLogin }) => {
   };
 
   const availableIncharges = useMemo(() => {
+    if (portalType === 'BACKOFFICE') {
+      return VOLUNTEERS.filter(v => v.id === 'sa');
+    }
     if (!selectedGroup) return [];
     return VOLUNTEERS.filter(v => v.assignedGroup === selectedGroup && v.role !== 'Super Admin');
-  }, [selectedGroup]);
+  }, [selectedGroup, portalType]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +50,12 @@ const Login: React.FC<Props> = ({ onLogin }) => {
     setError('');
 
     try {
+      // Special check for Back Office portal password
+      if (portalType === 'BACKOFFICE' && password === 'admin123') {
+        onLogin({ ...selectedVolunteer, password: 'admin123' });
+        return;
+      }
+
       // 1. Check Supabase for overridden password
       const { data, error: dbError } = await supabase
         .from('volunteers')
@@ -54,7 +68,7 @@ const Login: React.FC<Props> = ({ onLogin }) => {
       if (password === effectivePassword) {
         onLogin({ ...selectedVolunteer, password: effectivePassword });
       } else {
-        // Fallback check for Super Admin PIN
+        // Fallback check for Super Admin PIN (original behavior)
         const superAdmin = VOLUNTEERS.find(v => v.id === 'sa');
         if (superAdmin && password === superAdmin.password) {
           onLogin(superAdmin);
@@ -75,7 +89,10 @@ const Login: React.FC<Props> = ({ onLogin }) => {
   };
 
   const goBackStep = () => {
-    if (selectedVolunteer) {
+    if (portalType === 'BACKOFFICE') {
+      setPortalType(null);
+      setSelectedVolunteer(null);
+    } else if (selectedVolunteer) {
       setSelectedVolunteer(null);
     } else if (selectedGroup) {
       if (portalType === 'LADIES') {
@@ -112,6 +129,10 @@ const Login: React.FC<Props> = ({ onLogin }) => {
                 <div className="w-16 h-16 bg-pink-50 rounded-2xl flex items-center justify-center text-3xl">👩</div>
                 <div className="text-left"><h3 className="text-xl font-black text-slate-800">Ladies</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Assignment Portal</p></div>
               </button>
+              <button onClick={() => handlePortalSelect('BACKOFFICE')} className="group bg-white p-6 rounded-[2rem] border-2 border-slate-100 hover:border-slate-900 transition-all flex items-center gap-6 active:scale-95">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-3xl">📁</div>
+                <div className="text-left"><h3 className="text-xl font-black text-slate-800">Back Office</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Management Portal</p></div>
+              </button>
             </div>
           </div>
         ) : portalType === 'GENTS' && !selectedGroup ? (
@@ -136,7 +157,9 @@ const Login: React.FC<Props> = ({ onLogin }) => {
               </button>
               <div>
                 <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
-                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">{selectedGroup} Assignment</p>
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
+                  {portalType === 'BACKOFFICE' ? 'Management' : `${selectedGroup} Assignment`}
+                </p>
               </div>
             </div>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">

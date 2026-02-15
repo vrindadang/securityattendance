@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord, SewadarDetails } from './types';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord, SewadarDetails, Requirement } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import VolunteerDetails from './components/VolunteerDetails';
+import RequirementsView from './components/RequirementsView';
 import { supabase } from './supabase';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [dashboardSelectedSession, setDashboardSelectedSession] = useState<DutySession | null>(null);
 
   const [activeSession, setActiveSession] = useState<DutySession | null>(null);
@@ -161,6 +163,16 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const fetchRequirements = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('requirements').select('*').order('timestamp', { ascending: false });
+      if (error) throw error;
+      if (data) setRequirements(data as Requirement[]);
+    } catch (err) {
+      console.error("Fetch Requirements Error:", err);
+    }
+  }, []);
+
   const fetchData = useCallback(async (session: DutySession | null, target: 'active' | 'dashboard') => {
     if (!activeVolunteer || !session) {
       if (target === 'active') {
@@ -260,8 +272,9 @@ const App: React.FC = () => {
     if (activeVolunteer) {
       fetchSessions(true);
       fetchSewadarDetails();
+      fetchRequirements();
     }
-  }, [activeVolunteer, fetchSessions, fetchSewadarDetails]);
+  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements]);
 
   useEffect(() => {
     fetchData(activeSession, 'active');
@@ -368,6 +381,36 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Save Details Error:", err);
       throw err;
+    }
+  };
+
+  const handleSaveRequirement = async (description: string) => {
+    if (!activeVolunteer) return;
+    const newReq: Requirement = {
+      id: generateNumericId(),
+      group_name: activeVolunteer.assignedGroup || 'Global',
+      description,
+      timestamp: Date.now(),
+      volunteer_id: activeVolunteer.id,
+      volunteer_name: activeVolunteer.name,
+      status: 'Pending'
+    };
+    try {
+      const { error } = await supabase.from('requirements').insert(newReq);
+      if (error) throw error;
+      setRequirements(prev => [newReq, ...prev]);
+    } catch (err) {
+      console.error("Save Requirement Error:", err);
+    }
+  };
+
+  const handleUpdateRequirementStatus = async (id: string, status: Requirement['status']) => {
+    try {
+      const { error } = await supabase.from('requirements').update({ status }).eq('id', id);
+      if (error) throw error;
+      setRequirements(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    } catch (err) {
+      console.error("Update Requirement Status Error:", err);
     }
   };
 
@@ -495,7 +538,8 @@ const App: React.FC = () => {
         supabase.from('attendance').delete().neq('id', '0'),
         supabase.from('issues').delete().neq('id', '0'),
         supabase.from('vehicles').delete().neq('id', '0'),
-        supabase.from('daily_settings').delete().neq('id', '0')
+        supabase.from('daily_settings').delete().neq('id', '0'),
+        supabase.from('requirements').delete().neq('id', '0')
       ]);
 
       setActiveAttendance([]);
@@ -504,6 +548,7 @@ const App: React.FC = () => {
       setAttendance([]);
       setIssues([]);
       setVehicles([]);
+      setRequirements([]);
       setAllSessions([]);
       setActiveSession(null);
       setDashboardSelectedSession(null);
@@ -604,11 +649,19 @@ const App: React.FC = () => {
             activeVolunteer={activeVolunteer}
             onSaveDetails={handleSaveSewadarDetails}
           />
+        ) : activeView === 'Requirements' ? (
+          <RequirementsView
+            requirements={requirements}
+            activeVolunteer={activeVolunteer}
+            onAddRequirement={handleSaveRequirement}
+            onUpdateRequirementStatus={handleUpdateRequirementStatus}
+          />
         ) : (
           <Dashboard 
             attendance={attendance} 
             issues={issues} 
             vehicles={vehicles} 
+            requirements={requirements}
             activeVolunteer={activeVolunteer} 
             allSessions={allSessions} 
             selectedSessionId={dashboardSelectedSession?.id || null} 
@@ -616,6 +669,8 @@ const App: React.FC = () => {
             onSessionChange={handleSessionChange} 
             onReportIssue={handleReportIssue} 
             onSaveVehicle={handleSaveVehicle} 
+            onAddRequirement={handleSaveRequirement}
+            onUpdateRequirementStatus={handleUpdateRequirementStatus}
             isLoading={loading} 
             dutyStartTime={dashboardSelectedSession?.start_time || ''} 
             dutyEndTime={dashboardSelectedSession?.end_time || ''} 
@@ -629,6 +684,7 @@ const App: React.FC = () => {
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t flex justify-around items-center p-3 pb-6">
         <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Mark Sewa</span></button>
         <button onClick={() => setActiveView('VolunteerDetails')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'VolunteerDetails' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span className="text-[8px] font-black uppercase">Details</span></button>
+        <button onClick={() => setActiveView('Requirements')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Requirements' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg><span className="text-[8px] font-black uppercase">Requirements</span></button>
         <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
       </nav>
     </div>
