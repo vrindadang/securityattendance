@@ -75,38 +75,42 @@ const Dashboard: React.FC<Props> = ({
 
   const generateAttendancePDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
-    let currentY = 15;
-
     const groupName = activeVolunteer?.assignedGroup || 'Security';
     const currentSession = allSessions.find(s => s.id === selectedSessionId);
     const dateDisplay = currentSession?.date?.split('-').reverse().join('/') || '-';
-
     const isLadies = groupName === 'Ladies';
     const groupText = isLadies ? "Ladies Security Group" : `${groupName} Gents Security Group`;
-    const introText = `With the blessings of H.H. Sant Rajinder Singh Ji Maharaj, ${groupText}, presents the security report for ${dateDisplay}`;
-
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(introText, 14, currentY);
     
-    currentY += 15;
+    let currentY = 15;
+
+    // Header Intro
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    const introText = `With the blessings of H.H. Sant Rajinder Singh Ji Maharaj, ${groupText}, presents the security report for ${dateDisplay}`;
+    doc.text(introText, 14, currentY);
+
+    // Title
+    currentY += 12;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(50, 60, 120);
     doc.text("SKRM Security Sewa report", 14, currentY);
     
+    // Subtitle
     currentY += 7;
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
     doc.setFont("helvetica", "normal");
-    doc.text(`Duty Report Summary`, 14, currentY);
+    doc.text("Duty Report Summary", 14, currentY);
     
+    // Horizontal Divider
     currentY += 4;
     doc.setDrawColor(220, 220, 220);
     doc.line(14, currentY, 196, currentY);
 
-    currentY += 9;
+    // 1. Duty Overview
+    currentY += 10;
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
@@ -117,7 +121,7 @@ const Dashboard: React.FC<Props> = ({
       head: [['Metric', 'Details']],
       body: [
         ['Reporting Security Group', isLadies ? 'Ladies' : `${groupName} Gents`],
-        ['Total Sewadars on Duty', attendance.length],
+        ['Total Sewadars on Duty', new Set(attendance.map(a => a.sewadarId)).size],
         ['Ashram / Locations Covered', currentSession?.location || 'General Ashram'],
         ['Duty Start Timing', formatDateTime(dutyStartTime)],
         ['Duty End Timing', formatDateTime(dutyEndTime)]
@@ -128,25 +132,98 @@ const Dashboard: React.FC<Props> = ({
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
+    // Helper for shift logic
+    const getShift = (timeStr?: string) => {
+      if (!timeStr) return 'Day';
+      const hour = parseInt(timeStr.split(':')[0], 10);
+      if (hour >= 7 && hour < 19) return 'Day';
+      if ((hour >= 19 && hour <= 23) || (hour >= 0 && hour < 2)) return 'Evening';
+      return 'Night';
+    };
+
+    // 2. Shift Distribution Summary
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(0,0,0);
-    doc.text("Reported Issues & Incidents", 14, currentY);
-    
+    doc.text("2. Shift Distribution", 14, currentY);
+
+    const shiftCounts = { Day: 0, Evening: 0, Night: 0 };
+    attendance.forEach(a => {
+      shiftCounts[getShift(a.inTime)]++;
+    });
+
     autoTable(doc, {
       startY: currentY + 3,
-      head: [['#', 'Description', 'Time', 'Reported By']],
-      body: issues.map((issue, idx) => [
-        idx + 1,
-        issue.description,
-        new Date(issue.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        issue.volunteerName
-      ]),
-      headStyles: { fillColor: [180, 0, 0], textColor: 255, fontStyle: 'bold' },
+      head: [['Time Slot', 'Shift Description', 'Sewadar Count']],
+      body: [
+        ['07:00 AM - 07:00 PM', 'Day Shift', shiftCounts.Day],
+        ['07:00 PM - 02:00 AM', 'Evening/Late Shift', shiftCounts.Evening],
+        ['02:00 AM - 07:00 AM', 'Night/Early Morning', shiftCounts.Night]
+      ],
+      headStyles: { fillColor: [80, 80, 230], textColor: 255, fontStyle: 'bold' },
       bodyStyles: { fontSize: 9 },
       theme: 'grid'
     });
+    currentY = (doc as any).lastAutoTable.finalY + 12;
 
+    // 3. Sewa Point Deployment Summary
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("3. Sewa Point Deployment", 14, currentY);
+
+    const pointMap: Record<string, { loc: string, spot: string, day: number, eve: number, nit: number }> = {};
+    attendance.forEach(a => {
+      const key = `${a.workshopLocation}-${a.sewaPoint}`;
+      if (!pointMap[key]) {
+        pointMap[key] = { loc: a.workshopLocation || 'Other', spot: a.sewaPoint || 'General', day: 0, eve: 0, nit: 0 };
+      }
+      const s = getShift(a.inTime);
+      if (s === 'Day') pointMap[key].day++;
+      else if (s === 'Evening') pointMap[key].eve++;
+      else pointMap[key].nit++;
+    });
+
+    autoTable(doc, {
+      startY: currentY + 3,
+      head: [['Ashram / Location', 'Sewa Point / Spot', 'Day', 'Evening', 'Night']],
+      body: Object.values(pointMap).map(p => [p.loc, p.spot, p.day, p.eve, p.nit]),
+      headStyles: { fillColor: [20, 180, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
+      columnStyles: { 
+        2: { halign: 'center' }, 
+        3: { halign: 'center' }, 
+        4: { halign: 'center' } 
+      },
+      bodyStyles: { fontSize: 8.5 },
+      theme: 'grid'
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 12;
+
+    // 4. Reported Issues & Incidents
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("4. Reported Issues & Incidents", 14, currentY);
+    
+    if (issues.length > 0) {
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['#', 'Description', 'Time', 'Reported By']],
+        body: issues.map((issue, idx) => [
+          idx + 1,
+          issue.description,
+          new Date(issue.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          issue.volunteerName
+        ]),
+        headStyles: { fillColor: [180, 50, 50], textColor: 255, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 9 },
+        theme: 'grid'
+      });
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(150, 150, 150);
+      doc.text("No incidents reported during this session.", 14, currentY + 8);
+    }
+
+    // Secondary Pages: Detailed Attendance Log
     doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
