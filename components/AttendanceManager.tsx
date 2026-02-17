@@ -263,8 +263,12 @@ const AttendanceManager: React.FC<Props> = ({
                               ) : (
                                 <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest">Available</span>
                               )}
-                              {isMarked && records.some(r => !r.isProperUniform) && (
-                                <span className="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">No Dress</span>
+                              {isMarked && (
+                                records.every(r => r.isProperUniform !== false) ? (
+                                  <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">Proper Uniform</span>
+                                ) : (
+                                  <span className="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">No Dress</span>
+                                )
                               )}
                            </div>
                         </div>

@@ -40,6 +40,8 @@ export interface AttendanceRecord {
   outTime?: string;
   sewaPoint?: string;
   workshopLocation?: string;
+  // Added isProperUniform to fix type errors in App.tsx
+  isProperUniform?: boolean;
 }
 
 export interface VehicleRecord {

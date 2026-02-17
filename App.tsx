@@ -326,6 +326,7 @@ const App: React.FC = () => {
       out_time: details.outTime || '', 
       sewa_points: details.sewaPoint || '',
       workshop_location: details.workshopLocation || '', 
+      is_proper_uniform: details.isProperUniform ?? true
     };
 
     const newRecord: AttendanceRecord = {
@@ -341,6 +342,7 @@ const App: React.FC = () => {
       outTime: details.outTime || '',
       sewaPoint: details.sewaPoint || '', 
       workshopLocation: details.workshopLocation || '', 
+      isProperUniform: details.isProperUniform ?? true
     };
 
     try {
@@ -685,7 +687,7 @@ const App: React.FC = () => {
         <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Mark Sewa</span></button>
         <button onClick={() => setActiveView('VolunteerDetails')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'VolunteerDetails' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span className="text-[8px] font-black uppercase">Details</span></button>
         <button onClick={() => setActiveView('Requirements')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Requirements' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg><span className="text-[8px] font-black uppercase">Requirements</span></button>
-        <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
+        <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
       </nav>
     </div>
   );
