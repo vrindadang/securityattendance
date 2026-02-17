@@ -2,11 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, GentsGroup, Volunteer, VehicleRecord } from '../types';
 import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS } from '../constants';
+import { FlaggedVehicle } from '../App';
 
 interface Props {
   sewadars: Sewadar[];
   attendance: AttendanceRecord[];
   vehicles: VehicleRecord[];
+  flaggedVehicles?: FlaggedVehicle[];
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => void;
   onAddSewadar: (name: string, gender: Gender, group: GentsGroup | 'Ladies') => void;
@@ -23,6 +25,7 @@ const AttendanceManager: React.FC<Props> = ({
   sewadars, 
   attendance, 
   vehicles = [],
+  flaggedVehicles = [],
   onSaveAttendance, 
   onSaveVehicle,
   onAddSewadar, 
@@ -442,6 +445,32 @@ const AttendanceManager: React.FC<Props> = ({
       ) : (
         /* VEHICLE REPORTING VIEW */
         <div className="space-y-6 animate-fade-in pb-12">
+          {/* Flagged / Stationary Intelligence Section */}
+          {flaggedVehicles.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="px-4 text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                Stationary Vehicle Alerts (3+ Days)
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                {flaggedVehicles.map(v => (
+                  <div key={v.plateNumber} className="bg-amber-50 p-5 rounded-[2rem] border-2 border-amber-200 shadow-sm flex items-center justify-between group transition-all">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-black text-slate-900 text-sm">{v.plateNumber}</p>
+                        <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Suspicious</span>
+                      </div>
+                      <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Seen across {v.daysSpotted} sessions • {v.model || 'Unknown Model'}</p>
+                    </div>
+                    <div className="text-right">
+                       <span className="bg-amber-500 text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase shadow-sm">Stationary</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {!isCompleted && (
             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
               <div className="flex items-center gap-3">

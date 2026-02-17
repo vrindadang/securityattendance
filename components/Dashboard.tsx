@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement } from '../types';
+import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto } from '../types';
 import { VOLUNTEERS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -9,6 +9,7 @@ import { DutySession } from '../App';
 interface Props {
   attendance: AttendanceRecord[];
   issues: Issue[];
+  groupPhotos: GroupPhoto[];
   vehicles: VehicleRecord[];
   requirements: Requirement[];
   activeVolunteer: Volunteer | null;
@@ -17,6 +18,7 @@ interface Props {
   isSessionCompleted: boolean;
   onSessionChange: (id: string) => void;
   onReportIssue: (desc: string, photo?: string) => void;
+  onSaveGroupPhoto: (photo: string) => void;
   onSaveVehicle: (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => void;
   onAddRequirement: (desc: string) => void;
   onUpdateRequirementStatus?: (id: string, status: Requirement['status']) => void;
@@ -34,6 +36,7 @@ interface Props {
 const Dashboard: React.FC<Props> = ({ 
   attendance, 
   issues,
+  groupPhotos = [],
   vehicles = [],
   requirements = [],
   activeVolunteer, 
@@ -42,6 +45,7 @@ const Dashboard: React.FC<Props> = ({
   isSessionCompleted,
   onSessionChange,
   onReportIssue,
+  onSaveGroupPhoto,
   onDeleteIssue,
   dutyStartTime,
   dutyEndTime,
@@ -216,11 +220,46 @@ const Dashboard: React.FC<Props> = ({
         bodyStyles: { fontSize: 9 },
         theme: 'grid'
       });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
     } else {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
       doc.setTextColor(150, 150, 150);
       doc.text("No incidents reported during this session.", 14, currentY + 8);
+      currentY += 16;
+    }
+
+    // 5. Photos of Group
+    if (groupPhotos.length > 0) {
+      if (currentY > 210) { doc.addPage(); currentY = 20; }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      doc.text("5. Photos of Group", 14, currentY);
+      currentY += 10;
+
+      let photoX = 14;
+      let photoW = 85;
+      let photoH = 60;
+      let gap = 10;
+
+      groupPhotos.forEach((gp, idx) => {
+        if (photoX + photoW > 196) {
+          photoX = 14;
+          currentY += photoH + gap + 8; // Added space for caption
+        }
+        if (currentY + photoH + 10 > 280) {
+          doc.addPage();
+          currentY = 20;
+        }
+        try {
+          doc.addImage(gp.photo, 'JPEG', photoX, currentY, photoW, photoH);
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "italic");
+          doc.text(`Photo by ${gp.volunteerName} - ${new Date(gp.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`, photoX, currentY + photoH + 4);
+        } catch (e) { console.error("PDF Image Error", e); }
+        photoX += photoW + gap;
+      });
     }
 
     // Secondary Pages: Detailed Attendance Log
@@ -260,6 +299,17 @@ const Dashboard: React.FC<Props> = ({
       const reader = new FileReader();
       reader.onloadend = () => {
         setIssuePhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleGroupPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onSaveGroupPhoto(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -339,6 +389,39 @@ const Dashboard: React.FC<Props> = ({
           </button>
         </div>
       )}
+
+      {/* NEW Photos of Group Feature Section */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-black text-slate-400 uppercase">Photos of Group</h3>
+            <p className="text-[10px] font-bold text-slate-300 mt-1 uppercase tracking-widest">Share moments from your shift</p>
+          </div>
+          {!isSessionCompleted && (
+            <label className="cursor-pointer bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all">
+              Add Photo
+              <input type="file" accept="image/*" onChange={handleGroupPhotoChange} className="hidden" />
+            </label>
+          )}
+        </div>
+
+        {groupPhotos.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {groupPhotos.map((gp) => (
+              <div key={gp.id} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm group">
+                <img src={gp.photo} alt="Group Moment" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                  <p className="text-[7px] font-black text-white uppercase tracking-widest truncate">{gp.volunteerName}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No group photos captured yet.</p>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-3">
         <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Incident Logs</h3>

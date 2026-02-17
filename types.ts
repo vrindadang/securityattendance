@@ -74,6 +74,14 @@ export interface Issue {
   volunteerName: string;
 }
 
+export interface GroupPhoto {
+  id: string;
+  photo: string;
+  timestamp: number;
+  volunteerId: string;
+  volunteerName: string;
+}
+
 // Added ScoreRecord interface to fix missing import errors
 export interface ScoreRecord {
   id: string;

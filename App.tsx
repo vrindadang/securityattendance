@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord, SewadarDetails, Requirement } from './types';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
@@ -22,6 +22,13 @@ export interface DutySession {
   completed?: boolean;
 }
 
+export interface FlaggedVehicle {
+  plateNumber: string;
+  daysSpotted: number;
+  lastSeenDate: string;
+  model: string;
+}
+
 const App: React.FC = () => {
   const [activeVolunteer, setActiveVolunteer] = useState<Volunteer | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_VOLUNTEER);
@@ -32,13 +39,16 @@ const App: React.FC = () => {
   
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [groupPhotos, setGroupPhotos] = useState<GroupPhoto[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
+  const [flaggedVehicles, setFlaggedVehicles] = useState<FlaggedVehicle[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [dashboardSelectedSession, setDashboardSelectedSession] = useState<DutySession | null>(null);
 
   const [activeSession, setActiveSession] = useState<DutySession | null>(null);
   const [activeAttendance, setActiveAttendance] = useState<AttendanceRecord[]>([]);
   const [activeIssues, setActiveIssues] = useState<Issue[]>([]);
+  const [activeGroupPhotos, setActiveGroupPhotos] = useState<GroupPhoto[]>([]);
   const [activeVehicles, setActiveVehicles] = useState<VehicleRecord[]>([]);
 
   const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
@@ -173,15 +183,58 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const calculateFlaggedVehicles = useCallback((historicalVehicles: any[], currentDate: string) => {
+    const plateGroups: Record<string, { dates: Set<string>, model: string }> = {};
+    
+    historicalVehicles.forEach(v => {
+      if (!plateGroups[v.plate_number]) {
+        plateGroups[v.plate_number] = { dates: new Set(), model: v.model || '' };
+      }
+      plateGroups[v.plate_number].dates.add(v.date);
+    });
+
+    const flagged: FlaggedVehicle[] = [];
+    Object.entries(plateGroups).forEach(([plate, data]) => {
+      // We only care about unique dates
+      const uniqueDates = Array.from(data.dates).sort();
+      
+      // If spotted on 3 or more distinct dates
+      if (uniqueDates.length >= 3) {
+        // Find latest spotted date
+        const lastSeen = uniqueDates[uniqueDates.length - 1];
+        
+        // Simple heuristic: if last seen within 3 days of "current date", it's suspicious
+        const current = new Date(currentDate);
+        const last = new Date(lastSeen);
+        const diffDays = Math.ceil(Math.abs(current.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // If it hasn't moved for 3 sessions and was seen recently (not months ago)
+        if (diffDays <= 4) {
+          flagged.push({
+            plateNumber: plate,
+            daysSpotted: uniqueDates.length,
+            lastSeenDate: lastSeen,
+            model: data.model
+          });
+        }
+      }
+    });
+
+    setFlaggedVehicles(flagged);
+  }, []);
+
   const fetchData = useCallback(async (session: DutySession | null, target: 'active' | 'dashboard') => {
     if (!activeVolunteer || !session) {
       if (target === 'active') {
         setActiveAttendance([]);
         setActiveIssues([]);
+        setActiveGroupPhotos([]);
         setActiveVehicles([]);
+        setFlaggedVehicles([]);
       } else {
         setAttendance([]);
         setIssues([]);
+        setGroupPhotos([]);
         setVehicles([]);
       }
       return;
@@ -223,6 +276,20 @@ const App: React.FC = () => {
         volunteerName: i.volunteer_name
       })) : [];
 
+      const { data: photoData } = await supabase
+        .from('group_photos')
+        .select('*')
+        .eq('date', session.date)
+        .eq('group', session.group);
+
+      const mappedPhotos = photoData ? photoData.map((p: any) => ({
+        id: String(p.id),
+        photo: p.photo,
+        timestamp: p.timestamp,
+        volunteerId: p.volunteer_id,
+        volunteerName: p.volunteer_name
+      })) : [];
+
       const { data: vData } = await supabase
         .from('vehicles')
         .select('*')
@@ -240,13 +307,26 @@ const App: React.FC = () => {
         volunteerName: v.volunteer_name
       })) : [];
 
+      // Fetch historical vehicles for flagging logic
+      const { data: historicalVData } = await supabase
+        .from('vehicles')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(200);
+
+      if (historicalVData) {
+        calculateFlaggedVehicles(historicalVData, session.date);
+      }
+
       if (target === 'active') {
         setActiveAttendance(mappedAtt);
         setActiveIssues(mappedIssues);
+        setActiveGroupPhotos(mappedPhotos);
         setActiveVehicles(mappedVehicles);
       } else {
         setAttendance(mappedAtt);
         setIssues(mappedIssues);
+        setGroupPhotos(mappedPhotos);
         setVehicles(mappedVehicles);
       }
 
@@ -266,7 +346,7 @@ const App: React.FC = () => {
     } finally {
       if (target === 'dashboard') setLoading(false);
     }
-  }, [activeVolunteer]);
+  }, [activeVolunteer, calculateFlaggedVehicles]);
 
   useEffect(() => {
     if (activeVolunteer) {
@@ -325,6 +405,7 @@ const App: React.FC = () => {
       in_time: details.inTime || '', 
       out_time: details.outTime || '', 
       sewa_points: details.sewaPoint || '',
+      // Fix: changed workshop_location to workshopLocation
       workshop_location: details.workshopLocation || '', 
       is_proper_uniform: details.isProperUniform ?? true
     };
@@ -341,6 +422,7 @@ const App: React.FC = () => {
       inTime: details.inTime || '', 
       outTime: details.outTime || '',
       sewaPoint: details.sewaPoint || '', 
+      // Fix: changed workshop_location to workshopLocation
       workshopLocation: details.workshopLocation || '', 
       isProperUniform: details.isProperUniform ?? true
     };
@@ -434,6 +516,26 @@ const App: React.FC = () => {
       id: newIssue.id, date: activeSession.date, group: activeSession.group,
       description: newIssue.description, photo: newIssue.photo, timestamp: newIssue.timestamp,
       volunteer_id: newIssue.volunteerId, volunteer_name: newIssue.volunteerName
+    });
+  };
+
+  const handleSaveGroupPhoto = async (photo: string) => {
+    if (!activeVolunteer || !activeSession || activeSession.completed) return;
+    const newPhoto: GroupPhoto = {
+      id: generateNumericId(),
+      photo,
+      timestamp: Date.now(),
+      volunteerId: activeVolunteer.id,
+      volunteerName: activeVolunteer.name
+    };
+    setActiveGroupPhotos(prev => [...prev, newPhoto]);
+    if (dashboardSelectedSession?.id === activeSession.id) {
+      setGroupPhotos(prev => [...prev, newPhoto]);
+    }
+    await supabase.from('group_photos').insert({
+      id: newPhoto.id, date: activeSession.date, group: activeSession.group,
+      photo: newPhoto.photo, timestamp: newPhoto.timestamp,
+      volunteer_id: newPhoto.volunteerId, volunteer_name: newPhoto.volunteerName
     });
   };
 
@@ -539,6 +641,7 @@ const App: React.FC = () => {
       await Promise.all([
         supabase.from('attendance').delete().neq('id', '0'),
         supabase.from('issues').delete().neq('id', '0'),
+        supabase.from('group_photos').delete().neq('id', '0'),
         supabase.from('vehicles').delete().neq('id', '0'),
         supabase.from('daily_settings').delete().neq('id', '0'),
         supabase.from('requirements').delete().neq('id', '0')
@@ -546,9 +649,12 @@ const App: React.FC = () => {
 
       setActiveAttendance([]);
       setActiveIssues([]);
+      setActiveGroupPhotos([]);
       setActiveVehicles([]);
+      setFlaggedVehicles([]);
       setAttendance([]);
       setIssues([]);
+      setGroupPhotos([]);
       setVehicles([]);
       setRequirements([]);
       setAllSessions([]);
@@ -629,6 +735,7 @@ const App: React.FC = () => {
             onSaveAttendance={saveAttendance} 
             onSaveVehicle={handleSaveVehicle}
             vehicles={activeVehicles}
+            flaggedVehicles={flaggedVehicles}
             onAddSewadar={async (n, g, grp) => {
               const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp };
               try {
@@ -662,6 +769,7 @@ const App: React.FC = () => {
           <Dashboard 
             attendance={attendance} 
             issues={issues} 
+            groupPhotos={groupPhotos}
             vehicles={vehicles} 
             requirements={requirements}
             activeVolunteer={activeVolunteer} 
@@ -670,6 +778,7 @@ const App: React.FC = () => {
             isSessionCompleted={!!dashboardSelectedSession?.completed} 
             onSessionChange={handleSessionChange} 
             onReportIssue={handleReportIssue} 
+            onSaveGroupPhoto={handleSaveGroupPhoto}
             onSaveVehicle={handleSaveVehicle} 
             onAddRequirement={handleSaveRequirement}
             onUpdateRequirementStatus={handleUpdateRequirementStatus}
