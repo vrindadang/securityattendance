@@ -87,6 +87,16 @@ const Dashboard: React.FC<Props> = ({
     
     let currentY = 15;
 
+    // Helper to ensure vertical space
+    const ensureSpace = (h: number) => {
+      if (currentY + h > 275) {
+        doc.addPage();
+        currentY = 20;
+        return true;
+      }
+      return false;
+    };
+
     // Header Intro
     doc.setFont("helvetica", "italic");
     doc.setFontSize(8);
@@ -115,17 +125,20 @@ const Dashboard: React.FC<Props> = ({
 
     // 1. Duty Overview
     currentY += 10;
+    ensureSpace(40);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("1. Duty Overview", 14, currentY);
     
+    const totalSewadarsOnDuty = new Set(attendance.map(a => a.sewadarId)).size;
+
     autoTable(doc, {
       startY: currentY + 3,
       head: [['Metric', 'Details']],
       body: [
         ['Reporting Security Group', isLadies ? 'Ladies' : `${groupName} Gents`],
-        ['Total Sewadars on Duty', new Set(attendance.map(a => a.sewadarId)).size],
+        ['Total Sewadars on Duty', totalSewadarsOnDuty],
         ['Ashram / Locations Covered', currentSession?.location || 'General Ashram'],
         ['Duty Start Timing', formatDateTime(dutyStartTime)],
         ['Duty End Timing', formatDateTime(dutyEndTime)]
@@ -136,13 +149,13 @@ const Dashboard: React.FC<Props> = ({
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // Shift Logic in minutes (0 to 1440)
-    const DAY_S = 7 * 60; // 07:00
-    const DAY_E = 19 * 60; // 19:00
-    const EVE_S = 19 * 60; // 19:00
-    const EVE_E = 2 * 60; // 02:00 (of next day)
-    const NIT_S = 2 * 60; // 02:00
-    const NIT_E = 7 * 60; // 07:00
+    // Shift Logic in minutes
+    const DAY_S = 7 * 60; 
+    const DAY_E = 19 * 60;
+    const EVE_S = 19 * 60;
+    const EVE_E = 2 * 60;
+    const NIT_S = 2 * 60;
+    const NIT_E = 7 * 60;
 
     const timeToMins = (t: string) => {
       const [h, m] = t.split(':').map(Number);
@@ -152,47 +165,32 @@ const Dashboard: React.FC<Props> = ({
     const getOverlappingShifts = (inTime: string, outTime?: string) => {
       const start = timeToMins(inTime);
       const end = outTime ? timeToMins(outTime) : (start + 1);
-      
       const shifts: ('Day' | 'Evening' | 'Night')[] = [];
       const intervals: [number, number][] = [];
-      
       if (end < start) {
-        // Crosses midnight
         intervals.push([start, 1440]);
         intervals.push([0, end]);
       } else {
         intervals.push([start, end]);
       }
-
-      const checkOverlap = (s1: number, e1: number, s2: number, e2: number) => {
-        return Math.max(s1, s2) < Math.min(e1, e2);
-      };
-
+      const checkOverlap = (s1: number, e1: number, s2: number, e2: number) => Math.max(s1, s2) < Math.min(e1, e2);
       intervals.forEach(([is, ie]) => {
-        // Day
         if (checkOverlap(is, ie, DAY_S, DAY_E)) shifts.push('Day');
-        // Evening Part 1 (19-24)
         if (checkOverlap(is, ie, EVE_S, 1440)) shifts.push('Evening');
-        // Evening Part 2 (0-2)
         if (checkOverlap(is, ie, 0, EVE_E)) shifts.push('Evening');
-        // Night
         if (checkOverlap(is, ie, NIT_S, NIT_E)) shifts.push('Night');
       });
-
       return Array.from(new Set(shifts));
     };
 
     // 2. Shift Distribution Summary
+    ensureSpace(45);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
     doc.text("2. Shift Distribution", 14, currentY);
 
-    const shiftCounts = {
-      Day: new Set<string>(),
-      Evening: new Set<string>(),
-      Night: new Set<string>()
-    };
-
+    const shiftCounts = { Day: new Set<string>(), Evening: new Set<string>(), Night: new Set<string>() };
     attendance.forEach(a => {
       if (a.inTime) {
         const covered = getOverlappingShifts(a.inTime, a.outTime);
@@ -212,11 +210,27 @@ const Dashboard: React.FC<Props> = ({
       bodyStyles: { fontSize: 9 },
       theme: 'grid'
     });
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    
+    const shiftTotalSum = shiftCounts.Day.size + shiftCounts.Evening.size + shiftCounts.Night.size;
+    currentY = (doc as any).lastAutoTable.finalY + 4;
+    
+    // Check space for the note
+    const noteText = `Note: The Total Sewadars on Duty in Table 1 is ${totalSewadarsOnDuty}, but the Shift Distribution in Table 2 totals to ${shiftTotalSum}. This is because several sewadars did sewa across multiple shifts; if a person was active during two different time slots, they were counted in the total for both shifts in above table to show full sewa coverage.`;
+    const splitNote = doc.splitTextToSize(noteText, 180);
+    const noteHeight = (splitNote.length * 4) + 6;
+    ensureSpace(noteHeight);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    doc.text(splitNote, 14, currentY);
+    currentY += noteHeight + 4;
 
     // 3. Sewa Point Deployment Summary
+    ensureSpace(30);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
     doc.text("3. Sewa Point Deployment", 14, currentY);
 
     const pointMap: Record<string, { loc: string, spot: string, daySet: Set<string>, eveSet: Set<string>, nitSet: Set<string> }> = {};
@@ -226,9 +240,7 @@ const Dashboard: React.FC<Props> = ({
         pointMap[key] = { 
           loc: a.workshopLocation || 'Other', 
           spot: a.sewaPoint || 'General', 
-          daySet: new Set(), 
-          eveSet: new Set(), 
-          nitSet: new Set() 
+          daySet: new Set(), eveSet: new Set(), nitSet: new Set() 
         };
       }
       if (a.inTime) {
@@ -246,19 +258,17 @@ const Dashboard: React.FC<Props> = ({
       head: [['Ashram / Location', 'Sewa Point / Spot', 'Day', 'Evening', 'Night']],
       body: Object.values(pointMap).map(p => [p.loc, p.spot, p.daySet.size, p.eveSet.size, p.nitSet.size]),
       headStyles: { fillColor: [20, 180, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
-      columnStyles: { 
-        2: { halign: 'center' }, 
-        3: { halign: 'center' }, 
-        4: { halign: 'center' } 
-      },
+      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' } },
       bodyStyles: { fontSize: 8.5 },
       theme: 'grid'
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
     // 4. Reported Issues & Incidents
+    ensureSpace(25);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
     doc.text("4. Reported Issues & Incidents", 14, currentY);
     
     if (issues.length > 0) {
@@ -266,8 +276,7 @@ const Dashboard: React.FC<Props> = ({
         startY: currentY + 3,
         head: [['#', 'Description', 'Time', 'Reported By']],
         body: issues.map((issue, idx) => [
-          idx + 1,
-          issue.description,
+          idx + 1, issue.description,
           new Date(issue.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           issue.volunteerName
         ]),
@@ -277,14 +286,13 @@ const Dashboard: React.FC<Props> = ({
       });
       currentY = (doc as any).lastAutoTable.finalY + 12;
     } else {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.setTextColor(150, 150, 150);
+      doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(150, 150, 150);
       doc.text("No incidents reported during this session.", 14, currentY + 8);
       currentY += 16;
     }
 
     // 5. Vehicle Incident / Observation Log
+    ensureSpace(25);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0,0,0);
@@ -295,11 +303,7 @@ const Dashboard: React.FC<Props> = ({
         startY: currentY + 3,
         head: [['#', 'Plate Number', 'Type', 'Model', 'Observation', 'Time']],
         body: vehicles.map((v, idx) => [
-          idx + 1,
-          v.plateNumber,
-          v.type,
-          v.model || '-',
-          v.remarks || '-',
+          idx + 1, v.plateNumber, v.type, v.model || '-', v.remarks || '-',
           new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         ]),
         headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold' },
@@ -308,68 +312,42 @@ const Dashboard: React.FC<Props> = ({
       });
       currentY = (doc as any).lastAutoTable.finalY + 12;
     } else {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.setTextColor(150, 150, 150);
+      doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(150, 150, 150);
       doc.text("No vehicle incidents flagged.", 14, currentY + 8);
       currentY += 16;
     }
 
     // 6. Photos of Group
     if (groupPhotos.length > 0) {
-      if (currentY > 210) { doc.addPage(); currentY = 20; }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(0, 0, 0);
+      ensureSpace(35);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
       doc.text("6. Photos of Group", 14, currentY);
       currentY += 10;
-
-      let photoX = 14;
-      let photoW = 85;
-      let photoH = 60;
-      let gap = 10;
-
+      let photoX = 14; let photoW = 85; let photoH = 60; let gap = 10;
       groupPhotos.forEach((gp) => {
-        if (photoX + photoW > 196) {
-          photoX = 14;
-          currentY += photoH + gap + 8;
-        }
-        if (currentY + photoH + 10 > 280) {
-          doc.addPage();
-          currentY = 20;
-        }
+        if (photoX + photoW > 196) { photoX = 14; currentY += photoH + gap + 8; }
+        if (currentY + photoH + 10 > 280) { doc.addPage(); currentY = 20; }
         try {
           doc.addImage(gp.photo, 'JPEG', photoX, currentY, photoW, photoH);
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "italic");
+          doc.setFontSize(7); doc.setFont("helvetica", "italic"); doc.setTextColor(100, 100, 100);
           doc.text(`Photo by ${gp.volunteerName} - ${new Date(gp.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`, photoX, currentY + photoH + 4);
         } catch (e) { console.error("PDF Image Error", e); }
         photoX += photoW + gap;
       });
     }
 
-    // Detailed Log
+    // Detailed Log Page
     doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(50, 60, 120);
     doc.text("Detailed Attendance Log", 14, 20);
-    
     autoTable(doc, {
       startY: 32,
       head: [['#', 'Name', 'In', 'Out', 'Dur', 'Location', 'Spot', 'Verified By']],
       body: attendance.map((a, i) => {
         const verifier = VOLUNTEERS.find(v => v.id === a.volunteerId)?.name || 'Incharge';
-        return [
-          i + 1, 
-          a.name, 
-          a.inTime || '-', 
-          a.outTime || '-', 
-          calculateDuration(a.inTime, a.outTime), 
-          a.workshopLocation || '-', 
-          a.sewaPoint || '-', 
-          verifier
-        ];
+        return [i + 1, a.name, a.inTime || '-', a.outTime || '-', calculateDuration(a.inTime, a.outTime), a.workshopLocation || '-', a.sewaPoint || '-', verifier];
       }),
       headStyles: { fillColor: [50, 60, 120], textColor: 255, fontSize: 8 },
       bodyStyles: { fontSize: 7.5 },
@@ -383,9 +361,7 @@ const Dashboard: React.FC<Props> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setIssuePhoto(reader.result as string);
-      };
+      reader.onloadend = () => setIssuePhoto(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -394,9 +370,7 @@ const Dashboard: React.FC<Props> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        onSaveGroupPhoto(reader.result as string);
-      };
+      reader.onloadend = () => onSaveGroupPhoto(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -404,9 +378,7 @@ const Dashboard: React.FC<Props> = ({
   const handleReportIssueSubmit = () => {
     if (!issueDesc.trim()) return;
     onReportIssue(issueDesc, issuePhoto || undefined);
-    setIssueDesc('');
-    setIssuePhoto(null);
-    setShowReportConfirmModal(false);
+    setIssueDesc(''); setIssuePhoto(null); setShowReportConfirmModal(false);
   };
 
   return (
