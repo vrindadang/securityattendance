@@ -136,13 +136,50 @@ const Dashboard: React.FC<Props> = ({
     });
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
-    // Helper for shift logic
-    const getShift = (timeStr?: string) => {
-      if (!timeStr) return 'Day';
-      const hour = parseInt(timeStr.split(':')[0], 10);
-      if (hour >= 7 && hour < 19) return 'Day';
-      if ((hour >= 19 && hour <= 23) || (hour >= 0 && hour < 2)) return 'Evening';
-      return 'Night';
+    // Shift Logic in minutes (0 to 1440)
+    const DAY_S = 7 * 60; // 07:00
+    const DAY_E = 19 * 60; // 19:00
+    const EVE_S = 19 * 60; // 19:00
+    const EVE_E = 2 * 60; // 02:00 (of next day)
+    const NIT_S = 2 * 60; // 02:00
+    const NIT_E = 7 * 60; // 07:00
+
+    const timeToMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const getOverlappingShifts = (inTime: string, outTime?: string) => {
+      const start = timeToMins(inTime);
+      const end = outTime ? timeToMins(outTime) : (start + 1);
+      
+      const shifts: ('Day' | 'Evening' | 'Night')[] = [];
+      const intervals: [number, number][] = [];
+      
+      if (end < start) {
+        // Crosses midnight
+        intervals.push([start, 1440]);
+        intervals.push([0, end]);
+      } else {
+        intervals.push([start, end]);
+      }
+
+      const checkOverlap = (s1: number, e1: number, s2: number, e2: number) => {
+        return Math.max(s1, s2) < Math.min(e1, e2);
+      };
+
+      intervals.forEach(([is, ie]) => {
+        // Day
+        if (checkOverlap(is, ie, DAY_S, DAY_E)) shifts.push('Day');
+        // Evening Part 1 (19-24)
+        if (checkOverlap(is, ie, EVE_S, 1440)) shifts.push('Evening');
+        // Evening Part 2 (0-2)
+        if (checkOverlap(is, ie, 0, EVE_E)) shifts.push('Evening');
+        // Night
+        if (checkOverlap(is, ie, NIT_S, NIT_E)) shifts.push('Night');
+      });
+
+      return Array.from(new Set(shifts));
     };
 
     // 2. Shift Distribution Summary
@@ -150,18 +187,26 @@ const Dashboard: React.FC<Props> = ({
     doc.setFont("helvetica", "bold");
     doc.text("2. Shift Distribution", 14, currentY);
 
-    const shiftCounts = { Day: 0, Evening: 0, Night: 0 };
+    const shiftCounts = {
+      Day: new Set<string>(),
+      Evening: new Set<string>(),
+      Night: new Set<string>()
+    };
+
     attendance.forEach(a => {
-      shiftCounts[getShift(a.inTime)]++;
+      if (a.inTime) {
+        const covered = getOverlappingShifts(a.inTime, a.outTime);
+        covered.forEach(s => shiftCounts[s].add(a.sewadarId));
+      }
     });
 
     autoTable(doc, {
       startY: currentY + 3,
       head: [['Time Slot', 'Shift Description', 'Sewadar Count']],
       body: [
-        ['07:00 AM - 07:00 PM', 'Day Shift', shiftCounts.Day],
-        ['07:00 PM - 02:00 AM', 'Evening/Late Shift', shiftCounts.Evening],
-        ['02:00 AM - 07:00 AM', 'Night/Early Morning', shiftCounts.Night]
+        ['07:00 AM - 07:00 PM', 'Day Shift', shiftCounts.Day.size],
+        ['07:00 PM - 02:00 AM', 'Evening/Late Shift', shiftCounts.Evening.size],
+        ['02:00 AM - 07:00 AM', 'Night/Early Morning', shiftCounts.Night.size]
       ],
       headStyles: { fillColor: [80, 80, 230], textColor: 255, fontStyle: 'bold' },
       bodyStyles: { fontSize: 9 },
@@ -174,22 +219,32 @@ const Dashboard: React.FC<Props> = ({
     doc.setFont("helvetica", "bold");
     doc.text("3. Sewa Point Deployment", 14, currentY);
 
-    const pointMap: Record<string, { loc: string, spot: string, day: number, eve: number, nit: number }> = {};
+    const pointMap: Record<string, { loc: string, spot: string, daySet: Set<string>, eveSet: Set<string>, nitSet: Set<string> }> = {};
     attendance.forEach(a => {
       const key = `${a.workshopLocation}-${a.sewaPoint}`;
       if (!pointMap[key]) {
-        pointMap[key] = { loc: a.workshopLocation || 'Other', spot: a.sewaPoint || 'General', day: 0, eve: 0, nit: 0 };
+        pointMap[key] = { 
+          loc: a.workshopLocation || 'Other', 
+          spot: a.sewaPoint || 'General', 
+          daySet: new Set(), 
+          eveSet: new Set(), 
+          nitSet: new Set() 
+        };
       }
-      const s = getShift(a.inTime);
-      if (s === 'Day') pointMap[key].day++;
-      else if (s === 'Evening') pointMap[key].eve++;
-      else pointMap[key].nit++;
+      if (a.inTime) {
+        const covered = getOverlappingShifts(a.inTime, a.outTime);
+        covered.forEach(s => {
+          if (s === 'Day') pointMap[key].daySet.add(a.sewadarId);
+          else if (s === 'Evening') pointMap[key].eveSet.add(a.sewadarId);
+          else pointMap[key].nitSet.add(a.sewadarId);
+        });
+      }
     });
 
     autoTable(doc, {
       startY: currentY + 3,
       head: [['Ashram / Location', 'Sewa Point / Spot', 'Day', 'Evening', 'Night']],
-      body: Object.values(pointMap).map(p => [p.loc, p.spot, p.day, p.eve, p.nit]),
+      body: Object.values(pointMap).map(p => [p.loc, p.spot, p.daySet.size, p.eveSet.size, p.nitSet.size]),
       headStyles: { fillColor: [20, 180, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
       columnStyles: { 
         2: { halign: 'center' }, 
@@ -229,13 +284,44 @@ const Dashboard: React.FC<Props> = ({
       currentY += 16;
     }
 
-    // 5. Photos of Group
+    // 5. Vehicle Incident / Observation Log
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0,0,0);
+    doc.text("5. Vehicle Incident / Observation Log", 14, currentY);
+
+    if (vehicles.length > 0) {
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['#', 'Plate Number', 'Type', 'Model', 'Observation', 'Time']],
+        body: vehicles.map((v, idx) => [
+          idx + 1,
+          v.plateNumber,
+          v.type,
+          v.model || '-',
+          v.remarks || '-',
+          new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        ]),
+        headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 8.5 },
+        theme: 'grid'
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(150, 150, 150);
+      doc.text("No vehicle incidents flagged.", 14, currentY + 8);
+      currentY += 16;
+    }
+
+    // 6. Photos of Group
     if (groupPhotos.length > 0) {
       if (currentY > 210) { doc.addPage(); currentY = 20; }
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
-      doc.text("5. Photos of Group", 14, currentY);
+      doc.text("6. Photos of Group", 14, currentY);
       currentY += 10;
 
       let photoX = 14;
@@ -243,10 +329,10 @@ const Dashboard: React.FC<Props> = ({
       let photoH = 60;
       let gap = 10;
 
-      groupPhotos.forEach((gp, idx) => {
+      groupPhotos.forEach((gp) => {
         if (photoX + photoW > 196) {
           photoX = 14;
-          currentY += photoH + gap + 8; // Added space for caption
+          currentY += photoH + gap + 8;
         }
         if (currentY + photoH + 10 > 280) {
           doc.addPage();
@@ -262,7 +348,7 @@ const Dashboard: React.FC<Props> = ({
       });
     }
 
-    // Secondary Pages: Detailed Attendance Log
+    // Detailed Log
     doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
@@ -390,7 +476,6 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* NEW Photos of Group Feature Section */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -463,7 +548,7 @@ const Dashboard: React.FC<Props> = ({
 
       {showReportConfirmModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 text-center">
+          <div className="bg-white w-full max-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 text-center">
              <div className="w-20 h-20 bg-red-100 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto text-4xl shadow-inner">⚠️</div>
              <div>
                 <h3 className="text-2xl font-black text-slate-900">Submit Incident?</h3>

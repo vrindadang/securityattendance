@@ -122,14 +122,28 @@ const App: React.FC = () => {
       
       if (data && data.length > 0) {
         const mappedSessions = data.map(s => ({ ...s, id: String(s.id) }));
-        setAllSessions(mappedSessions);
         
-        const activeOrFuture = mappedSessions.find(s => !s.completed);
+        // Deduplicate sessions by date + group. Prioritize completed ones.
+        const uniqueSessionsMap: Record<string, DutySession> = {};
+        mappedSessions.forEach(s => {
+          const key = `${s.date}-${s.group}`;
+          // If we don't have this date/group yet, OR if existing one is active and new one is completed
+          if (!uniqueSessionsMap[key] || (!uniqueSessionsMap[key].completed && s.completed)) {
+            uniqueSessionsMap[key] = s;
+          }
+        });
+        const deduplicatedSessions = Object.values(uniqueSessionsMap).sort((a, b) => 
+          new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+        );
+
+        setAllSessions(deduplicatedSessions);
+        
+        const activeOrFuture = deduplicatedSessions.find(s => !s.completed);
         setActiveSession(activeOrFuture || null);
 
         if (isInitial) {
           const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
-          const savedSession = mappedSessions.find(s => s.id === savedSessionId);
+          const savedSession = deduplicatedSessions.find(s => s.id === savedSessionId);
           
           if (savedSession) {
             setDashboardSelectedSession(savedSession);
@@ -195,20 +209,12 @@ const App: React.FC = () => {
 
     const flagged: FlaggedVehicle[] = [];
     Object.entries(plateGroups).forEach(([plate, data]) => {
-      // We only care about unique dates
       const uniqueDates = Array.from(data.dates).sort();
-      
-      // If spotted on 3 or more distinct dates
       if (uniqueDates.length >= 3) {
-        // Find latest spotted date
         const lastSeen = uniqueDates[uniqueDates.length - 1];
-        
-        // Simple heuristic: if last seen within 3 days of "current date", it's suspicious
         const current = new Date(currentDate);
         const last = new Date(lastSeen);
         const diffDays = Math.ceil(Math.abs(current.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-        
-        // If it hasn't moved for 3 sessions and was seen recently (not months ago)
         if (diffDays <= 4) {
           flagged.push({
             plateNumber: plate,
@@ -307,7 +313,6 @@ const App: React.FC = () => {
         volunteerName: v.volunteer_name
       })) : [];
 
-      // Fetch historical vehicles for flagging logic
       const { data: historicalVData } = await supabase
         .from('vehicles')
         .select('*')
@@ -405,7 +410,6 @@ const App: React.FC = () => {
       in_time: details.inTime || '', 
       out_time: details.outTime || '', 
       sewa_points: details.sewaPoint || '',
-      // Fix: changed workshop_location to workshopLocation
       workshop_location: details.workshopLocation || '', 
       is_proper_uniform: details.isProperUniform ?? true
     };
@@ -422,7 +426,6 @@ const App: React.FC = () => {
       inTime: details.inTime || '', 
       outTime: details.outTime || '',
       sewaPoint: details.sewaPoint || '', 
-      // Fix: changed workshop_location to workshopLocation
       workshopLocation: details.workshopLocation || '', 
       isProperUniform: details.isProperUniform ?? true
     };
@@ -589,22 +592,52 @@ const App: React.FC = () => {
     }
     setIsSavingSettings(true);
     try {
-      const payload = {
-        date: configForm.startDate, group: activeVolunteer?.assignedGroup || 'Global',
-        location: configForm.locations.join(', '),
-        start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
-        end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
-        completed: false
-      };
-      const { data } = await supabase.from('daily_settings').insert(payload).select('*');
-      if (data && data.length > 0) {
-        const mappedSession = { ...data[0], id: String(data[0].id) };
-        setAllSessions(prev => [mappedSession, ...prev]);
-        setActiveSession(mappedSession);
-        setDashboardSelectedSession(mappedSession);
-        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
-        setSaveSuccess(true);
-        setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
+      const groupName = activeVolunteer?.assignedGroup || 'Global';
+      
+      // FIX: Check if an active session already exists for this date and group
+      const { data: existing } = await supabase
+        .from('daily_settings')
+        .select('*')
+        .eq('date', configForm.startDate)
+        .eq('group', groupName)
+        .eq('completed', false)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        // Update existing instead of creating a new row to avoid duplication
+        const payload = {
+          location: configForm.locations.join(', '),
+          start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
+          end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
+        };
+        const { data } = await supabase.from('daily_settings').update(payload).eq('id', existing[0].id).select('*');
+        if (data && data.length > 0) {
+          const mappedSession = { ...data[0], id: String(data[0].id) };
+          setAllSessions(prev => [mappedSession, ...prev.filter(s => s.id !== mappedSession.id)]);
+          setActiveSession(mappedSession);
+          setDashboardSelectedSession(mappedSession);
+          localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
+          setSaveSuccess(true);
+          setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
+        }
+      } else {
+        const payload = {
+          date: configForm.startDate, group: groupName,
+          location: configForm.locations.join(', '),
+          start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
+          end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
+          completed: false
+        };
+        const { data } = await supabase.from('daily_settings').insert(payload).select('*');
+        if (data && data.length > 0) {
+          const mappedSession = { ...data[0], id: String(data[0].id) };
+          setAllSessions(prev => [mappedSession, ...prev]);
+          setActiveSession(mappedSession);
+          setDashboardSelectedSession(mappedSession);
+          localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
+          setSaveSuccess(true);
+          setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
+        }
       }
     } catch (err) { alert("Config error"); } finally { setIsSavingSettings(false); }
   };
