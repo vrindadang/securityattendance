@@ -150,7 +150,9 @@ const Dashboard: React.FC<Props> = ({
     currentY = (doc as any).lastAutoTable.finalY + 12;
 
     // Shift Logic in minutes
-    const DAY_S = 7 * 60; 
+    const MOR_S = 7 * 60;
+    const MOR_E = 13 * 60;
+    const DAY_S = 13 * 60; 
     const DAY_E = 19 * 60;
     const EVE_S = 19 * 60;
     const EVE_E = 2 * 60;
@@ -162,10 +164,43 @@ const Dashboard: React.FC<Props> = ({
       return h * 60 + m;
     };
 
+    const getStatusDots = (inTime: string, outTime?: string) => {
+      const start = timeToMins(inTime);
+      const end = outTime ? timeToMins(outTime) : (start + 1);
+      const dots: string[] = [];
+      const shifts = [
+        { s: MOR_S, e: MOR_E, dur: 360 },
+        { s: DAY_S, e: DAY_E, dur: 360 },
+        { s: EVE_S, e: 1440, wrap: EVE_E, dur: 420 },
+        { s: NIT_S, e: NIT_E, dur: 300 }
+      ];
+      const intervals: [number, number][] = [];
+      if (end < start) { intervals.push([start, 1440]); intervals.push([0, end]); }
+      else { intervals.push([start, end]); }
+      shifts.forEach(shift => {
+        let overlap = 0;
+        intervals.forEach(([is, ie]) => {
+          if (shift.wrap !== undefined) {
+            overlap += Math.max(0, Math.min(ie, 1440) - Math.max(is, shift.s));
+            overlap += Math.max(0, Math.min(ie, shift.wrap) - Math.max(is, 0));
+          } else {
+            overlap += Math.max(0, Math.min(ie, shift.e) - Math.max(is, shift.s));
+          }
+        });
+        if (overlap > 0) {
+          const pct = (overlap / shift.dur) * 100;
+          if (pct >= 80) dots.push('#22c55e');
+          else if (pct >= 50) dots.push('#f59e0b');
+          else dots.push('#eab308');
+        }
+      });
+      return Array.from(new Set(dots));
+    };
+
     const getOverlappingShifts = (inTime: string, outTime?: string) => {
       const start = timeToMins(inTime);
       const end = outTime ? timeToMins(outTime) : (start + 1);
-      const shifts: ('Day' | 'Evening' | 'Night')[] = [];
+      const shifts: ('Morning' | 'Day' | 'Evening' | 'Night')[] = [];
       const intervals: [number, number][] = [];
       if (end < start) {
         intervals.push([start, 1440]);
@@ -175,6 +210,7 @@ const Dashboard: React.FC<Props> = ({
       }
       const checkOverlap = (s1: number, e1: number, s2: number, e2: number) => Math.max(s1, s2) < Math.min(e1, e2);
       intervals.forEach(([is, ie]) => {
+        if (checkOverlap(is, ie, MOR_S, MOR_E)) shifts.push('Morning');
         if (checkOverlap(is, ie, DAY_S, DAY_E)) shifts.push('Day');
         if (checkOverlap(is, ie, EVE_S, 1440)) shifts.push('Evening');
         if (checkOverlap(is, ie, 0, EVE_E)) shifts.push('Evening');
@@ -190,7 +226,7 @@ const Dashboard: React.FC<Props> = ({
     doc.setTextColor(0, 0, 0);
     doc.text("2. Shift Distribution", 14, currentY);
 
-    const shiftCounts = { Day: new Set<string>(), Evening: new Set<string>(), Night: new Set<string>() };
+    const shiftCounts = { Morning: new Set<string>(), Day: new Set<string>(), Evening: new Set<string>(), Night: new Set<string>() };
     attendance.forEach(a => {
       if (a.inTime) {
         const covered = getOverlappingShifts(a.inTime, a.outTime);
@@ -202,16 +238,17 @@ const Dashboard: React.FC<Props> = ({
       startY: currentY + 3,
       head: [['Time Slot', 'Shift Description', 'Sewadar Count']],
       body: [
-        ['07:00 AM - 07:00 PM', 'Day Shift', shiftCounts.Day.size],
-        ['07:00 PM - 02:00 AM', 'Evening/Late Shift', shiftCounts.Evening.size],
-        ['02:00 AM - 07:00 AM', 'Night/Early Morning', shiftCounts.Night.size]
+        ['07:00 AM - 01:00 PM', 'Morning Shift', shiftCounts.Morning.size],
+        ['01:00 PM - 07:00 PM', 'Day Shift', shiftCounts.Day.size],
+        ['07:00 PM - 02:00 AM', 'Evening Shift', shiftCounts.Evening.size],
+        ['02:00 AM - 07:00 AM', 'Night Shift', shiftCounts.Night.size]
       ],
       headStyles: { fillColor: [80, 80, 230], textColor: 255, fontStyle: 'bold' },
       bodyStyles: { fontSize: 9 },
       theme: 'grid'
     });
     
-    const shiftTotalSum = shiftCounts.Day.size + shiftCounts.Evening.size + shiftCounts.Night.size;
+    const shiftTotalSum = shiftCounts.Morning.size + shiftCounts.Day.size + shiftCounts.Evening.size + shiftCounts.Night.size;
     currentY = (doc as any).lastAutoTable.finalY + 4;
     
     // Check space for the note
@@ -233,20 +270,21 @@ const Dashboard: React.FC<Props> = ({
     doc.setTextColor(0, 0, 0);
     doc.text("3. Sewa Point Deployment", 14, currentY);
 
-    const pointMap: Record<string, { loc: string, spot: string, daySet: Set<string>, eveSet: Set<string>, nitSet: Set<string> }> = {};
+    const pointMap: Record<string, { loc: string, spot: string, morSet: Set<string>, daySet: Set<string>, eveSet: Set<string>, nitSet: Set<string> }> = {};
     attendance.forEach(a => {
       const key = `${a.workshopLocation}-${a.sewaPoint}`;
       if (!pointMap[key]) {
         pointMap[key] = { 
           loc: a.workshopLocation || 'Other', 
           spot: a.sewaPoint || 'General', 
-          daySet: new Set(), eveSet: new Set(), nitSet: new Set() 
+          morSet: new Set(), daySet: new Set(), eveSet: new Set(), nitSet: new Set() 
         };
       }
       if (a.inTime) {
         const covered = getOverlappingShifts(a.inTime, a.outTime);
         covered.forEach(s => {
-          if (s === 'Day') pointMap[key].daySet.add(a.sewadarId);
+          if (s === 'Morning') pointMap[key].morSet.add(a.sewadarId);
+          else if (s === 'Day') pointMap[key].daySet.add(a.sewadarId);
           else if (s === 'Evening') pointMap[key].eveSet.add(a.sewadarId);
           else pointMap[key].nitSet.add(a.sewadarId);
         });
@@ -255,10 +293,10 @@ const Dashboard: React.FC<Props> = ({
 
     autoTable(doc, {
       startY: currentY + 3,
-      head: [['Ashram / Location', 'Sewa Point / Spot', 'Day', 'Evening', 'Night']],
-      body: Object.values(pointMap).map(p => [p.loc, p.spot, p.daySet.size, p.eveSet.size, p.nitSet.size]),
+      head: [['Ashram / Location', 'Sewa Point / Spot', 'Morning', 'Day', 'Evening', 'Night']],
+      body: Object.values(pointMap).map(p => [p.loc, p.spot, p.morSet.size, p.daySet.size, p.eveSet.size, p.nitSet.size]),
       headStyles: { fillColor: [20, 180, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
-      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' } },
+      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } },
       bodyStyles: { fontSize: 8.5 },
       theme: 'grid'
     });
@@ -342,16 +380,54 @@ const Dashboard: React.FC<Props> = ({
     doc.setFontSize(22);
     doc.setTextColor(50, 60, 120);
     doc.text("Detailed Attendance Log", 14, 20);
+
+    // Legend at top
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    
+    let legendX = 14;
+    const legendY = 27;
+    
+    doc.setFillColor('#22c55e'); doc.circle(legendX, legendY - 0.8, 1, 'F');
+    doc.text(">80% Shift", legendX + 3, legendY);
+    
+    legendX += 25;
+    doc.setFillColor('#f59e0b'); doc.circle(legendX, legendY - 0.8, 1, 'F');
+    doc.text("50-80% Shift", legendX + 3, legendY);
+    
+    legendX += 30;
+    doc.setFillColor('#eab308'); doc.circle(legendX, legendY - 0.8, 1, 'F');
+    doc.text("<50% Shift", legendX + 3, legendY);
+
     autoTable(doc, {
-      startY: 32,
-      head: [['#', 'Name', 'In', 'Out', 'Dur', 'Location', 'Spot', 'Verified By']],
+      startY: 34,
+      head: [['#', 'Name', 'In', 'Out', 'Dur', 'Location', 'Spot', 'Verified By', 'Status']],
       body: attendance.map((a, i) => {
         const verifier = VOLUNTEERS.find(v => v.id === a.volunteerId)?.name || 'Incharge';
-        return [i + 1, a.name, a.inTime || '-', a.outTime || '-', calculateDuration(a.inTime, a.outTime), a.workshopLocation || '-', a.sewaPoint || '-', verifier];
+        return [i + 1, a.name, a.inTime || '-', a.outTime || '-', calculateDuration(a.inTime, a.outTime), a.workshopLocation || '-', a.sewaPoint || '-', verifier, ''];
       }),
-      headStyles: { fillColor: [50, 60, 120], textColor: 255, fontSize: 8 },
+      headStyles: { fillColor: [50, 60, 120], textColor: 255, fontSize: 8, halign: 'center' },
+      columnStyles: { 0: { halign: 'center' }, 8: { halign: 'center', cellWidth: 15 } },
       bodyStyles: { fontSize: 7.5 },
-      theme: 'grid'
+      theme: 'grid',
+      didDrawCell: (data) => {
+        if (data.section === 'body' && data.column.index === 8) {
+          const record = attendance[data.row.index];
+          if (record.inTime) {
+            const dots = getStatusDots(record.inTime, record.outTime);
+            const dotRadius = 1.2;
+            const dotGap = 1.5;
+            const totalWidth = dots.length * (dotRadius * 2) + (dots.length - 1) * dotGap;
+            let startX = data.cell.x + (data.cell.width - totalWidth) / 2 + dotRadius;
+            
+            dots.forEach((color, idx) => {
+              doc.setFillColor(color);
+              doc.circle(startX + (idx * (dotRadius * 2 + dotGap)), data.cell.y + data.cell.height / 2, dotRadius, 'F');
+            });
+          }
+        }
+      }
     });
 
     doc.save(`SKRM_Security_Report_${groupName}_${dateDisplay.replace(/\//g, '-')}.pdf`);
