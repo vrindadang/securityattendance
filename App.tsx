@@ -705,7 +705,16 @@ const App: React.FC = () => {
     }
   }, []);
 
-  if (!activeVolunteer) return <Login onLogin={v => { setActiveVolunteer(v); localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); }} />;
+  if (!activeVolunteer) return <Login onLogin={v => { 
+    try {
+      setActiveVolunteer(v); 
+      localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
+    } catch (e) {
+      console.error("Storage error:", e);
+      // Still set state even if storage fails
+      setActiveVolunteer(v);
+    }
+  }} />;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">

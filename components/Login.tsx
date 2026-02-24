@@ -56,12 +56,24 @@ const Login: React.FC<Props> = ({ onLogin }) => {
         return;
       }
 
-      // 1. Check Supabase for overridden password
-      const { data, error: dbError } = await supabase
+      // 1. Check Supabase for overridden password with a 3-second timeout
+      const supabaseQuery = supabase
         .from('volunteers')
         .select('password')
         .eq('id', selectedVolunteer.id)
         .single();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+
+      let data = null;
+      try {
+        const result: any = await Promise.race([supabaseQuery, timeoutPromise]);
+        data = result.data;
+      } catch (timeoutErr) {
+        console.warn('Supabase password check timed out, using local fallback');
+      }
       
       const effectivePassword = data?.password || selectedVolunteer.password;
 
