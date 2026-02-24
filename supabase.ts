@@ -1,5 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
+declare global {
+  interface Window {
+    ENV?: {
+      SUPABASE_URL?: string;
+      SUPABASE_ANON_KEY?: string;
+    };
+  }
+}
+
 /**
  * Use runtime environment variables injected by Google AI Studio / Vercel
  */
