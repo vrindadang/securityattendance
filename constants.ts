@@ -54,6 +54,7 @@ export const KIRPAL_ASHRAM_POINTS = [
   'Canteen Roof',
   'Photo Section Roof',
   'Front of Banni',
+  'Round',
   'Small Gate of Kothi'
 ];
 
@@ -86,6 +87,7 @@ export const SDS_DHAM_POINTS = [
   'VIP washroom',
   'Green room washroom',
   'Pandal',
+  'Round',
   'Mechanical Store'
 ];
 
