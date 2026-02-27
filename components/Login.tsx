@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { Volunteer, GentsGroup } from '../types';
 import { VOLUNTEERS, GENTS_GROUPS } from '../constants';
-import { supabase } from '../supabase';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface Props {
   onLogin: (volunteer: Volunteer) => void;
@@ -56,12 +57,8 @@ const Login: React.FC<Props> = ({ onLogin }) => {
         return;
       }
 
-      // 1. Check Supabase for overridden password with a 3-second timeout
-      const supabaseQuery = supabase
-        .from('volunteers')
-        .select('password')
-        .eq('id', selectedVolunteer.id)
-        .single();
+      // 1. Check Firestore for overridden password with a 3-second timeout
+      const firestorePromise = getDoc(doc(db, 'volunteers', selectedVolunteer.id));
       
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Timeout')), 3000)
@@ -69,10 +66,12 @@ const Login: React.FC<Props> = ({ onLogin }) => {
 
       let data = null;
       try {
-        const result: any = await Promise.race([supabaseQuery, timeoutPromise]);
-        data = result.data;
+        const result: any = await Promise.race([firestorePromise, timeoutPromise]);
+        if (result.exists()) {
+          data = { id: result.id, ...result.data() };
+        }
       } catch (timeoutErr) {
-        console.warn('Supabase password check timed out, using local fallback');
+        console.warn('Firestore password check timed out, using local fallback');
       }
       
       const effectivePassword = data?.password || selectedVolunteer.password;

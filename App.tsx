@@ -7,7 +7,8 @@ import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import VolunteerDetails from './components/VolunteerDetails';
 import RequirementsView from './components/RequirementsView';
-import { supabase } from './supabase';
+import { db } from './firebase';
+import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp } from 'firebase/firestore';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
 const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
@@ -108,17 +109,25 @@ const App: React.FC = () => {
     if (!activeVolunteer) return;
     
     try {
-      let query = supabase
-        .from('daily_settings')
-        .select('id, location, "group", start_time, end_time, date, completed');
+      const q = query(
+        collection(db, 'daily_settings'),
+        ...(activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup 
+          ? [where('group', '==', activeVolunteer.assignedGroup)] 
+          : [])
+      );
       
-      if (activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup) {
-        query = query.eq('"group"', activeVolunteer.assignedGroup);
-      }
-      
-      const { data, error } = await query.order('start_time', { ascending: false });
-      
-      if (error) throw error;
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs
+        .map(doc => {
+          const d = doc.data();
+          // Normalize date to string if it's a Timestamp
+          let dateStr = d.date;
+          if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
+            dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
+          }
+          return { id: doc.id, ...d, date: String(dateStr || '') };
+        })
+        .sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) as any[];
       
       if (data && data.length > 0) {
         const mappedSessions = data.map(s => ({ ...s, id: String(s.id) }));
@@ -168,8 +177,8 @@ const App: React.FC = () => {
 
   const fetchSewadarDetails = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('sewadar_details').select('*');
-      if (error) throw error;
+      const querySnapshot = await getDocs(collection(db, 'sewadar_details'));
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (data) {
         const map: Record<string, SewadarDetails> = {};
         data.forEach((d: any) => {
@@ -189,9 +198,12 @@ const App: React.FC = () => {
 
   const fetchRequirements = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('requirements').select('*').order('timestamp', { ascending: false });
-      if (error) throw error;
-      if (data) setRequirements(data as Requirement[]);
+      const q = query(collection(db, 'requirements'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)) as Requirement[];
+      if (data) setRequirements(data);
     } catch (err) {
       console.error("Fetch Requirements Error:", err);
     }
@@ -249,11 +261,21 @@ const App: React.FC = () => {
     if (target === 'dashboard') setLoading(true);
     
     try {
-      const { data: attData } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('date', session.date)
-        .eq('group', session.group);
+      const [y, m, d] = session.date.split('-').map(Number);
+      const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0));
+      const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 23, 59, 59));
+
+      const attQ = query(collection(db, 'attendance'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+      const attSnapshot = await getDocs(attQ);
+      const allAttData = attSnapshot.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = d.date;
+        if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
+          dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
+        }
+        return { id: doc.id, ...d, date: String(dateStr || '') };
+      });
+      const attData = allAttData.filter((a: any) => a.group === session.group);
 
       const mappedAtt = attData ? attData.map((a: any) => ({
         ...a,
@@ -267,11 +289,17 @@ const App: React.FC = () => {
         isProperUniform: a.is_proper_uniform 
       })) : [];
 
-      const { data: issuesData } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('date', session.date)
-        .eq('group', session.group);
+      const issuesQ = query(collection(db, 'issues'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+      const issuesSnapshot = await getDocs(issuesQ);
+      const allIssuesData = issuesSnapshot.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = d.date;
+        if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
+          dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
+        }
+        return { id: doc.id, ...d, date: String(dateStr || '') };
+      });
+      const issuesData = allIssuesData.filter((i: any) => i.group === session.group);
 
       const mappedIssues = issuesData ? issuesData.map((i: any) => ({
         id: String(i.id),
@@ -282,11 +310,17 @@ const App: React.FC = () => {
         volunteerName: i.volunteer_name
       })) : [];
 
-      const { data: photoData } = await supabase
-        .from('group_photos')
-        .select('*')
-        .eq('date', session.date)
-        .eq('group', session.group);
+      const photoQ = query(collection(db, 'group_photos'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+      const photoSnapshot = await getDocs(photoQ);
+      const allPhotoData = photoSnapshot.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = d.date;
+        if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
+          dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
+        }
+        return { id: doc.id, ...d, date: String(dateStr || '') };
+      });
+      const photoData = allPhotoData.filter((p: any) => p.group === session.group);
 
       const mappedPhotos = photoData ? photoData.map((p: any) => ({
         id: String(p.id),
@@ -296,11 +330,17 @@ const App: React.FC = () => {
         volunteerName: p.volunteer_name
       })) : [];
 
-      const { data: vData } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('date', session.date)
-        .eq('group', session.group);
+      const vQ = query(collection(db, 'vehicles'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+      const vSnapshot = await getDocs(vQ);
+      const allVData = vSnapshot.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = d.date;
+        if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
+          dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
+        }
+        return { id: doc.id, ...d, date: String(dateStr || '') };
+      });
+      const vData = allVData.filter((v: any) => v.group === session.group);
 
       const mappedVehicles = vData ? vData.map((v: any) => ({
         id: String(v.id),
@@ -313,11 +353,22 @@ const App: React.FC = () => {
         volunteerName: v.volunteer_name
       })) : [];
 
-      const { data: historicalVData } = await supabase
-        .from('vehicles')
-        .select('*')
-        .order('date', { ascending: false })
-        .limit(200);
+      const histVQ = query(collection(db, 'vehicles'), limit(200));
+      const histVSnapshot = await getDocs(histVQ);
+      const historicalVData = histVSnapshot.docs
+        .map(doc => {
+          const d = doc.data();
+          let dateStr = d.date;
+          if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
+            dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
+          }
+          return { id: doc.id, ...d, date: String(dateStr || '') };
+        })
+        .sort((a: any, b: any) => {
+          const dateA = String(a.date || '');
+          const dateB = String(b.date || '');
+          return dateB.localeCompare(dateA);
+        });
 
       if (historicalVData) {
         calculateFlaggedVehicles(historicalVData, session.date);
@@ -335,7 +386,8 @@ const App: React.FC = () => {
         setVehicles(mappedVehicles);
       }
 
-      const { data: customData } = await supabase.from('custom_sewadars').select('*');
+      const customSnapshot = await getDocs(collection(db, 'custom_sewadars'));
+      const customData = customSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (customData) {
         setCustomSewadars(customData.map((s: any) => ({
           id: String(s.id),
@@ -380,8 +432,7 @@ const App: React.FC = () => {
 
     if (isDelete && recordId) {
       try {
-        const { error } = await supabase.from('attendance').delete().eq('id', recordId);
-        if (error) throw error;
+        await deleteDoc(doc(db, 'attendance', recordId));
         setActiveAttendance(prev => prev.filter(a => a.id !== recordId));
         if (dashboardSelectedSession?.id === activeSession.id) {
            setAttendance(prev => prev.filter(a => a.id !== recordId));
@@ -398,13 +449,16 @@ const App: React.FC = () => {
     const isExisting = !!recordId;
     const finalRecordId = recordId || generateNumericId();
 
+    const [y, m, d] = sessionDate.split('-').map(Number);
+    const dateTimestamp = Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
+
     const dbPayload = {
       id: finalRecordId,
       sewadar_id: sewadarId, 
       name: sewadar.name, 
       group: sessionGroup, 
       gender: sewadar.gender,
-      date: sessionDate, 
+      date: dateTimestamp, 
       timestamp: Date.now(), 
       volunteer_id: activeVolunteer?.id || '',
       in_time: details.inTime || '', 
@@ -431,14 +485,7 @@ const App: React.FC = () => {
     };
 
     try {
-      let result;
-      if (isExisting) {
-        result = await supabase.from('attendance').update(dbPayload).eq('id', finalRecordId);
-      } else {
-        result = await supabase.from('attendance').insert(dbPayload);
-      }
-
-      if (result.error) throw result.error;
+      await setDoc(doc(db, 'attendance', finalRecordId), dbPayload);
       
       setActiveAttendance(prev => {
         const filtered = prev.filter(a => a.id !== finalRecordId);
@@ -457,13 +504,12 @@ const App: React.FC = () => {
 
   const handleSaveSewadarDetails = async (details: SewadarDetails) => {
     try {
-      const { error } = await supabase.from('sewadar_details').upsert({
+      await setDoc(doc(db, 'sewadar_details', details.sewadar_id), {
         sewadar_id: details.sewadar_id,
         address: details.address,
         dob: details.dob,
         phone: details.phone
-      });
-      if (error) throw error;
+      }, { merge: true });
       setSewadarDetailsMap(prev => ({ ...prev, [details.sewadar_id]: details }));
     } catch (err) {
       console.error("Save Details Error:", err);
@@ -483,8 +529,7 @@ const App: React.FC = () => {
       status: 'Pending'
     };
     try {
-      const { error } = await supabase.from('requirements').insert(newReq);
-      if (error) throw error;
+      await setDoc(doc(db, 'requirements', newReq.id), newReq);
       setRequirements(prev => [newReq, ...prev]);
     } catch (err) {
       console.error("Save Requirement Error:", err);
@@ -493,8 +538,7 @@ const App: React.FC = () => {
 
   const handleUpdateRequirementStatus = async (id: string, status: Requirement['status']) => {
     try {
-      const { error } = await supabase.from('requirements').update({ status }).eq('id', id);
-      if (error) throw error;
+      await updateDoc(doc(db, 'requirements', id), { status });
       setRequirements(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     } catch (err) {
       console.error("Update Requirement Status Error:", err);
@@ -515,8 +559,11 @@ const App: React.FC = () => {
     if (dashboardSelectedSession?.id === activeSession.id) {
       setIssues(prev => [...prev, newIssue]);
     }
-    await supabase.from('issues').insert({
-      id: newIssue.id, date: activeSession.date, group: activeSession.group,
+    const [y, m, d] = activeSession.date.split('-').map(Number);
+    const dateTimestamp = Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
+
+    await setDoc(doc(db, 'issues', newIssue.id), {
+      id: newIssue.id, date: dateTimestamp, group: activeSession.group,
       description: newIssue.description, photo: newIssue.photo, timestamp: newIssue.timestamp,
       volunteer_id: newIssue.volunteerId, volunteer_name: newIssue.volunteerName
     });
@@ -535,8 +582,11 @@ const App: React.FC = () => {
     if (dashboardSelectedSession?.id === activeSession.id) {
       setGroupPhotos(prev => [...prev, newPhoto]);
     }
-    await supabase.from('group_photos').insert({
-      id: newPhoto.id, date: activeSession.date, group: activeSession.group,
+    const [y, m, d] = activeSession.date.split('-').map(Number);
+    const dateTimestamp = Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
+
+    await setDoc(doc(db, 'group_photos', newPhoto.id), {
+      id: newPhoto.id, date: dateTimestamp, group: activeSession.group,
       photo: newPhoto.photo, timestamp: newPhoto.timestamp,
       volunteer_id: newPhoto.volunteerId, volunteer_name: newPhoto.volunteerName
     });
@@ -555,15 +605,18 @@ const App: React.FC = () => {
       volunteerName: activeVolunteer.name
     };
 
+    const [y, m, d] = activeSession.date.split('-').map(Number);
+    const dateTimestamp = Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
+
     try {
       setActiveVehicles(prev => [...prev, newV]);
       if (dashboardSelectedSession?.id === activeSession.id) {
         setVehicles(prev => [...prev, newV]);
       }
 
-      const { error } = await supabase.from('vehicles').insert({
+      await setDoc(doc(db, 'vehicles', newV.id), {
         id: newV.id, 
-        date: activeSession.date, 
+        date: dateTimestamp, 
         group: activeSession.group,
         type: v.type, 
         plate_number: cleanPlate, 
@@ -573,8 +626,6 @@ const App: React.FC = () => {
         volunteer_id: newV.volunteerId, 
         volunteer_name: newV.volunteerName
       });
-
-      if (error) throw error;
     } catch (err: any) {
       console.error("Failed to save vehicle log:", err);
       setActiveVehicles(prev => prev.filter(item => item.id !== newV.id));
@@ -593,58 +644,61 @@ const App: React.FC = () => {
     setIsSavingSettings(true);
     try {
       const groupName = activeVolunteer?.assignedGroup || 'Global';
+      const [y, m, d] = configForm.startDate.split('-').map(Number);
+      const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0));
+      const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 23, 59, 59));
       
-      // FIX: Check if an active session already exists for this date and group
-      const { data: existing } = await supabase
-        .from('daily_settings')
-        .select('*')
-        .eq('date', configForm.startDate)
-        .eq('group', groupName)
-        .eq('completed', false)
-        .limit(1);
+      const q = query(
+        collection(db, 'daily_settings'),
+        where('date', '>=', startOfDay),
+        where('date', '<=', endOfDay),
+        where('group', '==', groupName),
+        where('completed', '==', false),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      const existing = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       if (existing && existing.length > 0) {
-        // Update existing instead of creating a new row to avoid duplication
         const payload = {
           location: configForm.locations.join(', '),
           start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
           end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
         };
-        const { data } = await supabase.from('daily_settings').update(payload).eq('id', existing[0].id).select('*');
-        if (data && data.length > 0) {
-          const mappedSession = { ...data[0], id: String(data[0].id) };
-          setAllSessions(prev => [mappedSession, ...prev.filter(s => s.id !== mappedSession.id)]);
-          setActiveSession(mappedSession);
-          setDashboardSelectedSession(mappedSession);
-          localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
-          setSaveSuccess(true);
-          setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
-        }
+        await updateDoc(doc(db, 'daily_settings', existing[0].id), payload);
+        const mappedSession = { ...existing[0], ...payload, id: String(existing[0].id) } as DutySession;
+        setAllSessions(prev => [mappedSession, ...prev.filter(s => s.id !== mappedSession.id)]);
+        setActiveSession(mappedSession);
+        setDashboardSelectedSession(mappedSession);
+        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
+        setSaveSuccess(true);
+        setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       } else {
+        const id = generateNumericId();
         const payload = {
-          date: configForm.startDate, group: groupName,
+          id,
+          date: Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0)), 
+          group: groupName,
           location: configForm.locations.join(', '),
           start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
           end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
           completed: false
         };
-        const { data } = await supabase.from('daily_settings').insert(payload).select('*');
-        if (data && data.length > 0) {
-          const mappedSession = { ...data[0], id: String(data[0].id) };
-          setAllSessions(prev => [mappedSession, ...prev]);
-          setActiveSession(mappedSession);
-          setDashboardSelectedSession(mappedSession);
-          localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
-          setSaveSuccess(true);
-          setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
-        }
+        await setDoc(doc(db, 'daily_settings', id), payload);
+        const mappedSession = { ...payload, id: String(id) } as DutySession;
+        setAllSessions(prev => [mappedSession, ...prev]);
+        setActiveSession(mappedSession);
+        setDashboardSelectedSession(mappedSession);
+        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
+        setSaveSuccess(true);
+        setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       }
     } catch (err) { alert("Config error"); } finally { setIsSavingSettings(false); }
   };
 
   const handleCompleteSession = async (sessionId: string) => {
     try {
-      await supabase.from('daily_settings').update({ completed: true }).eq('id', sessionId);
+      await updateDoc(doc(db, 'daily_settings', sessionId), { completed: true });
       setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
       if (activeSession?.id === sessionId) setActiveSession(null);
       if (dashboardSelectedSession?.id === sessionId) {
@@ -671,14 +725,16 @@ const App: React.FC = () => {
 
     setLoading(true);
     try {
-      await Promise.all([
-        supabase.from('attendance').delete().neq('id', '0'),
-        supabase.from('issues').delete().neq('id', '0'),
-        supabase.from('group_photos').delete().neq('id', '0'),
-        supabase.from('vehicles').delete().neq('id', '0'),
-        supabase.from('daily_settings').delete().neq('id', '0'),
-        supabase.from('requirements').delete().neq('id', '0')
-      ]);
+      const collectionsToClear = ['attendance', 'issues', 'group_photos', 'vehicles', 'daily_settings', 'requirements'];
+      
+      for (const colName of collectionsToClear) {
+        const qSnapshot = await getDocs(collection(db, colName));
+        const batch = writeBatch(db);
+        qSnapshot.docs.forEach((d) => {
+          batch.delete(d.ref);
+        });
+        await batch.commit();
+      }
 
       setActiveAttendance([]);
       setActiveIssues([]);
@@ -781,7 +837,7 @@ const App: React.FC = () => {
             onAddSewadar={async (n, g, grp) => {
               const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp };
               try {
-                await supabase.from('custom_sewadars').insert({ id: newSewadar.id, name: newSewadar.name, gender: newSewadar.gender, group: newSewadar.group });
+                await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { id: newSewadar.id, name: newSewadar.name, gender: newSewadar.gender, group: newSewadar.group });
                 setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
               } catch (error) { console.error('Failed to add sewadar:', error); }
             }} 

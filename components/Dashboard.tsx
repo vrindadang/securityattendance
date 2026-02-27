@@ -81,7 +81,7 @@ const Dashboard: React.FC<Props> = ({
     const doc = new jsPDF('p', 'mm', 'a4');
     const groupName = activeVolunteer?.assignedGroup || 'Security';
     const currentSession = allSessions.find(s => s.id === selectedSessionId);
-    const dateDisplay = currentSession?.date?.split('-').reverse().join('/') || '-';
+    const dateDisplay = (typeof currentSession?.date === 'string' ? currentSession.date : '').split('-').reverse().join('/') || '-';
     const isLadies = groupName === 'Ladies';
     const groupText = isLadies ? "Ladies Security Group" : `${groupName} Gents Security Group`;
     
@@ -194,7 +194,7 @@ const Dashboard: React.FC<Props> = ({
           else dots.push('#eab308');
         }
       });
-      return Array.from(new Set(dots));
+      return dots;
     };
 
     const getOverlappingShifts = (inTime: string, outTime?: string) => {
@@ -478,7 +478,7 @@ const Dashboard: React.FC<Props> = ({
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Total Present</p>
-          <p className="text-4xl font-black text-slate-900">{attendance.length}</p>
+          <p className="text-4xl font-black text-slate-900">{new Set(attendance.map(a => a.sewadarId)).size}</p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Open Issues</p>
@@ -496,7 +496,7 @@ const Dashboard: React.FC<Props> = ({
           {allSessions.length === 0 && <option value="">No sessions found</option>}
           {allSessions.map(s => (
             <option key={s.id} value={s.id}>
-              {s.date.split('-').reverse().join('/')} - {s.location} ({s.completed ? 'Finalized' : 'Active'})
+              {(typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/')} - {s.location} ({s.completed ? 'Finalized' : 'Active'})
             </option>
           ))}
         </select>
