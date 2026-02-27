@@ -6,12 +6,14 @@ interface Props {
   requirements: Requirement[];
   activeVolunteer: Volunteer;
   onAddRequirement: (desc: string) => void;
-  onUpdateRequirementStatus: (id: string, status: Requirement['status']) => void;
+  onUpdateRequirementStatus: (id: string, status: Requirement['status'], comment?: string) => void;
 }
 
 const RequirementsView: React.FC<Props> = ({ requirements, activeVolunteer, onAddRequirement, onUpdateRequirementStatus }) => {
   const [showReqModal, setShowReqModal] = useState(false);
   const [reqDesc, setReqDesc] = useState('');
+  const [statusUpdateModal, setStatusUpdateModal] = useState<{id: string, status: Requirement['status']} | null>(null);
+  const [adminComment, setAdminComment] = useState('');
   
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const groupName = activeVolunteer.assignedGroup || 'Global';
@@ -96,6 +98,12 @@ const RequirementsView: React.FC<Props> = ({ requirements, activeVolunteer, onAd
                     }`}>
                       {req.description}
                     </p>
+                    {req.adminComment && (
+                      <div className="mt-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                        <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Admin Response</p>
+                        <p className="text-xs font-medium text-indigo-900">{req.adminComment}</p>
+                      </div>
+                    )}
                   </div>
                   <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border shadow-sm ${
                     req.status === 'Closed' ? 'bg-green-100 text-green-700 border-green-200' :
@@ -109,19 +117,28 @@ const RequirementsView: React.FC<Props> = ({ requirements, activeVolunteer, onAd
                 {isSuperAdmin && (
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100/50">
                     <button 
-                      onClick={() => onUpdateRequirementStatus(req.id, 'Pending')}
+                      onClick={() => {
+                        setAdminComment(req.adminComment || '');
+                        setStatusUpdateModal({ id: req.id, status: 'Pending' });
+                      }}
                       className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase transition-all ${req.status === 'Pending' ? 'bg-yellow-400 text-yellow-900 shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-yellow-50'}`}
                     >
                       Pending
                     </button>
                     <button 
-                      onClick={() => onUpdateRequirementStatus(req.id, 'Closed')}
+                      onClick={() => {
+                        setAdminComment(req.adminComment || '');
+                        setStatusUpdateModal({ id: req.id, status: 'Closed' });
+                      }}
                       className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase transition-all ${req.status === 'Closed' ? 'bg-green-500 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-green-50'}`}
                     >
                       Mark Closed
                     </button>
                     <button 
-                      onClick={() => onUpdateRequirementStatus(req.id, 'Not Required')}
+                      onClick={() => {
+                        setAdminComment(req.adminComment || '');
+                        setStatusUpdateModal({ id: req.id, status: 'Not Required' });
+                      }}
                       className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase transition-all ${req.status === 'Not Required' ? 'bg-sky-500 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-sky-50'}`}
                     >
                       Not Required
@@ -174,6 +191,41 @@ const RequirementsView: React.FC<Props> = ({ requirements, activeVolunteer, onAd
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {statusUpdateModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 leading-tight">Update Status</h3>
+              <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">Changing to {statusUpdateModal.status}</p>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Admin Comment (Optional)</label>
+              <textarea 
+                className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                placeholder="Add a note about this update..."
+                rows={3}
+                value={adminComment}
+                onChange={(e) => setAdminComment(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => { setStatusUpdateModal(null); setAdminComment(''); }} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest">Cancel</button>
+              <button 
+                onClick={() => {
+                  onUpdateRequirementStatus(statusUpdateModal.id, statusUpdateModal.status, adminComment);
+                  setStatusUpdateModal(null);
+                  setAdminComment('');
+                }}
+                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95"
+              >
+                Confirm Update
+              </button>
             </div>
           </div>
         </div>

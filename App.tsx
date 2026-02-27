@@ -125,7 +125,7 @@ const App: React.FC = () => {
           if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
             dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
           }
-          return { id: doc.id, ...d, date: String(dateStr || '') };
+          return { ...d, id: doc.id, date: String(dateStr || '') };
         })
         .sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) as any[];
       
@@ -178,7 +178,7 @@ const App: React.FC = () => {
   const fetchSewadarDetails = useCallback(async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'sewadar_details'));
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       if (data) {
         const map: Record<string, SewadarDetails> = {};
         data.forEach((d: any) => {
@@ -201,7 +201,7 @@ const App: React.FC = () => {
       const q = query(collection(db, 'requirements'));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map(doc => ({ ...doc.data(), id: doc.id }))
         .sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)) as Requirement[];
       if (data) setRequirements(data);
     } catch (err) {
@@ -273,7 +273,7 @@ const App: React.FC = () => {
         if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
           dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
         }
-        return { id: doc.id, ...d, date: String(dateStr || '') };
+        return { ...d, id: doc.id, date: String(dateStr || '') };
       });
       const attData = allAttData.filter((a: any) => a.group === session.group);
 
@@ -297,7 +297,7 @@ const App: React.FC = () => {
         if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
           dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
         }
-        return { id: doc.id, ...d, date: String(dateStr || '') };
+        return { ...d, id: doc.id, date: String(dateStr || '') };
       });
       const issuesData = allIssuesData.filter((i: any) => i.group === session.group);
 
@@ -318,7 +318,7 @@ const App: React.FC = () => {
         if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
           dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
         }
-        return { id: doc.id, ...d, date: String(dateStr || '') };
+        return { ...d, id: doc.id, date: String(dateStr || '') };
       });
       const photoData = allPhotoData.filter((p: any) => p.group === session.group);
 
@@ -338,7 +338,7 @@ const App: React.FC = () => {
         if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
           dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
         }
-        return { id: doc.id, ...d, date: String(dateStr || '') };
+        return { ...d, id: doc.id, date: String(dateStr || '') };
       });
       const vData = allVData.filter((v: any) => v.group === session.group);
 
@@ -362,7 +362,7 @@ const App: React.FC = () => {
           if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
             dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
           }
-          return { id: doc.id, ...d, date: String(dateStr || '') };
+          return { ...d, id: doc.id, date: String(dateStr || '') };
         })
         .sort((a: any, b: any) => {
           const dateA = String(a.date || '');
@@ -387,7 +387,7 @@ const App: React.FC = () => {
       }
 
       const customSnapshot = await getDocs(collection(db, 'custom_sewadars'));
-      const customData = customSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const customData = customSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       if (customData) {
         setCustomSewadars(customData.map((s: any) => ({
           id: String(s.id),
@@ -536,10 +536,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateRequirementStatus = async (id: string, status: Requirement['status']) => {
+  const handleUpdateRequirementStatus = async (id: string, status: Requirement['status'], adminComment?: string) => {
     try {
-      await updateDoc(doc(db, 'requirements', id), { status });
-      setRequirements(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      const updateData: any = { status };
+      if (adminComment !== undefined) {
+        updateData.adminComment = adminComment;
+      }
+      await updateDoc(doc(db, 'requirements', id), updateData);
+      setRequirements(prev => prev.map(r => r.id === id ? { ...r, status, adminComment: adminComment ?? r.adminComment } : r));
     } catch (err) {
       console.error("Update Requirement Status Error:", err);
     }
@@ -657,7 +661,7 @@ const App: React.FC = () => {
         limit(1)
       );
       const querySnapshot = await getDocs(q);
-      const existing = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const existing = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
       if (existing && existing.length > 0) {
         const payload = {

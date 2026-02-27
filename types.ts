@@ -63,6 +63,7 @@ export interface Requirement {
   volunteer_id: string;
   volunteer_name: string;
   status: 'Pending' | 'Closed' | 'Not Required';
+  adminComment?: string;
 }
 
 export interface Issue {
