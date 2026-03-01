@@ -261,7 +261,13 @@ const App: React.FC = () => {
     if (target === 'dashboard') setLoading(true);
     
     try {
-      const [y, m, d] = session.date.split('-').map(Number);
+      let dateStr = session.date as any;
+      if (dateStr && typeof dateStr !== 'string' && dateStr.toDate) {
+        dateStr = dateStr.toDate().toISOString().split('T')[0];
+      }
+      const [y, m, d] = String(dateStr || '').split('-').map(Number);
+      if (isNaN(y) || isNaN(m) || isNaN(d)) throw new Error("Invalid session date format");
+      
       const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0));
       const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 23, 59, 59));
 
@@ -371,7 +377,7 @@ const App: React.FC = () => {
         });
 
       if (historicalVData) {
-        calculateFlaggedVehicles(historicalVData, session.date);
+        calculateFlaggedVehicles(historicalVData, String(dateStr || ''));
       }
 
       if (target === 'active') {
@@ -648,29 +654,44 @@ const App: React.FC = () => {
     setIsSavingSettings(true);
     try {
       const groupName = activeVolunteer?.assignedGroup || 'Global';
-      const [y, m, d] = configForm.startDate.split('-').map(Number);
+      
+      const parseDateParts = (dateStr: string) => {
+        const parts = dateStr.split(/[-/]/).map(Number);
+        if (parts[0] > 1000) return { y: parts[0], m: parts[1], d: parts[2] };
+        return { d: parts[0], m: parts[1], y: parts[2] };
+      };
+
+      const { y, m, d } = parseDateParts(configForm.startDate);
+      if (isNaN(y) || isNaN(m) || isNaN(d)) throw new Error("Invalid start date format");
+
       const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0));
       const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 23, 59, 59));
       
+      const getISO = (dateStr: string, timeStr: string) => {
+        const { y: year, m: month, d: day } = parseDateParts(dateStr);
+        const [hh, mm] = timeStr.split(':').map(Number);
+        const dt = new Date(year, month - 1, day, hh, mm);
+        if (isNaN(dt.getTime())) throw new Error("Invalid date or time value");
+        return dt.toISOString();
+      };
+
       const q = query(
         collection(db, 'daily_settings'),
         where('date', '>=', startOfDay),
-        where('date', '<=', endOfDay),
-        where('group', '==', groupName),
-        where('completed', '==', false),
-        limit(1)
+        where('date', '<=', endOfDay)
       );
       const querySnapshot = await getDocs(q);
-      const existing = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      const allExisting = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      const existing = allExisting.filter((s: any) => s.group === groupName && s.completed === false);
 
       if (existing && existing.length > 0) {
         const payload = {
           location: configForm.locations.join(', '),
-          start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
-          end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
+          start_time: getISO(configForm.startDate, configForm.startTime),
+          end_time: getISO(configForm.endDate, configForm.endTime),
         };
         await updateDoc(doc(db, 'daily_settings', existing[0].id), payload);
-        const mappedSession = { ...existing[0], ...payload, id: String(existing[0].id) } as DutySession;
+        const mappedSession = { ...existing[0], ...payload, id: String(existing[0].id), date: configForm.startDate } as DutySession;
         setAllSessions(prev => [mappedSession, ...prev.filter(s => s.id !== mappedSession.id)]);
         setActiveSession(mappedSession);
         setDashboardSelectedSession(mappedSession);
@@ -684,12 +705,12 @@ const App: React.FC = () => {
           date: Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0)), 
           group: groupName,
           location: configForm.locations.join(', '),
-          start_time: new Date(`${configForm.startDate}T${configForm.startTime}`).toISOString(),
-          end_time: new Date(`${configForm.endDate}T${configForm.endTime}`).toISOString(),
+          start_time: getISO(configForm.startDate, configForm.startTime),
+          end_time: getISO(configForm.endDate, configForm.endTime),
           completed: false
         };
         await setDoc(doc(db, 'daily_settings', id), payload);
-        const mappedSession = { ...payload, id: String(id) } as DutySession;
+        const mappedSession = { ...payload, id: String(id), date: configForm.startDate } as DutySession;
         setAllSessions(prev => [mappedSession, ...prev]);
         setActiveSession(mappedSession);
         setDashboardSelectedSession(mappedSession);
@@ -697,7 +718,10 @@ const App: React.FC = () => {
         setSaveSuccess(true);
         setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       }
-    } catch (err) { alert("Config error"); } finally { setIsSavingSettings(false); }
+    } catch (err) { 
+      console.error("Config error details:", err);
+      alert("Config error: " + (err instanceof Error ? err.message : "Unknown error")); 
+    } finally { setIsSavingSettings(false); }
   };
 
   const handleCompleteSession = async (sessionId: string) => {
