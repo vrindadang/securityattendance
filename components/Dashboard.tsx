@@ -190,8 +190,8 @@ const Dashboard: React.FC<Props> = ({
         if (overlap > 0) {
           const pct = (overlap / shift.dur) * 100;
           if (pct >= 80) dots.push('#22c55e');
-          else if (pct >= 50) dots.push('#f59e0b');
-          else dots.push('#eab308');
+          else if (pct >= 50) dots.push('#eab308');
+          else dots.push('#ef4444');
         }
       });
       return dots;
@@ -393,11 +393,11 @@ const Dashboard: React.FC<Props> = ({
     doc.text(">80% Shift", legendX + 3, legendY);
     
     legendX += 25;
-    doc.setFillColor('#f59e0b'); doc.circle(legendX, legendY - 0.8, 1, 'F');
+    doc.setFillColor('#eab308'); doc.circle(legendX, legendY - 0.8, 1, 'F');
     doc.text("50-80% Shift", legendX + 3, legendY);
     
     legendX += 30;
-    doc.setFillColor('#eab308'); doc.circle(legendX, legendY - 0.8, 1, 'F');
+    doc.setFillColor('#ef4444'); doc.circle(legendX, legendY - 0.8, 1, 'F');
     doc.text("<50% Shift", legendX + 3, legendY);
 
     autoTable(doc, {
