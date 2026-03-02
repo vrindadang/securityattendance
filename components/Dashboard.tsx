@@ -82,8 +82,8 @@ const Dashboard: React.FC<Props> = ({
     const groupName = activeVolunteer?.assignedGroup || 'Security';
     const currentSession = allSessions.find(s => s.id === selectedSessionId);
     const dateDisplay = (typeof currentSession?.date === 'string' ? currentSession.date : '').split('-').reverse().join('/') || '-';
-    const isLadies = groupName === 'Ladies';
-    const groupText = isLadies ? "Ladies Security Group" : `${groupName} Gents Security Group`;
+    const isLadies = activeVolunteer?.role.includes('Ladies');
+    const groupText = isLadies ? `${groupName} Ladies Security Group` : `${groupName} Gents Security Group`;
     
     let currentY = 15;
 

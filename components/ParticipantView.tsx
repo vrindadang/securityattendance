@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Sewadar, AttendanceRecord, ScoreRecord } from '../types';
-import { GENTS_GROUPS } from '../constants';
+import { GENTS_GROUPS, LADIES_GROUPS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -33,18 +33,25 @@ const ParticipantView: React.FC<Props> = ({ sewadars, attendance, scores, onAdmi
   const [selectedSewadarId, setSelectedSewadarId] = useState<string | null>(null);
 
   const teamStandings = useMemo(() => {
-    const allGroups = [...GENTS_GROUPS, 'Ladies'];
-    return allGroups.map(group => {
-      const groupSewadars = sewadars.filter(s => s.group === group);
+    const gentsGroups = GENTS_GROUPS.map(g => ({ name: g, gender: 'Gents' as const }));
+    const ladiesGroups = LADIES_GROUPS.map(g => ({ name: g, gender: 'Ladies' as const }));
+    const legacyLadies = { name: 'Ladies', gender: 'Ladies' as const };
+    
+    const allGroups = [...gentsGroups, ...ladiesGroups, legacyLadies];
+    
+    return allGroups.map(groupInfo => {
+      const groupSewadars = sewadars.filter(s => s.group === groupInfo.name && s.gender === groupInfo.gender);
       const groupPoints = scores.filter(sc => 
         groupSewadars.some(s => s.id === sc.sewadarId) && !sc.isDeleted
       ).reduce((sum, sc) => sum + sc.points, 0);
-      return { name: group, points: groupPoints };
-    }).sort((a, b) => {
-      // Ladies always on top
-      if (a.name === 'Ladies') return -1;
-      if (b.name === 'Ladies') return 1;
-      // Sort others by points descending
+      return { name: groupInfo.name, gender: groupInfo.gender, points: groupPoints };
+    }).filter(t => t.points > 0 || t.name === 'Monday' || t.name === 'Ladies')
+    .sort((a, b) => {
+      // Ladies groups generally higher priority in sorting if points equal
+      if (a.points === b.points) {
+        if (a.gender === 'Ladies' && b.gender === 'Gents') return -1;
+        if (a.gender === 'Gents' && b.gender === 'Ladies') return 1;
+      }
       return b.points - a.points;
     });
   }, [sewadars, scores]);
@@ -109,7 +116,7 @@ const ParticipantView: React.FC<Props> = ({ sewadars, attendance, scores, onAdmi
                     #{idx + 1}
                   </span>
                   <span className="font-black text-slate-700 text-sm">
-                    {team.name === 'Ladies' ? '👩' : '👮‍♂️'} {team.name}
+                    {team.gender === 'Ladies' ? '👩' : '👮‍♂️'} {team.gender === 'Ladies' && team.name !== 'Ladies' ? `Ladies ${team.name}` : team.name}
                   </span>
                 </div>
                 <span className="font-black text-slate-900 text-lg">{team.points} <span className="text-[8px] text-slate-400 font-bold uppercase ml-1">Pts</span></span>

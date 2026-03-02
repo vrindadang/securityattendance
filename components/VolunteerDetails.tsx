@@ -18,7 +18,8 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
   const filtered = useMemo(() => {
     return sewadars.filter(s => {
       const isSuperAdmin = activeVolunteer.role === 'Super Admin';
-      const matchGroup = isSuperAdmin || s.group === activeVolunteer.assignedGroup;
+      const isLadies = activeVolunteer.role.includes('Ladies');
+      const matchGroup = isSuperAdmin || isLadies || s.group === activeVolunteer.assignedGroup;
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchGroup && matchSearch;
     }).sort((a, b) => a.name.localeCompare(b.name));

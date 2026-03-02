@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { Volunteer, GentsGroup } from '../types';
-import { VOLUNTEERS, GENTS_GROUPS } from '../constants';
+import { Volunteer, DutyGroup } from '../types';
+import { VOLUNTEERS, GENTS_GROUPS, LADIES_GROUPS } from '../constants';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -13,7 +13,7 @@ type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | null;
 
 const Login: React.FC<Props> = ({ onLogin }) => {
   const [portalType, setPortalType] = useState<PortalType>(null);
-  const [selectedGroup, setSelectedGroup] = useState<GentsGroup | 'Ladies' | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(null);
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,9 +21,7 @@ const Login: React.FC<Props> = ({ onLogin }) => {
 
   const handlePortalSelect = (type: PortalType) => {
     setPortalType(type);
-    if (type === 'LADIES') {
-      setSelectedGroup('Ladies');
-    } else if (type === 'BACKOFFICE') {
+    if (type === 'BACKOFFICE') {
       setSelectedGroup(null);
       // Pre-select Super Admin for Back Office portal
       const sa = VOLUNTEERS.find(v => v.id === 'sa');
@@ -31,7 +29,7 @@ const Login: React.FC<Props> = ({ onLogin }) => {
     }
   };
 
-  const handleGroupSelect = (day: GentsGroup) => {
+  const handleGroupSelect = (day: DutyGroup) => {
     setSelectedGroup(day);
   };
 
@@ -40,7 +38,9 @@ const Login: React.FC<Props> = ({ onLogin }) => {
       return VOLUNTEERS.filter(v => v.id === 'sa');
     }
     if (!selectedGroup) return [];
-    return VOLUNTEERS.filter(v => v.assignedGroup === selectedGroup && v.role !== 'Super Admin');
+    
+    const roleFilter = portalType === 'LADIES' ? 'Ladies Admin' : 'Gents Admin';
+    return VOLUNTEERS.filter(v => v.assignedGroup === selectedGroup && v.role === roleFilter);
   }, [selectedGroup, portalType]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -146,7 +146,7 @@ const Login: React.FC<Props> = ({ onLogin }) => {
               </button>
             </div>
           </div>
-        ) : portalType === 'GENTS' && !selectedGroup ? (
+        ) : (portalType === 'GENTS' || portalType === 'LADIES') && !selectedGroup ? (
           <div className="animate-in fade-in slide-in-from-right-4">
             <div className="flex items-center gap-4 mb-8">
               <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
@@ -155,8 +155,8 @@ const Login: React.FC<Props> = ({ onLogin }) => {
               <h2 className="text-2xl font-black text-slate-900">Select Group</h2>
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {GENTS_GROUPS.map(group => (
-                <button key={group} onClick={() => handleGroupSelect(group)} className="w-full bg-white p-5 rounded-2xl border-2 border-slate-100 hover:border-indigo-500 transition-all text-left font-black text-slate-700 active:scale-95">{group} Group</button>
+              {(portalType === 'GENTS' ? GENTS_GROUPS : LADIES_GROUPS).map(group => (
+                <button key={group} onClick={() => handleGroupSelect(group)} className={`w-full bg-white p-5 rounded-2xl border-2 transition-all text-left font-black active:scale-95 ${portalType === 'LADIES' ? 'border-pink-50 hover:border-pink-500 text-pink-700' : 'border-slate-100 hover:border-indigo-500 text-slate-700'}`}>{group} Group</button>
               ))}
             </div>
           </div>

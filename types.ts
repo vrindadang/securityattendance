@@ -1,21 +1,21 @@
 
 export type Gender = 'Gents' | 'Ladies';
 
-export type GentsGroup = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+export type DutyGroup = string;
 
 export interface Volunteer {
   id: string;
   name: string;
   role: string;
   password: string;
-  assignedGroup?: GentsGroup | 'Ladies';
+  assignedGroup?: DutyGroup;
 }
 
 export interface Sewadar {
   id: string;
   name: string;
   gender: Gender;
-  group: GentsGroup | 'Ladies';
+  group: DutyGroup;
   isCustom?: boolean;
 }
 
@@ -31,7 +31,7 @@ export interface AttendanceRecord {
   id: string; 
   sewadarId: string;
   name: string;
-  group: GentsGroup | 'Ladies';
+  group: DutyGroup;
   gender: Gender;
   date: string; 
   timestamp: number;

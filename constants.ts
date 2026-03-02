@@ -1,7 +1,11 @@
 
-import { Sewadar, GentsGroup, Volunteer } from './types';
+import { Sewadar, DutyGroup, Volunteer } from './types';
 
-export const GENTS_GROUPS: GentsGroup[] = [
+export const GENTS_GROUPS: DutyGroup[] = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+];
+
+export const LADIES_GROUPS: DutyGroup[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
 ];
 
@@ -126,6 +130,16 @@ const GROUP_INCHARGES: Record<string, string[]> = {
   'Ladies': ['KIRAN BALA']
 };
 
+const LADIES_GROUP_INCHARGES: Record<string, string[]> = {
+  'Monday': ['Kiran', 'Sudesh Rohiala'],
+  'Tuesday': ['Geeta', 'Anita Sethi'],
+  'Wednesday': ['Suman', 'Kamlesh Verma'],
+  'Thursday': ['Pushpa', 'Jolly'],
+  'Friday': ['Rani', 'Pushpa Singh'],
+  'Saturday': ['Manju', 'Sunita Verma'],
+  'Sunday': ['Jyoti Khera', 'Mehak Chawla']
+};
+
 const generateVolunteers = (): Volunteer[] => {
   const vols: Volunteer[] = [];
   GENTS_GROUPS.forEach(day => {
@@ -140,16 +154,29 @@ const generateVolunteers = (): Volunteer[] => {
       });
     });
   });
-  const ladiesInchargeNames = GROUP_INCHARGES['Ladies'] || ['Ladies Incharge 1'];
-  ladiesInchargeNames.forEach((name, i) => {
-    vols.push({
-      id: `v_ladies_${i + 1}`,
-      name: name,
-      role: 'Ladies Admin',
-      password: '222',
-      assignedGroup: 'Ladies'
+  
+  LADIES_GROUPS.forEach(day => {
+    const inchargeNames = LADIES_GROUP_INCHARGES[day] || [`Ladies ${day} Incharge 1`];
+    inchargeNames.forEach((name, i) => {
+      vols.push({
+        id: `v_ladies_${day.toLowerCase().substring(0, 3)}_${i + 1}`,
+        name: name,
+        role: 'Ladies Admin',
+        password: '222',
+        assignedGroup: day
+      });
     });
   });
+
+  // Keep the original generic Ladies group for compatibility if needed
+  vols.push({
+    id: `v_ladies_generic`,
+    name: 'Ladies Incharge',
+    role: 'Ladies Admin',
+    password: '222',
+    assignedGroup: 'Ladies'
+  });
+
   vols.push({ id: 'sa', name: 'Super Admin', role: 'Super Admin', password: '000' });
   return vols;
 };
@@ -158,7 +185,7 @@ export const VOLUNTEERS: Volunteer[] = generateVolunteers();
 
 const generateInitialSewadars = (): Sewadar[] => {
   const sewadars: Sewadar[] = [];
-  const addList = (list: string[], group: GentsGroup) => {
+  const addList = (list: string[], group: DutyGroup) => {
     list.forEach((name, i) => {
       sewadars.push({ id: `G-${group}-${i}`, name: name, gender: 'Gents', group: group });
     });

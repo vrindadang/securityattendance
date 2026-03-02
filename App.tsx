@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, GentsGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto } from './types';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
@@ -60,6 +60,14 @@ const App: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
 
+  const visibleSewadars = useMemo(() => {
+    if (!activeVolunteer) return [];
+    const all = [...INITIAL_SEWADARS, ...customSewadars];
+    if (activeVolunteer.role === 'Super Admin') return all;
+    const isLadies = activeVolunteer.role.includes('Ladies');
+    return all.filter(s => isLadies ? s.gender === 'Ladies' : s.gender === 'Gents');
+  }, [activeVolunteer, customSewadars]);
+
   const getLocalDate = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -112,7 +120,9 @@ const App: React.FC = () => {
       const q = query(
         collection(db, 'daily_settings'),
         ...(activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup 
-          ? [where('group', '==', activeVolunteer.assignedGroup)] 
+          ? [where('group', 'in', activeVolunteer.role.includes('Ladies') 
+              ? [`Ladies-${activeVolunteer.assignedGroup}`, 'Ladies'] 
+              : [activeVolunteer.assignedGroup])] 
           : [])
       );
       
@@ -126,6 +136,22 @@ const App: React.FC = () => {
             dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
           }
           return { ...d, id: doc.id, date: String(dateStr || '') };
+        })
+        .filter(s => {
+          if (!activeVolunteer || activeVolunteer.role === 'Super Admin') return true;
+          if (!activeVolunteer.role.includes('Ladies')) return true;
+          
+          // For Ladies, we allow the specific day-prefixed group
+          if (s.group === `Ladies-${activeVolunteer.assignedGroup}`) return true;
+          
+          // Or we allow the generic 'Ladies' group but ONLY if the date matches their assigned day
+          if (s.group === 'Ladies' && s.date) {
+            const date = new Date(s.date);
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayOfWeek = days[date.getDay()];
+            return dayOfWeek === activeVolunteer.assignedGroup;
+          }
+          return false;
         })
         .sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) as any[];
       
@@ -399,7 +425,7 @@ const App: React.FC = () => {
           id: String(s.id),
           name: s.name,
           gender: s.gender as Gender,
-          group: s.group as GentsGroup | 'Ladies',
+          group: s.group as DutyGroup,
           isCustom: true
         })));
       }
@@ -478,7 +504,7 @@ const App: React.FC = () => {
       id: finalRecordId,
       sewadarId: sewadarId, 
       name: sewadar.name, 
-      group: sessionGroup as GentsGroup | 'Ladies',
+      group: sessionGroup as DutyGroup,
       gender: sewadar.gender as Gender, 
       date: sessionDate, 
       timestamp: dbPayload.timestamp,
@@ -527,7 +553,7 @@ const App: React.FC = () => {
     if (!activeVolunteer) return;
     const newReq: Requirement = {
       id: generateNumericId(),
-      group_name: activeVolunteer.assignedGroup || 'Global',
+      group_name: activeVolunteer.role.includes('Ladies') ? `Ladies-${activeVolunteer.assignedGroup}` : (activeVolunteer.assignedGroup || 'Global'),
       description,
       timestamp: Date.now(),
       volunteer_id: activeVolunteer.id,
@@ -653,7 +679,7 @@ const App: React.FC = () => {
     }
     setIsSavingSettings(true);
     try {
-      const groupName = activeVolunteer?.assignedGroup || 'Global';
+      const groupName = activeVolunteer?.role.includes('Ladies') ? `Ladies-${activeVolunteer?.assignedGroup}` : (activeVolunteer?.assignedGroup || 'Global');
       
       const parseDateParts = (dateStr: string) => {
         const parts = dateStr.split(/[-/]/).map(Number);
@@ -856,7 +882,7 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto px-6 pt-6 pb-24 no-scrollbar">
         {activeView === 'Attendance' ? (
           <AttendanceManager 
-            sewadars={[...INITIAL_SEWADARS, ...customSewadars]} 
+            sewadars={visibleSewadars} 
             attendance={activeAttendance} 
             onSaveAttendance={saveAttendance} 
             onSaveVehicle={handleSaveVehicle}
@@ -879,7 +905,7 @@ const App: React.FC = () => {
           />
         ) : activeView === 'VolunteerDetails' ? (
           <VolunteerDetails
-            sewadars={[...INITIAL_SEWADARS, ...customSewadars]}
+            sewadars={visibleSewadars}
             details={sewadarDetailsMap}
             activeVolunteer={activeVolunteer}
             onSaveDetails={handleSaveSewadarDetails}

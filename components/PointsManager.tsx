@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sewadar, Gender, AttendanceRecord, GentsGroup, ScoreRecord } from '../types';
-import { GENTS_GROUPS, VOLUNTEERS, GAMES } from '../constants';
+import { Sewadar, Gender, AttendanceRecord, DutyGroup, ScoreRecord } from '../types';
+import { GENTS_GROUPS, LADIES_GROUPS, VOLUNTEERS, GAMES } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -14,7 +14,7 @@ interface Props {
 
 const PointsManager: React.FC<Props> = ({ sewadars, attendance, scores, onAddScore, onDeleteScore, onPromoteTo100 }) => {
   const [genderTab, setGenderTab] = useState<Gender>('Gents');
-  const [gentsGroupTab, setGentsGroupTab] = useState<GentsGroup>('Monday');
+  const [gentsGroupTab, setGentsGroupTab] = useState<DutyGroup>('Monday');
   const [selectedSewadarId, setSelectedSewadarId] = useState<string>('');
   const [selectedGame, setSelectedGame] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,10 +97,10 @@ const PointsManager: React.FC<Props> = ({ sewadars, attendance, scores, onAddSco
           ))}
         </div>
 
-        {genderTab === 'Gents' && !searchTerm && (
+        {!searchTerm && (
           <div className="overflow-x-auto pb-1 no-scrollbar -mx-4 px-4">
             <div className="flex gap-2 min-w-max">
-              {GENTS_GROUPS.map((day) => (
+              {(genderTab === 'Gents' ? GENTS_GROUPS : LADIES_GROUPS).map((day) => (
                 <button
                   key={day}
                   onClick={() => { setGentsGroupTab(day); setSelectedSewadarId(''); }}
@@ -110,7 +110,7 @@ const PointsManager: React.FC<Props> = ({ sewadars, attendance, scores, onAddSco
                       : 'bg-white text-slate-400 border-slate-100'
                   }`}
                 >
-                  👮‍♂️ {day.substring(0, 3)}
+                  {genderTab === 'Gents' ? '👮‍♂️' : '👩'} {day.substring(0, 3)}
                 </button>
               ))}
             </div>

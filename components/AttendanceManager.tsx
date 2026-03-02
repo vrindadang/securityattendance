@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Sewadar, Gender, AttendanceRecord, GentsGroup, Volunteer, VehicleRecord } from '../types';
+import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord } from '../types';
 import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS } from '../constants';
 import { FlaggedVehicle } from '../App';
 
@@ -11,7 +11,7 @@ interface Props {
   flaggedVehicles?: FlaggedVehicle[];
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => void;
-  onAddSewadar: (name: string, gender: Gender, group: GentsGroup | 'Ladies') => void;
+  onAddSewadar: (name: string, gender: Gender, group: DutyGroup) => void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
   sessionDate: string;
@@ -38,8 +38,10 @@ const AttendanceManager: React.FC<Props> = ({
   onChangeLocation 
 }) => {
   const [mode, setMode] = useState<'ATTENDANCE' | 'VEHICLES'>('ATTENDANCE');
-  const [selectedGender] = useState<Gender | null>(activeVolunteer.assignedGroup === 'Ladies' ? 'Ladies' : (activeVolunteer.assignedGroup ? 'Gents' : null));
-  const [selectedGroup] = useState<GentsGroup | 'Ladies' | null>(activeVolunteer.assignedGroup || null);
+  const [selectedGender] = useState<Gender | null>(activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents');
+  const [selectedGroup] = useState<DutyGroup | null>(
+    activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || null)
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -54,8 +56,10 @@ const AttendanceManager: React.FC<Props> = ({
   // States for adding new sewadar
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newGender] = useState<Gender>(activeVolunteer.assignedGroup === 'Ladies' ? 'Ladies' : 'Gents');
-  const [newGroup] = useState<GentsGroup | 'Ladies'>(activeVolunteer.assignedGroup || 'Monday');
+  const [newGender] = useState<Gender>(activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents');
+  const [newGroup] = useState<DutyGroup>(
+    activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || 'Monday')
+  );
 
   // Vehicle Form state
   const [vType, setVType] = useState<'2-wheeler' | '4-wheeler'>('4-wheeler');
