@@ -131,13 +131,13 @@ const GROUP_INCHARGES: Record<string, string[]> = {
 };
 
 const LADIES_GROUP_INCHARGES: Record<string, string[]> = {
-  'Monday': ['Kiran', 'Sudesh Rohiala'],
-  'Tuesday': ['Geeta', 'Anita Sethi'],
-  'Wednesday': ['Suman', 'Kamlesh Verma'],
-  'Thursday': ['Pushpa', 'Jolly'],
-  'Friday': ['Rani', 'Pushpa Singh'],
-  'Saturday': ['Manju', 'Sunita Verma'],
-  'Sunday': ['Jyoti Khera', 'Mehak Chawla']
+  'Monday': ['Kanta Rani', 'Kiran', 'Sudesh Rohiala'],
+  'Tuesday': ['Kanta Rani', 'Geeta', 'Anita Sethi'],
+  'Wednesday': ['Kanta Rani', 'Suman', 'Kamlesh Verma'],
+  'Thursday': ['Kanta Rani', 'Pushpa', 'Jolly'],
+  'Friday': ['Kanta Rani', 'Rani', 'Pushpa Singh'],
+  'Saturday': ['Kanta Rani', 'Manju', 'Sunita Verma'],
+  'Sunday': ['Kanta Rani', 'Jyoti Khera', 'Mehak Chawla']
 };
 
 const generateVolunteers = (): Volunteer[] => {
