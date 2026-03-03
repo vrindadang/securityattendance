@@ -137,7 +137,7 @@ const App: React.FC = () => {
           }
           return { ...d, id: doc.id, date: String(dateStr || '') };
         })
-        .filter(s => {
+        .filter((s: any) => {
           if (!activeVolunteer || activeVolunteer.role === 'Super Admin') return true;
           if (!activeVolunteer.role.includes('Ladies')) return true;
           
@@ -156,11 +156,11 @@ const App: React.FC = () => {
         .sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) as any[];
       
       if (data && data.length > 0) {
-        const mappedSessions = data.map(s => ({ ...s, id: String(s.id) }));
+        const mappedSessions = data.map((s: any) => ({ ...s, id: String(s.id) }));
         
         // Deduplicate sessions by date + group. Prioritize completed ones.
         const uniqueSessionsMap: Record<string, DutySession> = {};
-        mappedSessions.forEach(s => {
+        mappedSessions.forEach((s: any) => {
           const key = `${s.date}-${s.group}`;
           // If we don't have this date/group yet, OR if existing one is active and new one is completed
           if (!uniqueSessionsMap[key] || (!uniqueSessionsMap[key].completed && s.completed)) {

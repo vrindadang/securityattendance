@@ -81,8 +81,20 @@ const AttendanceManager: React.FC<Props> = ({
       const matchGroup = !selectedGroup || s.group === selectedGroup;
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchGender && matchGroup && matchSearch;
-    }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [sewadars, selectedGender, selectedGroup, searchTerm]);
+    }).sort((a, b) => {
+      const aMarked = attendance.some(rec => rec.sewadarId === a.id && rec.date === sessionDate);
+      const bMarked = attendance.some(rec => rec.sewadarId === b.id && rec.date === sessionDate);
+      
+      if (aMarked && !bMarked) return -1;
+      if (!aMarked && bMarked) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [sewadars, selectedGender, selectedGroup, searchTerm, attendance, sessionDate]);
+
+  const markedCount = useMemo(() => {
+    const markedIds = new Set(attendance.filter(a => a.date === sessionDate).map(a => a.sewadarId));
+    return markedIds.size;
+  }, [attendance, sessionDate]);
 
   const formatConfigHeader = () => {
     if (!dutyStartTime || !dutyEndTime || !sessionDate) return '-';
@@ -225,7 +237,11 @@ const AttendanceManager: React.FC<Props> = ({
                 {isCompleted ? '✅ FINALIZED' : hasConfig ? 'Active Session' : 'Pending Config'}
               </p>
               <h2 className="text-base font-black text-slate-800">{workshopLocation || 'No Location Set'}</h2>
-              <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
+              <div className="flex items-center gap-3">
+                <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
+                <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Marked: {markedCount}</p>
+              </div>
             </div>
             {!isCompleted && (
               <button onClick={onChangeLocation} className="px-5 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600">Change</button>
@@ -256,33 +272,46 @@ const AttendanceManager: React.FC<Props> = ({
                   <div key={s.id} className="flex flex-col gap-1">
                     <button 
                       onClick={() => handleToggle(s)} 
-                      className={`w-full bg-white px-5 py-5 rounded-[2.5rem] shadow-sm border-2 flex items-center justify-between transition-all ${isMarked ? 'border-emerald-100 bg-emerald-50/5' : 'border-slate-50'}`}
+                      className={isMarked 
+                        ? "w-full bg-emerald-50/40 px-6 py-3.5 rounded-[1.8rem] shadow-sm border border-emerald-100 flex items-center justify-between transition-all hover:bg-emerald-50/60"
+                        : `w-full bg-white px-5 py-5 rounded-[2.5rem] shadow-sm border-2 flex items-center justify-between transition-all border-slate-50`
+                      }
                     >
-                      <div className="flex items-center gap-5">
-                        <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
-                        <div className="text-left">
-                           <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
-                           <div className="flex gap-2 mt-2">
-                              {isMarked ? (
-                                <span className="bg-emerald-500 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
-                                  {records.length} Duty Point{records.length > 1 ? 's' : ''}
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest">Available</span>
-                              )}
-                              {isMarked && (
-                                records.every(r => r.isProperUniform !== false) ? (
-                                  <span className="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">Proper Uniform</span>
-                                ) : (
-                                  <span className="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">No Dress</span>
-                                )
-                              )}
-                           </div>
-                        </div>
-                      </div>
-                      <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center transition-all ${isMarked ? 'bg-emerald-500 border-emerald-400 shadow-md' : 'bg-slate-50 border-slate-100'}`}>
-                        {isMarked ? <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <div className="w-5 h-5 rounded-full border-2 border-slate-200"></div>}
-                      </div>
+                      {isMarked ? (
+                        <>
+                          <div className="flex items-center gap-4">
+                            <div className="text-[9px] font-black text-emerald-300 w-5 text-center">{idx + 1}</div>
+                            <div className="text-left">
+                               <p className="font-black text-sm text-slate-800 leading-tight">
+                                 {s.name} 
+                                 <span className="ml-2 text-[10px] font-bold text-emerald-600/60">
+                                   ({records.map(r => r.sewaPoint || 'General').join(', ')} • {records.every(r => r.isProperUniform !== false) ? 'Uniform' : <span className="text-red-600 font-black">No Dress</span>})
+                                 </span>
+                               </p>
+                            </div>
+                          </div>
+                          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-sm">
+                             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                             </svg>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-5">
+                            <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
+                            <div className="text-left">
+                               <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                               <div className="flex flex-wrap gap-2 mt-2">
+                                  <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest">Available</span>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="w-14 h-14 rounded-2xl border-2 flex items-center justify-center transition-all bg-slate-50 border-slate-100">
+                            <div className="w-5 h-5 rounded-full border-2 border-slate-200"></div>
+                          </div>
+                        </>
+                      )}
                     </button>
 
                     {isExpanded && (
