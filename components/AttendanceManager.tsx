@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord } from '../types';
+import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
 import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS } from '../constants';
-import { FlaggedVehicle } from '../App';
 
 interface Props {
   sewadars: Sewadar[];

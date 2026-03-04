@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto } from './types';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto, DutySession, FlaggedVehicle } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
@@ -12,23 +12,6 @@ import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, del
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
 const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
-
-export interface DutySession {
-  id: string;
-  location: string;
-  start_time: string;
-  end_time: string;
-  group: string;
-  date: string;
-  completed?: boolean;
-}
-
-export interface FlaggedVehicle {
-  plateNumber: string;
-  daysSpotted: number;
-  lastSeenDate: string;
-  model: string;
-}
 
 const App: React.FC = () => {
   const [activeVolunteer, setActiveVolunteer] = useState<Volunteer | null>(() => {

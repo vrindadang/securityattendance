@@ -94,4 +94,21 @@ export interface ScoreRecord {
   isDeleted?: boolean;
 }
 
+export interface DutySession {
+  id: string;
+  location: string;
+  start_time: string;
+  end_time: string;
+  group: string;
+  date: string;
+  completed?: boolean;
+}
+
+export interface FlaggedVehicle {
+  plateNumber: string;
+  daysSpotted: number;
+  lastSeenDate: string;
+  model: string;
+}
+
 export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements';

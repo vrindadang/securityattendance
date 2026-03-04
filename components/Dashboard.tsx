@@ -1,10 +1,9 @@
 
 import React, { useMemo, useState } from 'react';
-import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto } from '../types';
+import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession } from '../types';
 import { VOLUNTEERS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { DutySession } from '../App';
 
 interface Props {
   attendance: AttendanceRecord[];
