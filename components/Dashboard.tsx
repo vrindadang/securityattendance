@@ -225,29 +225,94 @@ const Dashboard: React.FC<Props> = ({
     doc.setTextColor(0, 0, 0);
     doc.text("2. Shift Distribution", 14, currentY);
 
-    const shiftCounts = { Morning: new Set<string>(), Day: new Set<string>(), Evening: new Set<string>(), Night: new Set<string>() };
+    const shiftCounts = { 
+      Morning: { total: new Set<string>(), green: 0, yellow: 0, red: 0 }, 
+      Day: { total: new Set<string>(), green: 0, yellow: 0, red: 0 }, 
+      Evening: { total: new Set<string>(), green: 0, yellow: 0, red: 0 }, 
+      Night: { total: new Set<string>(), green: 0, yellow: 0, red: 0 } 
+    };
+    
+    const shiftSewadarStatus: Record<string, Record<string, string>> = {
+      Morning: {}, Day: {}, Evening: {}, Night: {}
+    };
+
     attendance.forEach(a => {
       if (a.inTime) {
-        const covered = getOverlappingShifts(a.inTime, a.outTime);
-        covered.forEach(s => shiftCounts[s].add(a.sewadarId));
+        const start = timeToMins(a.inTime);
+        const end = a.outTime ? timeToMins(a.outTime) : (start + 1);
+        const intervals: [number, number][] = [];
+        if (end < start) { intervals.push([start, 1440]); intervals.push([0, end]); }
+        else { intervals.push([start, end]); }
+
+        const shifts = [
+          { name: 'Morning' as const, s: MOR_S, e: MOR_E, dur: 360 },
+          { name: 'Day' as const, s: DAY_S, e: DAY_E, dur: 360 },
+          { name: 'Evening' as const, s: EVE_S, e: 1440, wrap: EVE_E, dur: 420 },
+          { name: 'Night' as const, s: NIT_S, e: NIT_E, dur: 300 }
+        ];
+
+        shifts.forEach(shift => {
+          let overlap = 0;
+          intervals.forEach(([is, ie]) => {
+            if (shift.wrap !== undefined) {
+              overlap += Math.max(0, Math.min(ie, 1440) - Math.max(is, shift.s));
+              overlap += Math.max(0, Math.min(ie, shift.wrap) - Math.max(is, 0));
+            } else {
+              overlap += Math.max(0, Math.min(ie, shift.e) - Math.max(is, shift.s));
+            }
+          });
+
+          if (overlap > 0) {
+            shiftCounts[shift.name].total.add(a.sewadarId);
+            const pct = (overlap / shift.dur) * 100;
+            let color = '#ef4444';
+            if (pct >= 80) color = '#22c55e';
+            else if (pct >= 50) color = '#eab308';
+
+            const currentBest = shiftSewadarStatus[shift.name][a.sewadarId];
+            if (!currentBest || 
+                (color === '#22c55e') || 
+                (color === '#eab308' && currentBest === '#ef4444')) {
+              shiftSewadarStatus[shift.name][a.sewadarId] = color;
+            }
+          }
+        });
       }
+    });
+
+    // Count final statuses
+    (Object.keys(shiftCounts) as (keyof typeof shiftCounts)[]).forEach(s => {
+      Object.values(shiftSewadarStatus[s]).forEach(color => {
+        if (color === '#22c55e') shiftCounts[s].green++;
+        else if (color === '#eab308') shiftCounts[s].yellow++;
+        else if (color === '#ef4444') shiftCounts[s].red++;
+      });
     });
 
     autoTable(doc, {
       startY: currentY + 3,
-      head: [['Time Slot', 'Shift Description', 'Sewadar Count']],
+      head: [['Time Slot', 'Shift Description', 'Count', '', '', '']],
       body: [
-        ['07:00 AM - 01:00 PM', 'Morning Shift', shiftCounts.Morning.size],
-        ['01:00 PM - 07:00 PM', 'Day Shift', shiftCounts.Day.size],
-        ['07:00 PM - 02:00 AM', 'Evening Shift', shiftCounts.Evening.size],
-        ['02:00 AM - 07:00 AM', 'Night Shift', shiftCounts.Night.size]
+        ['07:00 AM - 01:00 PM', 'Morning Shift', shiftCounts.Morning.total.size, shiftCounts.Morning.green, shiftCounts.Morning.yellow, shiftCounts.Morning.red],
+        ['01:00 PM - 07:00 PM', 'Day Shift', shiftCounts.Day.total.size, shiftCounts.Day.green, shiftCounts.Day.yellow, shiftCounts.Day.red],
+        ['07:00 PM - 02:00 AM', 'Evening Shift', shiftCounts.Evening.total.size, shiftCounts.Evening.green, shiftCounts.Evening.yellow, shiftCounts.Evening.red],
+        ['02:00 AM - 07:00 AM', 'Night Shift', shiftCounts.Night.total.size, shiftCounts.Night.green, shiftCounts.Night.yellow, shiftCounts.Night.red]
       ],
-      headStyles: { fillColor: [80, 80, 230], textColor: 255, fontStyle: 'bold' },
+      headStyles: { fillColor: [80, 80, 230], textColor: 255, fontStyle: 'bold', halign: 'center' },
+      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } },
       bodyStyles: { fontSize: 9 },
-      theme: 'grid'
+      theme: 'grid',
+      didDrawCell: (data) => {
+        if (data.section === 'head' && data.column.index >= 3) {
+          const colors = ['#22c55e', '#eab308', '#ef4444'];
+          const color = colors[data.column.index - 3];
+          doc.setFillColor(color);
+          doc.circle(data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, 2, 'F');
+        }
+      }
     });
     
-    const shiftTotalSum = shiftCounts.Morning.size + shiftCounts.Day.size + shiftCounts.Evening.size + shiftCounts.Night.size;
+    const shiftTotalSum = shiftCounts.Morning.total.size + shiftCounts.Day.total.size + shiftCounts.Evening.total.size + shiftCounts.Night.total.size;
     currentY = (doc as any).lastAutoTable.finalY + 4;
     
     // Check space for the note
