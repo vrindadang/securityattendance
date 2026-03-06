@@ -40,6 +40,8 @@ const App: React.FC = () => {
   const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>({});
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [isLoginMainScreen, setIsLoginMainScreen] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
@@ -848,16 +850,20 @@ const App: React.FC = () => {
       </div>
 
       {!activeVolunteer ? (
-        <div className={`flex-1 flex flex-col transition-all ${bannerVisible ? 'pb-24' : ''}`}>
-          <Login onLogin={v => { 
-            try {
-              setActiveVolunteer(v); 
-              localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
-            } catch (e) {
-              console.error("Storage error:", e);
-              setActiveVolunteer(v);
-            }
-          }} />
+        <div className={`flex-1 flex flex-col transition-all ${bannerVisible && !isLoginMainScreen ? 'pb-24' : ''}`}>
+          <Login 
+            onLogin={v => { 
+              try {
+                setActiveVolunteer(v); 
+                localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
+              } catch (e) {
+                console.error("Storage error:", e);
+                setActiveVolunteer(v);
+              }
+            }} 
+            onShowNotice={() => setShowNoticeModal(true)}
+            onMainScreenChange={setIsLoginMainScreen}
+          />
         </div>
       ) : (
         <>
@@ -977,7 +983,23 @@ const App: React.FC = () => {
       )}
         </>
       )}
-      {bannerVisible && <ImportantInfoBanner photo={securityNoticePhoto} />}
+      {bannerVisible && activeVolunteer && (
+        <ImportantInfoBanner 
+          photo={securityNoticePhoto} 
+          externalShowModal={showNoticeModal} 
+          onOpenExternal={() => setShowNoticeModal(true)}
+          onCloseExternal={() => setShowNoticeModal(false)}
+        />
+      )}
+      {bannerVisible && !activeVolunteer && (
+        <ImportantInfoBanner 
+          photo={securityNoticePhoto} 
+          externalShowModal={showNoticeModal} 
+          onOpenExternal={() => setShowNoticeModal(true)}
+          onCloseExternal={() => setShowNoticeModal(false)}
+          hideBottomBar={isLoginMainScreen}
+        />
+      )}
     </div>
   );
 };

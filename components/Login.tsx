@@ -7,17 +7,24 @@ import { doc, getDoc } from 'firebase/firestore';
 
 interface Props {
   onLogin: (volunteer: Volunteer) => void;
+  onShowNotice: () => void;
+  onMainScreenChange?: (isMain: boolean) => void;
 }
 
 type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | null;
 
-const Login: React.FC<Props> = ({ onLogin }) => {
+const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange }) => {
   const [portalType, setPortalType] = useState<PortalType>(null);
   const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(null);
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  // Notify parent of screen changes
+  React.useEffect(() => {
+    onMainScreenChange?.(!portalType);
+  }, [portalType, onMainScreenChange]);
 
   const handlePortalSelect = (type: PortalType) => {
     setPortalType(type);
@@ -143,6 +150,10 @@ const Login: React.FC<Props> = ({ onLogin }) => {
               <button onClick={() => handlePortalSelect('BACKOFFICE')} className="group bg-white p-6 rounded-[2rem] border-2 border-slate-100 hover:border-slate-900 transition-all flex items-center gap-6 active:scale-95">
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-3xl">📁</div>
                 <div className="text-left"><h3 className="text-xl font-black text-slate-800">Back Office</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Management Portal</p></div>
+              </button>
+              <button onClick={onShowNotice} className="group bg-emerald-600 p-6 rounded-[2rem] border-2 border-emerald-500 hover:bg-emerald-700 transition-all flex items-center gap-6 active:scale-95 text-white">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">⚠️</div>
+                <div className="text-left"><h3 className="text-xl font-black">Important Notice</h3><p className="text-[10px] text-white/70 font-bold uppercase tracking-widest">Security Alert</p></div>
               </button>
             </div>
           </div>

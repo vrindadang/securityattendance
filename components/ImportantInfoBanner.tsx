@@ -2,24 +2,41 @@ import React, { useState } from 'react';
 
 interface Props {
   photo?: string;
+  externalShowModal?: boolean;
+  onOpenExternal?: () => void;
+  onCloseExternal?: () => void;
+  hideBottomBar?: boolean;
 }
 
-const ImportantInfoBanner: React.FC<Props> = ({ photo }) => {
-  const [showModal, setShowModal] = useState(false);
+const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpenExternal, onCloseExternal, hideBottomBar }) => {
+  const [internalShowModal, setInternalShowModal] = useState(false);
+
+  const showModal = externalShowModal !== undefined ? externalShowModal : internalShowModal;
+  const setShowModal = (val: boolean) => {
+    if (val) {
+      onOpenExternal?.();
+      setInternalShowModal(true);
+    } else {
+      onCloseExternal?.();
+      setInternalShowModal(false);
+    }
+  };
 
   const displayPhoto = photo || "https://ais-pre-2snntgklnesvtcldmdlnzp-89530588459.asia-southeast1.run.app/api/images/man.png";
 
   return (
     <>
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-[110] bg-emerald-600 text-white px-6 py-3 cursor-pointer shadow-[0_-4px_20px_rgba(0,0,0,0.1)] hover:bg-emerald-700 transition-all active:scale-[0.99]"
-        onClick={() => setShowModal(true)}
-      >
-        <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5">Important Notice</p>
-          <p className="text-sm font-black tracking-tight">Entry of Mr. Ron Flewich (6-March-2026)</p>
+      {!showModal && !hideBottomBar && (
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-[110] bg-emerald-600 text-white px-6 py-3 cursor-pointer shadow-[0_-4px_20px_rgba(0,0,0,0.1)] hover:bg-emerald-700 transition-all active:scale-[0.99]"
+          onClick={() => setShowModal(true)}
+        >
+          <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5">Important Notice</p>
+            <p className="text-sm font-black tracking-tight">Entry of Mr. Ron Flewich (6-March-2026)</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm">
