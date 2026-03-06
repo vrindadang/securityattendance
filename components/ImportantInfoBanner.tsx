@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface Props {
   photo?: string;
@@ -6,54 +6,23 @@ interface Props {
 
 const ImportantInfoBanner: React.FC<Props> = ({ photo }) => {
   const [showModal, setShowModal] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-
-  const message = "Entry of Mr Ron Flewich is strictly restricted in KIRPAL Ashram and Sawan Ashram. He is allowed at Kirpal Bagh only with strict monitoring. Click for more details.";
 
   const displayPhoto = photo || "https://ais-pre-2snntgklnesvtcldmdlnzp-89530588459.asia-southeast1.run.app/api/images/man.png";
 
   return (
     <>
-      <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-2 relative overflow-hidden group cursor-pointer" onClick={() => setShowModal(true)}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex-1 overflow-hidden relative h-6">
-            <div 
-              className={`whitespace-nowrap absolute flex items-center gap-8 ${isPaused ? '' : 'animate-marquee'}`}
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
-            >
-              <span className="text-emerald-800 text-sm font-bold flex items-center gap-2">
-                <span className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded font-black">IMPORTANT</span>
-                {message}
-              </span>
-              <span className="text-emerald-800 text-sm font-bold flex items-center gap-2">
-                <span className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded font-black">IMPORTANT</span>
-                {message}
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 text-emerald-600">
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsPaused(!isPaused); }}
-              className="p-1 hover:bg-emerald-100 rounded-full transition-colors"
-            >
-              {isPaused ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              ) : (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-              )}
-            </button>
-            <div className="flex flex-col gap-0.5">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg>
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-            </div>
-          </div>
+      <div 
+        className="fixed bottom-0 left-0 right-0 z-[110] bg-emerald-600 text-white px-6 py-3 cursor-pointer shadow-[0_-4px_20px_rgba(0,0,0,0.1)] hover:bg-emerald-700 transition-all active:scale-[0.99]"
+        onClick={() => setShowModal(true)}
+      >
+        <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5">Important Notice</p>
+          <p className="text-sm font-black tracking-tight">Entry of Mr. Ron Flewich (6-March-2026)</p>
         </div>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="bg-emerald-600 px-8 py-6 flex items-center justify-between text-white">
               <h2 className="text-xl font-black uppercase tracking-tight">Important Security Notice</h2>
@@ -114,16 +83,6 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo }) => {
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee {
-          animation: marquee 30s linear infinite;
-        }
-      `}</style>
     </>
   );
 };

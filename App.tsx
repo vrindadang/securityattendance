@@ -833,7 +833,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <div className="sticky top-0 z-50">
-        {bannerVisible && <ImportantInfoBanner photo={securityNoticePhoto} />}
         {activeVolunteer && (
           <header className="bg-white/80 backdrop-blur-md border-b px-6 py-4 flex items-center justify-between">
             <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Security Sewa</h1>
@@ -849,15 +848,17 @@ const App: React.FC = () => {
       </div>
 
       {!activeVolunteer ? (
-        <Login onLogin={v => { 
-          try {
-            setActiveVolunteer(v); 
-            localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
-          } catch (e) {
-            console.error("Storage error:", e);
-            setActiveVolunteer(v);
-          }
-        }} />
+        <div className={`flex-1 flex flex-col transition-all ${bannerVisible ? 'pb-24' : ''}`}>
+          <Login onLogin={v => { 
+            try {
+              setActiveVolunteer(v); 
+              localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
+            } catch (e) {
+              console.error("Storage error:", e);
+              setActiveVolunteer(v);
+            }
+          }} />
+        </div>
       ) : (
         <>
           {showSettingsModal && (
@@ -900,7 +901,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          <main className="flex-1 overflow-y-auto px-6 pt-6 pb-24 no-scrollbar">
+          <main className={`flex-1 overflow-y-auto px-6 pt-6 no-scrollbar transition-all ${bannerVisible ? 'pb-40' : 'pb-24'}`}>
         {activeView === 'Attendance' ? (
           <AttendanceManager 
             sewadars={visibleSewadars} 
@@ -966,14 +967,17 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t flex justify-around items-center p-3 pb-6">
-        <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Mark Sewa</span></button>
-        <button onClick={() => setActiveView('VolunteerDetails')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'VolunteerDetails' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span className="text-[8px] font-black uppercase">Details</span></button>
-        <button onClick={() => setActiveView('Requirements')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Requirements' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg><span className="text-[8px] font-black uppercase">Requirements</span></button>
-        <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
-      </nav>
+      {activeVolunteer && (
+        <nav className={`fixed left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t flex justify-around items-center p-3 pb-6 transition-all ${bannerVisible ? 'bottom-[64px]' : 'bottom-0'}`}>
+          <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Mark Sewa</span></button>
+          <button onClick={() => setActiveView('VolunteerDetails')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'VolunteerDetails' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span className="text-[8px] font-black uppercase">Details</span></button>
+          <button onClick={() => setActiveView('Requirements')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Requirements' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg><span className="text-[8px] font-black uppercase">Requirements</span></button>
+          <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2-2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
+        </nav>
+      )}
         </>
       )}
+      {bannerVisible && <ImportantInfoBanner photo={securityNoticePhoto} />}
     </div>
   );
 };
