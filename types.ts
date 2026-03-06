@@ -60,6 +60,7 @@ export interface Requirement {
   group_name: string;
   description: string;
   timestamp: number;
+  updatedAt?: number;
   volunteer_id: string;
   volunteer_name: string;
   status: 'Pending' | 'Closed' | 'Not Required';
