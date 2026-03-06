@@ -643,13 +643,52 @@ const App: React.FC = () => {
     });
   };
 
-  const handleSaveVehicle = async (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => {
+  const handleSaveVehicle = async (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => {
     if (!activeVolunteer || !activeSession || activeSession.completed) return;
     
-    const cleanPlate = v.plateNumber.toUpperCase().trim();
+    if (isDelete && id) {
+      try {
+        await deleteDoc(doc(db, 'vehicles', id));
+        setActiveVehicles(prev => prev.filter(rec => rec.id !== id));
+        if (dashboardSelectedSession?.id === activeSession.id) {
+          setVehicles(prev => prev.filter(rec => rec.id !== id));
+        }
+      } catch (err) {
+        console.error("Delete Vehicle Error:", err);
+      }
+      return;
+    }
+
+    if (id) {
+      // Update existing
+      try {
+        const cleanPlate = v.plateNumber?.toUpperCase().trim();
+        const updateData: any = {
+          type: v.type,
+          plate_number: cleanPlate,
+          model: v.model,
+          remarks: v.remarks
+        };
+        await updateDoc(doc(db, 'vehicles', id), updateData);
+        
+        const updateLocal = (prev: VehicleRecord[]) => prev.map(rec => rec.id === id ? { ...rec, ...v, plateNumber: cleanPlate || rec.plateNumber } : rec);
+        setActiveVehicles(updateLocal);
+        if (dashboardSelectedSession?.id === activeSession.id) {
+          setVehicles(updateLocal);
+        }
+      } catch (err) {
+        console.error("Update Vehicle Error:", err);
+      }
+      return;
+    }
+
+    // Create new
+    const cleanPlate = v.plateNumber?.toUpperCase().trim() || '';
     const newV: VehicleRecord = {
-      ...v,
+      type: v.type as any,
       plateNumber: cleanPlate,
+      model: v.model || '',
+      remarks: v.remarks || '',
       id: generateNumericId(),
       timestamp: Date.now(),
       volunteerId: activeVolunteer.id,

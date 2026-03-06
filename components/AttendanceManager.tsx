@@ -9,7 +9,7 @@ interface Props {
   vehicles: VehicleRecord[];
   flaggedVehicles?: FlaggedVehicle[];
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
-  onSaveVehicle: (v: Omit<VehicleRecord, 'id' | 'timestamp' | 'volunteerId' | 'volunteerName'>) => void;
+  onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
   onAddSewadar: (name: string, gender: Gender, group: DutyGroup) => void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
@@ -65,6 +65,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [vPlate, setVPlate] = useState('');
   const [vModel, setVModel] = useState('');
   const [vRemarks, setVRemarks] = useState('');
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
 
   const availableLocs = useMemo(() => {
     const list = workshopLocation?.split(',').map(l => l.trim()).filter(Boolean) || [];
@@ -176,11 +177,28 @@ const AttendanceManager: React.FC<Props> = ({
   const handleVehicleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!vPlate.trim()) return;
-    onSaveVehicle({ type: vType, plateNumber: vPlate.toUpperCase(), model: vModel, remarks: vRemarks });
+    onSaveVehicle({ type: vType, plateNumber: vPlate.toUpperCase(), model: vModel, remarks: vRemarks }, editingVehicleId || undefined);
     setVPlate('');
     setVModel('');
     setVRemarks('');
-    alert("Vehicle incident logged successfully.");
+    setEditingVehicleId(null);
+    alert(editingVehicleId ? "Vehicle entry updated." : "Vehicle incident logged successfully.");
+  };
+
+  const handleEditVehicle = (v: VehicleRecord) => {
+    setVType(v.type);
+    setVPlate(v.plateNumber);
+    setVModel(v.model);
+    setVRemarks(v.remarks);
+    setEditingVehicleId(v.id);
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteVehicle = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this vehicle entry?")) {
+      onSaveVehicle({}, id, true);
+    }
   };
 
   return (
@@ -505,9 +523,26 @@ const AttendanceManager: React.FC<Props> = ({
 
           {!isCompleted && (
             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Flag Vehicle Report</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                    {editingVehicleId ? 'Update Vehicle Report' : 'Flag Vehicle Report'}
+                  </h3>
+                </div>
+                {editingVehicleId && (
+                  <button 
+                    onClick={() => {
+                      setEditingVehicleId(null);
+                      setVPlate('');
+                      setVModel('');
+                      setVRemarks('');
+                    }}
+                    className="text-[10px] font-black text-red-500 uppercase tracking-widest"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </div>
 
               <form onSubmit={handleVehicleSubmit} className="space-y-6">
@@ -548,13 +583,31 @@ const AttendanceManager: React.FC<Props> = ({
               <div className="grid grid-cols-1 gap-3">
                 {vehicles.slice().reverse().map((v, i) => (
                   <div key={v.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all">
-                     <div className="space-y-1">
+                     <div className="flex-1 space-y-1">
                        <p className="font-black text-slate-900 text-sm">{vehicles.length - i}. {v.plateNumber} ({v.type === '4-wheeler' ? '4-W' : '2-W'})</p>
                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{v.model || 'Unknown Model'}</p>
                        {v.remarks && <p className="text-xs text-slate-500 mt-2 italic">"{v.remarks}"</p>}
                      </div>
-                     <div className="text-right">
-                       <p className="text-[10px] font-black text-slate-300 uppercase">{new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                     <div className="flex items-center gap-4">
+                       <div className="text-right">
+                         <p className="text-[10px] font-black text-slate-300 uppercase">{new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                       </div>
+                       {!isCompleted && (
+                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => handleEditVehicle(v)}
+                              className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteVehicle(v.id)}
+                              className="p-2 text-red-300 hover:text-red-500 transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                            </button>
+                         </div>
+                       )}
                      </div>
                   </div>
                 ))}
