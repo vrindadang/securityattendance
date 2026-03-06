@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import VolunteerDetails from './components/VolunteerDetails';
 import RequirementsView from './components/RequirementsView';
+import ImportantInfoBanner from './components/ImportantInfoBanner';
 import { db } from './firebase';
 import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp } from 'firebase/firestore';
 
@@ -42,6 +43,7 @@ const App: React.FC = () => {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
+  const [securityNoticePhoto, setSecurityNoticePhoto] = useState<string>('https://ais-pre-2snntgklnesvtcldmdlnzp-89530588459.asia-southeast1.run.app/api/images/man.png');
 
   const visibleSewadars = useMemo(() => {
     if (!activeVolunteer) return [];
@@ -217,6 +219,33 @@ const App: React.FC = () => {
       console.error("Fetch Requirements Error:", err);
     }
   }, []);
+
+  const fetchSecurityPhoto = useCallback(async () => {
+    try {
+      const docSnap = await getDocs(query(collection(db, 'app_settings'), where('key', '==', 'security_notice_photo')));
+      if (!docSnap.empty) {
+        setSecurityNoticePhoto(docSnap.docs[0].data().value);
+      }
+    } catch (err) {
+      console.error("Fetch Security Photo Error:", err);
+    }
+  }, []);
+
+  const handleUploadSecurityPhoto = async (photo: string) => {
+    try {
+      const q = query(collection(db, 'app_settings'), where('key', '==', 'security_notice_photo'));
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        await addDoc(collection(db, 'app_settings'), { key: 'security_notice_photo', value: photo });
+      } else {
+        await updateDoc(doc(db, 'app_settings', querySnapshot.docs[0].id), { value: photo });
+      }
+      setSecurityNoticePhoto(photo);
+    } catch (err) {
+      console.error("Upload Security Photo Error:", err);
+      alert("Failed to upload photo.");
+    }
+  };
 
   const calculateFlaggedVehicles = useCallback((historicalVehicles: any[], currentDate: string) => {
     const plateGroups: Record<string, { dates: Set<string>, model: string }> = {};
@@ -425,8 +454,9 @@ const App: React.FC = () => {
       fetchSessions(true);
       fetchSewadarDetails();
       fetchRequirements();
+      fetchSecurityPhoto();
     }
-  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements]);
+  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchSecurityPhoto]);
 
   useEffect(() => {
     fetchData(activeSession, 'active');
@@ -798,71 +828,79 @@ const App: React.FC = () => {
     }
   }, []);
 
-  if (!activeVolunteer) return <Login onLogin={v => { 
-    try {
-      setActiveVolunteer(v); 
-      localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
-    } catch (e) {
-      console.error("Storage error:", e);
-      // Still set state even if storage fails
-      setActiveVolunteer(v);
-    }
-  }} />;
+  const bannerVisible = !activeVolunteer || showSettingsModal || activeView === 'Dashboard';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
-            <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-            <div className="text-center">
-              <h2 className="text-2xl font-black text-slate-900">New Duty Session</h2>
+      <div className="sticky top-0 z-50">
+        {bannerVisible && <ImportantInfoBanner photo={securityNoticePhoto} />}
+        {activeVolunteer && (
+          <header className="bg-white/80 backdrop-blur-md border-b px-6 py-4 flex items-center justify-between">
+            <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Security Sewa</h1>
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <p className="text-[10px] font-black text-slate-900">{activeVolunteer.name}</p>
+                <p className="text-[8px] font-bold text-indigo-500 uppercase">{activeVolunteer.role}</p>
+              </div>
+              <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); localStorage.removeItem(STORAGE_KEY_SESSION_ID); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
             </div>
-            <form onSubmit={handleSaveSettings} className="space-y-6">
-              <div className="grid grid-cols-1 gap-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Locations</label>
-                <div className="grid grid-cols-1 gap-2">
-                  {LOCATIONS_LIST.map(loc => (
-                    <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
-                    <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty End</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
-                    <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
-                  </div>
-                </div>
-              </div>
-              <button type="submit" disabled={isSavingSettings || saveSuccess} className="w-full py-5 rounded-[2rem] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-xl">{isSavingSettings ? 'Starting...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty')}</button>
-            </form>
-          </div>
-        </div>
-      )}
+          </header>
+        )}
+      </div>
 
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b px-6 py-4 flex items-center justify-between">
-        <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Security Sewa</h1>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-[10px] font-black text-slate-900">{activeVolunteer.name}</p>
-            <p className="text-[8px] font-bold text-indigo-500 uppercase">{activeVolunteer.role}</p>
-          </div>
-          <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); localStorage.removeItem(STORAGE_KEY_SESSION_ID); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
-        </div>
-      </header>
+      {!activeVolunteer ? (
+        <Login onLogin={v => { 
+          try {
+            setActiveVolunteer(v); 
+            localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
+          } catch (e) {
+            console.error("Storage error:", e);
+            setActiveVolunteer(v);
+          }
+        }} />
+      ) : (
+        <>
+          {showSettingsModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
+              <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
+                <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <div className="text-center">
+                  <h2 className="text-2xl font-black text-slate-900">New Duty Session</h2>
+                </div>
+                <form onSubmit={handleSaveSettings} className="space-y-6">
+                  <div className="grid grid-cols-1 gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Locations</label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {LOCATIONS_LIST.map(loc => (
+                        <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
+                        <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty End</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
+                        <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
+                      </div>
+                    </div>
+                  </div>
+                  <button type="submit" disabled={isSavingSettings || saveSuccess} className="w-full py-5 rounded-[2rem] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-xl">{isSavingSettings ? 'Starting...' : (saveSuccess ? 'Session Started ✓' : 'Start Duty')}</button>
+                </form>
+              </div>
+            </div>
+          )}
 
-      <main className="flex-1 overflow-y-auto px-6 pt-6 pb-24 no-scrollbar">
+          <main className="flex-1 overflow-y-auto px-6 pt-6 pb-24 no-scrollbar">
         {activeView === 'Attendance' ? (
           <AttendanceManager 
             sewadars={visibleSewadars} 
@@ -917,6 +955,7 @@ const App: React.FC = () => {
             onSaveVehicle={handleSaveVehicle} 
             onAddRequirement={handleSaveRequirement}
             onUpdateRequirementStatus={handleUpdateRequirementStatus}
+            onUploadSecurityPhoto={handleUploadSecurityPhoto}
             isLoading={loading} 
             dutyStartTime={dashboardSelectedSession?.start_time || ''} 
             dutyEndTime={dashboardSelectedSession?.end_time || ''} 
@@ -933,6 +972,8 @@ const App: React.FC = () => {
         <button onClick={() => setActiveView('Requirements')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Requirements' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg><span className="text-[8px] font-black uppercase">Requirements</span></button>
         <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
       </nav>
+        </>
+      )}
     </div>
   );
 };
