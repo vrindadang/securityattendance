@@ -7,10 +7,12 @@ interface Props {
   details: Record<string, SewadarDetails>;
   activeVolunteer: Volunteer;
   onSaveDetails: (details: SewadarDetails) => Promise<void>;
+  onDeleteSewadar?: (id: string) => void;
 }
 
-const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer, onSaveDetails }) => {
+const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
   const [formData, setFormData] = useState({ address: '', dob: '', phone: '' });
   const [isSaving, setIsSaving] = useState(false);
@@ -111,12 +113,22 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
                     )}
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleEdit(s)}
-                  className="px-6 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600 hover:bg-indigo-600 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
-                >
-                  {hasDetails ? 'Edit Info' : '+ Add Info'}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button 
+                    onClick={() => handleEdit(s)}
+                    className="px-6 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600 hover:bg-indigo-600 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
+                  >
+                    {hasDetails ? 'Edit Info' : '+ Add Info'}
+                  </button>
+                  {isSuperAdmin && onDeleteSewadar && (
+                    <button 
+                      onClick={() => onDeleteSewadar(s.id)}
+                      className="px-6 py-3 bg-red-50 border border-red-100 rounded-xl text-[9px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

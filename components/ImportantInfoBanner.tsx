@@ -33,7 +33,7 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
         >
           <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5">Important Notice</p>
-            <p className="text-sm font-black tracking-tight">Entry of Mr. Ron Flewich (6-March-2026)</p>
+            <p className="text-sm font-black tracking-tight">Entry of Mr. Ron Filewich (6-March-2026)</p>
           </div>
         </div>
       )}
@@ -54,7 +54,7 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
                   <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-xl relative">
                     <img 
                       src={displayPhoto} 
-                      alt="Mr Ron Flewich" 
+                      alt="Mr Ron Filewich" 
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
@@ -62,7 +62,7 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
                       }}
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-white/90 backdrop-blur-sm py-2 border-t border-slate-100">
-                      <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Mr Ron Flewich</p>
+                      <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Mr Ron Filewich</p>
                     </div>
                   </div>
                 </div>
@@ -71,7 +71,7 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
                   <div className="space-y-4">
                     <p className="font-black text-slate-900 text-lg">Dear All,</p>
                     <p className="text-slate-600 leading-relaxed font-medium text-base">
-                      Entry of <span className="text-red-600 font-black">Mr Ron Flewich</span> as per photo attached, is strictly restricted in <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">KIRPAL Ashram</span> and <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">Sawan Ashram</span>. Please ensure he is not allowed in both the Ashrams.
+                      Entry of <span className="text-red-600 font-black">Mr Ron Filewich</span> as per photo attached, is strictly restricted in <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">KIRPAL Ashram</span> and <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">Sawan Ashram</span>. Please ensure he is not allowed in both the Ashrams.
                     </p>
                     <p className="text-slate-600 leading-relaxed font-medium text-base">
                       He is allowed at <span className="font-black text-slate-900">Kirpal Bagh</span> only but Security has to be vigilent to monitor his activities from distance and to report to Admin Controller in case anything he is doing which is not as per SKRM rules.

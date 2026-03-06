@@ -11,6 +11,7 @@ interface Props {
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
   onAddSewadar: (name: string, gender: Gender, group: DutyGroup) => void;
+  onDeleteSewadar?: (id: string) => void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
   sessionDate: string;
@@ -28,6 +29,7 @@ const AttendanceManager: React.FC<Props> = ({
   onSaveAttendance, 
   onSaveVehicle,
   onAddSewadar, 
+  onDeleteSewadar,
   activeVolunteer, 
   workshopLocation, 
   sessionDate,
@@ -37,7 +39,8 @@ const AttendanceManager: React.FC<Props> = ({
   onChangeLocation 
 }) => {
   const [mode, setMode] = useState<'ATTENDANCE' | 'VEHICLES'>('ATTENDANCE');
-  const [selectedGender] = useState<Gender | null>(activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents');
+  const isSuperAdmin = activeVolunteer.role === 'Super Admin';
+  const [selectedGender] = useState<Gender | null>(isSuperAdmin ? null : (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents'));
   const [selectedGroup] = useState<DutyGroup | null>(
     activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || null)
   );
@@ -482,6 +485,17 @@ const AttendanceManager: React.FC<Props> = ({
                                  {editingRecordId ? 'Update & Close' : 'Confirm & Done'}
                               </button>
                               <button onClick={() => { setExpandedId(null); setEditingRecordId(null); }} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel / Close</button>
+                              {isSuperAdmin && onDeleteSewadar && (
+                                <button 
+                                  onClick={() => {
+                                    onDeleteSewadar(s.id);
+                                    setExpandedId(null);
+                                  }} 
+                                  className="w-full py-4 text-red-400 font-black text-[10px] uppercase tracking-widest border-t border-red-50 mt-4"
+                                >
+                                  Delete Member Permanently
+                                </button>
+                              )}
                            </div>
                         </div>
                       </div>

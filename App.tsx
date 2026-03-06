@@ -37,6 +37,7 @@ const App: React.FC = () => {
   const [activeVehicles, setActiveVehicles] = useState<VehicleRecord[]>([]);
 
   const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
+  const [deletedSewadarIds, setDeletedSewadarIds] = useState<Set<string>>(new Set());
   const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>({});
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -49,11 +50,11 @@ const App: React.FC = () => {
 
   const visibleSewadars = useMemo(() => {
     if (!activeVolunteer) return [];
-    const all = [...INITIAL_SEWADARS, ...customSewadars];
+    const all = [...INITIAL_SEWADARS, ...customSewadars].filter(s => !deletedSewadarIds.has(s.id));
     if (activeVolunteer.role === 'Super Admin') return all;
     const isLadies = activeVolunteer.role.includes('Ladies');
     return all.filter(s => isLadies ? s.gender === 'Ladies' : s.gender === 'Gents');
-  }, [activeVolunteer, customSewadars]);
+  }, [activeVolunteer, customSewadars, deletedSewadarIds]);
 
   const getLocalDate = () => {
     const d = new Date();
@@ -230,6 +231,16 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Fetch Security Photo Error:", err);
+    }
+  }, []);
+
+  const fetchDeletedSewadars = useCallback(async () => {
+    try {
+      const q = query(collection(db, 'deleted_sewadars'));
+      const querySnapshot = await getDocs(q);
+      setDeletedSewadarIds(new Set(querySnapshot.docs.map(d => d.id)));
+    } catch (err) {
+      console.error("Fetch Deleted Error:", err);
     }
   }, []);
 
@@ -452,13 +463,17 @@ const App: React.FC = () => {
   }, [activeVolunteer, calculateFlaggedVehicles]);
 
   useEffect(() => {
+    fetchSecurityPhoto();
+  }, [fetchSecurityPhoto]);
+
+  useEffect(() => {
     if (activeVolunteer) {
       fetchSessions(true);
       fetchSewadarDetails();
       fetchRequirements();
-      fetchSecurityPhoto();
+      fetchDeletedSewadars();
     }
-  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchSecurityPhoto]);
+  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars]);
 
   useEffect(() => {
     fetchData(activeSession, 'active');
@@ -561,6 +576,21 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Save Details Error:", err);
       throw err;
+    }
+  };
+
+  const handleDeleteSewadar = async (id: string) => {
+    if (!activeVolunteer || activeVolunteer.role !== 'Super Admin') return;
+    if (!window.confirm("Are you sure you want to delete this member?")) return;
+    try {
+      await setDoc(doc(db, 'deleted_sewadars', id), { id, deletedAt: Date.now() });
+      setDeletedSewadarIds(prev => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+    } catch (err) {
+      console.error("Delete Sewadar Error:", err);
     }
   };
 
@@ -969,6 +999,7 @@ const App: React.FC = () => {
             dutyEndTime={activeSession?.end_time || ''} 
             isCompleted={activeSession?.completed} 
             onChangeLocation={() => setShowSettingsModal(true)} 
+            onDeleteSewadar={handleDeleteSewadar}
           />
         ) : activeView === 'VolunteerDetails' ? (
           <VolunteerDetails
@@ -976,6 +1007,7 @@ const App: React.FC = () => {
             details={sewadarDetailsMap}
             activeVolunteer={activeVolunteer}
             onSaveDetails={handleSaveSewadarDetails}
+            onDeleteSewadar={handleDeleteSewadar}
           />
         ) : activeView === 'Requirements' ? (
           <RequirementsView

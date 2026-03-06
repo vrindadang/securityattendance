@@ -153,7 +153,13 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange }) =
               </button>
               <button onClick={onShowNotice} className="group bg-emerald-600 p-6 rounded-[2rem] border-2 border-emerald-500 hover:bg-emerald-700 transition-all flex items-center gap-6 active:scale-95 text-white">
                 <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">⚠️</div>
-                <div className="text-left"><h3 className="text-xl font-black">Important Notice</h3><p className="text-[10px] text-white/70 font-bold uppercase tracking-widest">Security Alert</p></div>
+                <div className="text-left">
+                  <h3 className="text-xl font-black">Important Notice</h3>
+                  <div className="flex flex-col mt-0.5">
+                    <p className="text-[9px] text-white/90 font-black uppercase tracking-widest">6 March 2026</p>
+                    <p className="text-[9px] text-emerald-100 font-bold uppercase tracking-widest">Entry restricted for Mr Ron Filewich</p>
+                  </div>
+                </div>
               </button>
             </div>
           </div>
