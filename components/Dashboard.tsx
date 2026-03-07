@@ -226,6 +226,32 @@ const Dashboard: React.FC<Props> = ({
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("2. Shift Distribution", 14, currentY);
+    currentY += 6;
+
+    // Legend for dots
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    
+    const shiftLegendX = 18;
+    const shiftLegendSpacing = 40;
+    
+    // Green
+    doc.setFillColor(34, 197, 94);
+    doc.circle(shiftLegendX, currentY, 1.5, 'F');
+    doc.text(">80% Shift", shiftLegendX + 4, currentY + 1);
+    
+    // Yellow
+    doc.setFillColor(234, 179, 8);
+    doc.circle(shiftLegendX + shiftLegendSpacing, currentY, 1.5, 'F');
+    doc.text("50-80% Shift", shiftLegendX + shiftLegendSpacing + 4, currentY + 1);
+    
+    // Red
+    doc.setFillColor(239, 68, 68);
+    doc.circle(shiftLegendX + shiftLegendSpacing * 2, currentY, 1.5, 'F');
+    doc.text("<50% Shift", shiftLegendX + shiftLegendSpacing * 2 + 4, currentY + 1);
+    
+    currentY += 4;
 
     const shiftCounts = { 
       Morning: { total: new Set<string>(), green: 0, yellow: 0, red: 0 }, 
@@ -319,7 +345,7 @@ const Dashboard: React.FC<Props> = ({
     
     // Check space for the note
     const noteText = `Note: The Total Sewadars on Duty in Table 1 is ${totalSewadarsOnDuty}, but the Shift Distribution in Table 2 totals to ${shiftTotalSum}. This is because several sewadars did sewa across multiple shifts; if a person was active during two different time slots, they were counted in the total for both shifts in above table to show full sewa coverage.`;
-    const splitNote = doc.splitTextToSize(noteText, 180);
+    const splitNote = doc.splitTextToSize(noteText, 182);
     const noteHeight = (splitNote.length * 4) + 6;
     ensureSpace(noteHeight);
     
