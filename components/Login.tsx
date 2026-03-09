@@ -152,7 +152,13 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-3xl">📁</div>
                 <div className="text-left"><h3 className="text-xl font-black text-slate-800">Back Office</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Management Portal</p></div>
               </button>
-              <button onClick={onShowNotice} className="group bg-emerald-600 p-6 rounded-[2rem] border-2 border-emerald-500 hover:bg-emerald-700 transition-all flex items-center gap-6 active:scale-95 text-white">
+              <button onClick={onShowNotice} className="relative group bg-emerald-600 p-6 rounded-[2rem] border-2 border-emerald-500 hover:bg-emerald-700 transition-all flex items-center gap-6 active:scale-95 text-white">
+                {latestNotice && (Date.now() - latestNotice.timestamp < 3 * 24 * 60 * 60 * 1000) && (
+                  <div className="absolute -top-4 -right-4 bg-white text-emerald-600 px-4 py-2 rounded-full text-[10px] font-black flex items-center gap-1.5 shadow-[0_0_20px_rgba(16,185,129,0.5)] animate-blink border-[3px] border-emerald-400 z-10 scale-110">
+                    <span className="text-base">☁️</span>
+                    <span className="uppercase tracking-widest">New</span>
+                  </div>
+                )}
                 <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">⚠️</div>
                 <div className="text-left">
                   <h3 className="text-xl font-black">Important Notice</h3>

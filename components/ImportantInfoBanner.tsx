@@ -54,7 +54,7 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 no-scrollbar">
               {notices.length > 0 ? (
                 notices.map((notice, idx) => (
-                  <div key={notice.id} className={`flex flex-col md:flex-row gap-8 items-start ${idx !== 0 ? 'pt-8 border-t border-slate-100' : ''}`}>
+                  <div key={notice.id} className={`flex flex-col md:flex-row gap-8 items-start ${idx !== 0 ? 'pt-8 border-t border-slate-300' : ''}`}>
                     {notice.photo && (
                       <div className="w-full md:w-48 shrink-0">
                         <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-xl">
@@ -70,7 +70,10 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
                     
                     <div className="flex-1 space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-2xl font-black text-slate-900 leading-tight">{notice.title}</h3>
+                        <h3 className="text-2xl font-black text-slate-900 leading-tight">
+                          <span className="text-emerald-600 mr-2">{idx + 1}.</span>
+                          {notice.title}
+                        </h3>
                         <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">
                           {new Date(notice.timestamp).toLocaleDateString('en-GB')}
                         </span>
