@@ -112,4 +112,13 @@ export interface FlaggedVehicle {
   model: string;
 }
 
+export interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  photo?: string;
+  timestamp: number;
+  authorName: string;
+}
+
 export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements';

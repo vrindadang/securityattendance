@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto, DutySession, FlaggedVehicle } from './types';
+import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto, DutySession, FlaggedVehicle, Notice } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
@@ -51,6 +51,7 @@ const App: React.FC = () => {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [allSessions, setAllSessions] = useState<DutySession[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [securityNoticePhoto, setSecurityNoticePhoto] = useState<string>('https://ais-pre-2snntgklnesvtcldmdlnzp-89530588459.asia-southeast1.run.app/api/images/man.png');
 
   const visibleSewadars = useMemo(() => {
@@ -245,6 +246,17 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const fetchNotices = useCallback(async () => {
+    try {
+      const q = query(collection(db, 'notices'), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Notice[];
+      setNotices(data);
+    } catch (err) {
+      console.error("Fetch Notices Error:", err);
+    }
+  }, []);
+
   const fetchSecurityPhoto = useCallback(async () => {
     try {
       const docSnap = await getDocs(query(collection(db, 'app_settings'), where('key', '==', 'security_notice_photo')));
@@ -279,6 +291,35 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Upload Security Photo Error:", err);
       alert("Failed to upload photo.");
+    }
+  };
+
+  const handleAddNotice = async (title: string, content: string, photo?: string) => {
+    if (!activeVolunteer) return;
+    try {
+      const newNotice = {
+        title,
+        content,
+        photo: photo || '',
+        timestamp: Date.now(),
+        authorName: activeVolunteer.name
+      };
+      await addDoc(collection(db, 'notices'), newNotice);
+      fetchNotices();
+    } catch (err) {
+      console.error("Add Notice Error:", err);
+      alert("Failed to add notice.");
+    }
+  };
+
+  const handleDeleteNotice = async (id: string) => {
+    if (!activeVolunteer || activeVolunteer.role !== 'Super Admin') return;
+    if (!window.confirm("Delete this notice?")) return;
+    try {
+      await deleteDoc(doc(db, 'notices', id));
+      fetchNotices();
+    } catch (err) {
+      console.error("Delete Notice Error:", err);
     }
   };
 
@@ -502,8 +543,9 @@ const App: React.FC = () => {
       fetchSewadarDetails();
       fetchRequirements();
       fetchDeletedSewadars();
+      fetchNotices();
     }
-  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars]);
+  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars, fetchNotices]);
 
   useEffect(() => {
     fetchData(activeSession, 'active');
@@ -965,6 +1007,7 @@ const App: React.FC = () => {
             }} 
             onShowNotice={() => setShowNoticeModal(true)}
             onMainScreenChange={setIsLoginMainScreen}
+            latestNotice={notices.length > 0 ? notices[0] : null}
           />
         </div>
       ) : (
@@ -1073,6 +1116,9 @@ const App: React.FC = () => {
             onOpenSettings={() => setShowSettingsModal(true)} 
             onCompleteSession={handleCompleteSession} 
             onResetAllData={handleResetAllData} 
+            notices={notices}
+            onAddNotice={handleAddNotice}
+            onDeleteNotice={handleDeleteNotice}
           />
         )}
       </main>
@@ -1101,6 +1147,7 @@ const App: React.FC = () => {
           externalShowModal={showNoticeModal} 
           onOpenExternal={() => setShowNoticeModal(true)}
           onCloseExternal={() => setShowNoticeModal(false)}
+          notices={notices}
         />
       )}
       {bannerVisible && !activeVolunteer && (
@@ -1110,6 +1157,7 @@ const App: React.FC = () => {
           onOpenExternal={() => setShowNoticeModal(true)}
           onCloseExternal={() => setShowNoticeModal(false)}
           hideBottomBar={isLoginMainScreen}
+          notices={notices}
         />
       )}
     </div>

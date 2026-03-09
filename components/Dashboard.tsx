@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession } from '../types';
+import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession, Notice } from '../types';
 import { VOLUNTEERS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -31,6 +31,9 @@ interface Props {
   onCompleteSession: (sessionId: string) => void;
   onResetAllData?: () => void;
   onUploadSecurityPhoto?: (photo: string) => void;
+  notices?: Notice[];
+  onAddNotice?: (title: string, content: string, photo?: string) => void;
+  onDeleteNotice?: (id: string) => void;
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -51,11 +54,16 @@ const Dashboard: React.FC<Props> = ({
   dutyEndTime,
   onCompleteSession,
   onResetAllData,
-  onUploadSecurityPhoto
+  onUploadSecurityPhoto,
+  notices = [],
+  onAddNotice,
+  onDeleteNotice
 }) => {
   const [issueDesc, setIssueDesc] = useState('');
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
+  const [showNoticeForm, setShowNoticeForm] = useState(false);
+  const [newNotice, setNewNotice] = useState({ title: '', content: '', photo: '' });
 
   const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
   
@@ -678,6 +686,102 @@ const Dashboard: React.FC<Props> = ({
 
       {isSuperAdmin && (
         <div className="mt-12 space-y-6">
+          <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-400 uppercase flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                Manage Notices
+              </h3>
+              <button 
+                onClick={() => setShowNoticeForm(!showNoticeForm)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+              >
+                {showNoticeForm ? 'Close Form' : '+ Add Notice'}
+              </button>
+            </div>
+
+            {showNoticeForm && (
+              <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border-2 border-slate-100 animate-in fade-in slide-in-from-top-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notice Title</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-5 py-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                    placeholder="e.g. Entry Restricted"
+                    value={newNotice.title}
+                    onChange={e => setNewNotice(p => ({...p, title: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notice Content</label>
+                  <textarea 
+                    className="w-full px-5 py-4 bg-white border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500" 
+                    placeholder="Detailed message..."
+                    rows={3}
+                    value={newNotice.content}
+                    onChange={e => setNewNotice(p => ({...p, content: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notice Photo (Optional)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setNewNotice(p => ({...p, photo: reader.result as string}));
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white file:text-indigo-600 shadow-sm" 
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    if (!newNotice.title || !newNotice.content) return alert("Title and content are required.");
+                    onAddNotice?.(newNotice.title, newNotice.content, newNotice.photo);
+                    setNewNotice({ title: '', content: '', photo: '' });
+                    setShowNoticeForm(false);
+                  }}
+                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                >
+                  Post Notice
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+              {notices.map(notice => (
+                <div key={notice.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    {notice.photo && (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0">
+                        <img src={notice.photo} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-black text-slate-900 text-sm">{notice.title}</h4>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                        {new Date(notice.timestamp).toLocaleDateString()} • {notice.authorName}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onDeleteNotice?.(notice.id)}
+                    className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              ))}
+              {notices.length === 0 && (
+                <p className="text-center py-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest italic">No notices posted yet.</p>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
             <h3 className="text-xs font-black text-slate-400 uppercase flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>

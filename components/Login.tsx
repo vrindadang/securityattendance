@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Volunteer, DutyGroup } from '../types';
+import { Volunteer, DutyGroup, Notice } from '../types';
 import { VOLUNTEERS, GENTS_GROUPS, LADIES_GROUPS } from '../constants';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -9,11 +9,12 @@ interface Props {
   onLogin: (volunteer: Volunteer) => void;
   onShowNotice: () => void;
   onMainScreenChange?: (isMain: boolean) => void;
+  latestNotice?: Notice | null;
 }
 
 type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | null;
 
-const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange }) => {
+const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, latestNotice }) => {
   const [portalType, setPortalType] = useState<PortalType>(null);
   const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(null);
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
@@ -156,8 +157,12 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange }) =
                 <div className="text-left">
                   <h3 className="text-xl font-black">Important Notice</h3>
                   <div className="flex flex-col mt-0.5">
-                    <p className="text-[9px] text-white/90 font-black uppercase tracking-widest">6 March 2026</p>
-                    <p className="text-[9px] text-emerald-100 font-bold uppercase tracking-widest">Entry restricted for Mr Ron Filewich</p>
+                    <p className="text-[9px] text-white/90 font-black uppercase tracking-widest">
+                      {latestNotice ? new Date(latestNotice.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '6 March 2026'}
+                    </p>
+                    <p className="text-[9px] text-emerald-100 font-bold uppercase tracking-widest">
+                      {latestNotice ? latestNotice.title : 'Entry restricted for Mr Ron Filewich'}
+                    </p>
                   </div>
                 </div>
               </button>

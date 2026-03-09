@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Notice } from '../types';
 
 interface Props {
   photo?: string;
@@ -6,9 +7,10 @@ interface Props {
   onOpenExternal?: () => void;
   onCloseExternal?: () => void;
   hideBottomBar?: boolean;
+  notices?: Notice[];
 }
 
-const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpenExternal, onCloseExternal, hideBottomBar }) => {
+const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpenExternal, onCloseExternal, hideBottomBar, notices = [] }) => {
   const [internalShowModal, setInternalShowModal] = useState(false);
 
   const showModal = externalShowModal !== undefined ? externalShowModal : internalShowModal;
@@ -22,7 +24,8 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
     }
   };
 
-  const displayPhoto = photo || "https://ais-pre-2snntgklnesvtcldmdlnzp-89530588459.asia-southeast1.run.app/api/images/man.png";
+  const latestNotice = notices.length > 0 ? notices[0] : null;
+  const displayTitle = latestNotice ? latestNotice.title : "Entry of Mr. Ron Filewich (6-March-2026)";
 
   return (
     <>
@@ -33,7 +36,7 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
         >
           <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5">Important Notice</p>
-            <p className="text-sm font-black tracking-tight">Entry of Mr. Ron Filewich (6-March-2026)</p>
+            <p className="text-sm font-black tracking-tight">{displayTitle}</p>
           </div>
         </div>
       )}
@@ -41,55 +44,93 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
       {showModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="bg-emerald-600 px-8 py-6 flex items-center justify-between text-white">
-              <h2 className="text-xl font-black uppercase tracking-tight">Important Security Notice</h2>
+            <div className="bg-emerald-600 px-8 py-6 flex items-center justify-between text-white shrink-0">
+              <h2 className="text-xl font-black uppercase tracking-tight">Security Notices</h2>
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             
-            <div className="p-8 overflow-y-auto space-y-8">
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                <div className="w-full md:w-56 shrink-0">
-                  <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-xl relative">
-                    <img 
-                      src={displayPhoto} 
-                      alt="Mr Ron Filewich" 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/ron/300/400';
-                      }}
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-white/90 backdrop-blur-sm py-2 border-t border-slate-100">
-                      <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Mr Ron Filewich</p>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 no-scrollbar">
+              {notices.length > 0 ? (
+                notices.map((notice, idx) => (
+                  <div key={notice.id} className={`flex flex-col md:flex-row gap-8 items-start ${idx !== 0 ? 'pt-8 border-t border-slate-100' : ''}`}>
+                    {notice.photo && (
+                      <div className="w-full md:w-48 shrink-0">
+                        <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-xl">
+                          <img 
+                            src={notice.photo} 
+                            alt={notice.title} 
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-2xl font-black text-slate-900 leading-tight">{notice.title}</h3>
+                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                          {new Date(notice.timestamp).toLocaleDateString('en-GB')}
+                        </span>
+                      </div>
+                      <div className="text-slate-600 leading-relaxed font-medium text-base whitespace-pre-wrap">
+                        {notice.content}
+                      </div>
+                      <div className="pt-4 flex items-center gap-2">
+                        <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs">👤</div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Posted By</p>
+                          <p className="text-sm font-bold text-slate-700">{notice.authorName}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col md:flex-row gap-8 items-start">
+                  <div className="w-full md:w-56 shrink-0">
+                    <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-xl relative">
+                      <img 
+                        src={photo || "https://ais-pre-2snntgklnesvtcldmdlnzp-89530588459.asia-southeast1.run.app/api/images/man.png"} 
+                        alt="Mr Ron Filewich" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/ron/300/400';
+                        }}
+                      />
+                      <div className="absolute inset-x-0 bottom-0 bg-white/90 backdrop-blur-sm py-2 border-t border-slate-100">
+                        <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Mr Ron Filewich</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 space-y-6">
+                    <div className="space-y-4">
+                      <p className="font-black text-slate-900 text-lg">Dear All,</p>
+                      <p className="text-slate-600 leading-relaxed font-medium text-base">
+                        Entry of <span className="text-red-600 font-black">Mr Ron Filewich</span> as per photo attached, is strictly restricted in <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">KIRPAL Ashram</span> and <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">Sawan Ashram</span>. Please ensure he is not allowed in both the Ashrams.
+                      </p>
+                      <p className="text-slate-600 leading-relaxed font-medium text-base">
+                        He is allowed at <span className="font-black text-slate-900">Kirpal Bagh</span> only but Security has to be vigilent to monitor his activities from distance and to report to Admin Controller in case anything he is doing which is not as per SKRM rules.
+                      </p>
+                      <p className="text-slate-600 leading-relaxed font-medium italic text-base">
+                        Please communicate this message in your groups and ensure it is implemented strictly.
+                      </p>
+                    </div>
+                    
+                    <div className="pt-6 border-t border-slate-100">
+                      <p className="text-base font-black text-slate-900">Regards,</p>
+                      <p className="text-base font-bold text-emerald-600 uppercase tracking-widest">L K Nagpal</p>
                     </div>
                   </div>
                 </div>
-                
-                <div className="flex-1 space-y-6">
-                  <div className="space-y-4">
-                    <p className="font-black text-slate-900 text-lg">Dear All,</p>
-                    <p className="text-slate-600 leading-relaxed font-medium text-base">
-                      Entry of <span className="text-red-600 font-black">Mr Ron Filewich</span> as per photo attached, is strictly restricted in <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">KIRPAL Ashram</span> and <span className="font-black text-slate-900 underline decoration-emerald-500 underline-offset-4">Sawan Ashram</span>. Please ensure he is not allowed in both the Ashrams.
-                    </p>
-                    <p className="text-slate-600 leading-relaxed font-medium text-base">
-                      He is allowed at <span className="font-black text-slate-900">Kirpal Bagh</span> only but Security has to be vigilent to monitor his activities from distance and to report to Admin Controller in case anything he is doing which is not as per SKRM rules.
-                    </p>
-                    <p className="text-slate-600 leading-relaxed font-medium italic text-base">
-                      Please communicate this message in your groups and ensure it is implemented strictly.
-                    </p>
-                  </div>
-                  
-                  <div className="pt-6 border-t border-slate-100">
-                    <p className="text-base font-black text-slate-900">Regards,</p>
-                    <p className="text-base font-bold text-emerald-600 uppercase tracking-widest">L K Nagpal</p>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
             
-            <div className="p-6 bg-slate-50 border-t flex justify-end">
+            <div className="p-6 bg-slate-50 border-t flex justify-end shrink-0">
               <button 
                 onClick={() => setShowModal(false)}
                 className="px-12 py-4 bg-[#0f172a] text-white rounded-xl font-black uppercase tracking-widest text-sm hover:bg-slate-800 transition-all shadow-lg active:scale-95"
