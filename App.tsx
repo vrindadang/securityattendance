@@ -9,7 +9,7 @@ import VolunteerDetails from './components/VolunteerDetails';
 import RequirementsView from './components/RequirementsView';
 import ImportantInfoBanner from './components/ImportantInfoBanner';
 import { db } from './firebase';
-import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
 
 const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
 const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
@@ -246,15 +246,15 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const fetchNotices = useCallback(async () => {
-    try {
-      const q = query(collection(db, 'notices'), orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
+  useEffect(() => {
+    const q = query(collection(db, 'notices'), orderBy('timestamp', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Notice[];
       setNotices(data);
-    } catch (err) {
-      console.error("Fetch Notices Error:", err);
-    }
+    }, (err) => {
+      console.error("Notices Sync Error:", err);
+    });
+    return () => unsubscribe();
   }, []);
 
   const fetchSecurityPhoto = useCallback(async () => {
@@ -305,7 +305,6 @@ const App: React.FC = () => {
         authorName: activeVolunteer.name
       };
       await addDoc(collection(db, 'notices'), newNotice);
-      fetchNotices();
     } catch (err) {
       console.error("Add Notice Error:", err);
       alert("Failed to add notice.");
@@ -317,7 +316,6 @@ const App: React.FC = () => {
     if (!window.confirm("Delete this notice?")) return;
     try {
       await deleteDoc(doc(db, 'notices', id));
-      fetchNotices();
     } catch (err) {
       console.error("Delete Notice Error:", err);
     }
@@ -543,9 +541,8 @@ const App: React.FC = () => {
       fetchSewadarDetails();
       fetchRequirements();
       fetchDeletedSewadars();
-      fetchNotices();
     }
-  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars, fetchNotices]);
+  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars]);
 
   useEffect(() => {
     fetchData(activeSession, 'active');
