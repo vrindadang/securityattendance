@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import VolunteerDetails from './components/VolunteerDetails';
 import RequirementsView from './components/RequirementsView';
+import WeeklyReportsView from './components/WeeklyReportsView';
 import ImportantInfoBanner from './components/ImportantInfoBanner';
 import { db } from './firebase';
 import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
@@ -1089,6 +1090,8 @@ const App: React.FC = () => {
             onAddRequirement={handleSaveRequirement}
             onUpdateRequirementStatus={handleUpdateRequirementStatus}
           />
+        ) : activeView === 'WeeklyReports' ? (
+          <WeeklyReportsView activeVolunteer={activeVolunteer} />
         ) : (
           <Dashboard 
             attendance={attendance} 
@@ -1134,6 +1137,12 @@ const App: React.FC = () => {
             <span className="text-[8px] font-black uppercase">Requirements</span>
           </button>
           <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2-2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
+          {activeVolunteer.role === 'Super Admin' && (
+            <button onClick={() => setActiveView('WeeklyReports')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'WeeklyReports' ? 'text-indigo-600' : 'text-slate-400'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <span className="text-[8px] font-black uppercase">Weekly</span>
+            </button>
+          )}
         </nav>
       )}
         </>

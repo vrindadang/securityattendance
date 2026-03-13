@@ -121,4 +121,24 @@ export interface Notice {
   authorName: string;
 }
 
-export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements';
+export interface WeeklyReport {
+  id: string;
+  startDate: string;
+  endDate: string;
+  gender: Gender;
+  totalSewadars: number;
+  groupBreakdown: Record<string, number>;
+  shiftTrends: Record<string, number>;
+  highTrafficPoints: { point: string; count: number }[];
+  coverageGaps: string[];
+  averageShiftLength: number;
+  thresholdStats: { above80: number; below50: number; others: number };
+  incidentSummary: string;
+  vehicleTrends: string;
+  activeSewadars: { name: string; count: number; hours: number }[];
+  verificationStatus: string;
+  recommendations: string;
+  timestamp: number;
+}
+
+export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports';

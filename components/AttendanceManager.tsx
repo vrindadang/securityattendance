@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
-import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS } from '../constants';
+import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, LADIES_GROUPS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -40,8 +40,8 @@ const AttendanceManager: React.FC<Props> = ({
 }) => {
   const [mode, setMode] = useState<'ATTENDANCE' | 'VEHICLES'>('ATTENDANCE');
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
-  const [selectedGender] = useState<Gender | null>(isSuperAdmin ? null : (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents'));
-  const [selectedGroup] = useState<DutyGroup | null>(
+  const [selectedGender, setSelectedGender] = useState<Gender | null>(isSuperAdmin ? null : (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents'));
+  const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(
     activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || null)
   );
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,8 +58,8 @@ const AttendanceManager: React.FC<Props> = ({
   // States for adding new sewadar
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newGender] = useState<Gender>(activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents');
-  const [newGroup] = useState<DutyGroup>(
+  const [newGender, setNewGender] = useState<Gender>(activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents');
+  const [newGroup, setNewGroup] = useState<DutyGroup>(
     activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || 'Monday')
   );
 
@@ -212,8 +212,46 @@ const AttendanceManager: React.FC<Props> = ({
            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
               <h2 className="text-2xl font-black text-slate-900">Add New Member</h2>
               <form onSubmit={handleCreateSewadar} className="space-y-4">
-                 <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full Name" />
-                 <div className="flex gap-2">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Name</label>
+                    <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full Name" />
+                 </div>
+                 
+                 {isSuperAdmin && (
+                   <div className="grid grid-cols-2 gap-3">
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Gender</label>
+                        <select 
+                          className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none"
+                          value={newGender}
+                          onChange={e => {
+                            const val = e.target.value as Gender;
+                            setNewGender(val);
+                            if (val === 'Ladies') setNewGroup('Ladies');
+                          }}
+                        >
+                          <option value="Gents">Gents</option>
+                          <option value="Ladies">Ladies</option>
+                        </select>
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Group</label>
+                        <select 
+                          className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none"
+                          value={newGroup}
+                          onChange={e => setNewGroup(e.target.value as DutyGroup)}
+                        >
+                          {newGender === 'Ladies' ? (
+                            <option value="Ladies">Ladies</option>
+                          ) : (
+                            GENTS_GROUPS.map(g => <option key={g} value={g}>{g}</option>)
+                          )}
+                        </select>
+                     </div>
+                   </div>
+                 )}
+
+                 <div className="flex gap-2 pt-4">
                     <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
                     <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
                  </div>
@@ -269,6 +307,49 @@ const AttendanceManager: React.FC<Props> = ({
           </div>
 
           <div className={`${isLocked && !isCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
+            {isSuperAdmin && (
+              <div className="mb-4 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Gender</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      value={selectedGender || ''}
+                      onChange={(e) => {
+                        const val = e.target.value as Gender || null;
+                        setSelectedGender(val);
+                        if (val === 'Ladies') setSelectedGroup('Ladies');
+                        else if (val === 'Gents') setSelectedGroup(null);
+                      }}
+                    >
+                      <option value="">All Genders</option>
+                      <option value="Gents">Gents</option>
+                      <option value="Ladies">Ladies</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Group</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      value={selectedGroup || ''}
+                      onChange={(e) => setSelectedGroup(e.target.value as DutyGroup || null)}
+                    >
+                      <option value="">All Groups</option>
+                      {GENTS_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                      <option value="Ladies">Ladies</option>
+                    </select>
+                  </div>
+                </div>
+                {(selectedGender || selectedGroup) && (
+                  <button 
+                    onClick={() => { setSelectedGender(null); setSelectedGroup(null); }}
+                    className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-2 hover:text-indigo-800 transition-colors"
+                  >
+                    ✕ Clear Filters
+                  </button>
+                )}
+              </div>
+            )}
             <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 flex gap-2">
                <input 
                 type="text" 
