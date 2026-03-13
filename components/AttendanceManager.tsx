@@ -62,6 +62,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [newGroup, setNewGroup] = useState<DutyGroup>(
     activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || 'Monday')
   );
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   // Vehicle Form state
   const [vType, setVType] = useState<'2-wheeler' | '4-wheeler'>('4-wheeler');
@@ -171,9 +172,25 @@ const AttendanceManager: React.FC<Props> = ({
 
   const handleCreateSewadar = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
-    onAddSewadar(newName.trim(), newGender, newGroup);
+    const trimmedName = newName.trim();
+    if (!trimmedName) return;
+
+    // Fuzzy matching normalization: lowercase and remove non-alphanumeric
+    const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedNewName = normalize(trimmedName);
+
+    const isDuplicate = sewadars.some(s => 
+      s.group === newGroup && normalize(s.name) === normalizedNewName
+    );
+
+    if (isDuplicate) {
+      setDuplicateError(`A member with a similar name already exists in the ${newGroup} group.`);
+      return;
+    }
+
+    onAddSewadar(trimmedName, newGender, newGroup);
     setNewName('');
+    setDuplicateError(null);
     setShowAddModal(false);
   };
 
@@ -214,7 +231,7 @@ const AttendanceManager: React.FC<Props> = ({
               <form onSubmit={handleCreateSewadar} className="space-y-4">
                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Name</label>
-                    <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full Name" />
+                    <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => { setNewName(e.target.value); setDuplicateError(null); }} placeholder="Full Name" />
                  </div>
                  
                  {isSuperAdmin && (
@@ -228,6 +245,7 @@ const AttendanceManager: React.FC<Props> = ({
                             const val = e.target.value as Gender;
                             setNewGender(val);
                             if (val === 'Ladies') setNewGroup('Ladies');
+                            setDuplicateError(null);
                           }}
                         >
                           <option value="Gents">Gents</option>
@@ -239,7 +257,7 @@ const AttendanceManager: React.FC<Props> = ({
                         <select 
                           className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none"
                           value={newGroup}
-                          onChange={e => setNewGroup(e.target.value as DutyGroup)}
+                          onChange={e => { setNewGroup(e.target.value as DutyGroup); setDuplicateError(null); }}
                         >
                           {newGender === 'Ladies' ? (
                             <option value="Ladies">Ladies</option>
@@ -251,8 +269,14 @@ const AttendanceManager: React.FC<Props> = ({
                    </div>
                  )}
 
+                 {duplicateError && (
+                   <div className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl">
+                     <p className="text-xs font-bold text-red-600 text-center">{duplicateError}</p>
+                   </div>
+                 )}
+
                  <div className="flex gap-2 pt-4">
-                    <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
+                    <button type="button" onClick={() => { setShowAddModal(false); setDuplicateError(null); }} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
                     <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
                  </div>
               </form>
@@ -358,7 +382,7 @@ const AttendanceManager: React.FC<Props> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <button onClick={() => setShowAddModal(true)} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
+              <button onClick={() => { setDuplicateError(null); setShowAddModal(true); }} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
               </button>
             </div>
