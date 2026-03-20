@@ -94,7 +94,7 @@ const App: React.FC = () => {
   };
 
   const [configForm, setConfigForm] = useState({
-    locations: [] as string[],
+    locations: [...LOCATIONS_LIST],
     startDate: getLocalDate(),
     startTime: '07:00',
     endDate: getTomorrowDate(),
@@ -103,25 +103,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (showSettingsModal && activeVolunteer) {
-      if (activeVolunteer.assignedGroup === 'Ladies') {
-        setConfigForm(prev => ({
-          ...prev,
-          locations: [...LOCATIONS_LIST],
-          startDate: getLocalDate(),
-          startTime: '07:00',
-          endDate: getTomorrowDate(),
-          endTime: '07:00'
-        }));
-      } else {
-        setConfigForm(prev => ({
-          ...prev,
-          locations: [],
-          startDate: getLocalDate(),
-          startTime: '07:00',
-          endDate: getTomorrowDate(),
-          endTime: '07:00'
-        }));
-      }
+      setConfigForm(prev => ({
+        ...prev,
+        locations: [...LOCATIONS_LIST],
+        startDate: getLocalDate(),
+        startTime: '07:00',
+        endDate: getTomorrowDate(),
+        endTime: '07:00'
+      }));
     }
   }, [showSettingsModal, activeVolunteer]);
 
@@ -882,6 +871,12 @@ const App: React.FC = () => {
         setSaveSuccess(true);
         setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       } else {
+        // Check if there's any other active session for this group before creating a new one
+        if (activeSession && !activeSession.completed) {
+          alert("A previous session needs to be finalized first before starting another active session.");
+          return;
+        }
+
         const id = generateNumericId();
         const payload = {
           id,
@@ -917,6 +912,22 @@ const App: React.FC = () => {
       }
       setActiveView('Attendance');
     } catch (err) { alert("Error finalizing duty."); }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!window.confirm("Are you sure you want to delete this session? This will NOT delete attendance records associated with it, but the session configuration will be gone.")) return;
+    try {
+      await deleteDoc(doc(db, 'daily_settings', sessionId));
+      setAllSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (activeSession?.id === sessionId) setActiveSession(null);
+      if (dashboardSelectedSession?.id === sessionId) {
+        setDashboardSelectedSession(null);
+        localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+      }
+      alert("Session deleted successfully.");
+    } catch (err) {
+      alert("Error deleting session.");
+    }
   };
 
   const handleSessionChange = (id: string) => {
@@ -1020,14 +1031,6 @@ const App: React.FC = () => {
                   <h2 className="text-2xl font-black text-slate-900">New Duty Session</h2>
                 </div>
                 <form onSubmit={handleSaveSettings} className="space-y-6">
-                  <div className="grid grid-cols-1 gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Locations</label>
-                    <div className="grid grid-cols-1 gap-2">
-                      {LOCATIONS_LIST.map(loc => (
-                        <button type="button" key={loc} onClick={() => setConfigForm(p => ({ ...p, locations: p.locations.includes(loc) ? p.locations.filter(l => l !== loc) : [...p.locations, loc] }))} className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase border-2 transition-all ${configForm.locations.includes(loc) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{loc}</button>
-                      ))}
-                    </div>
-                  </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
@@ -1059,10 +1062,16 @@ const App: React.FC = () => {
             onSaveVehicle={handleSaveVehicle}
             vehicles={activeVehicles}
             flaggedVehicles={flaggedVehicles}
-            onAddSewadar={async (n, g, grp) => {
-              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp };
+            onAddSewadar={async (n, g, grp, shift) => {
+              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp, shift };
               try {
-                await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { id: newSewadar.id, name: newSewadar.name, gender: newSewadar.gender, group: newSewadar.group });
+                await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { 
+                  id: newSewadar.id, 
+                  name: newSewadar.name, 
+                  gender: newSewadar.gender, 
+                  group: newSewadar.group,
+                  shift: newSewadar.shift || null
+                });
                 setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
               } catch (error) { console.error('Failed to add sewadar:', error); }
             }} 
@@ -1119,6 +1128,7 @@ const App: React.FC = () => {
             notices={notices}
             onAddNotice={handleAddNotice}
             onDeleteNotice={handleDeleteNotice}
+            onDeleteSession={handleDeleteSession}
           />
         )}
       </main>

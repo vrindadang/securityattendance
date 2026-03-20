@@ -10,7 +10,7 @@ interface Props {
   flaggedVehicles?: FlaggedVehicle[];
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
-  onAddSewadar: (name: string, gender: Gender, group: DutyGroup) => void;
+  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT') => void;
   onDeleteSewadar?: (id: string) => void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
@@ -42,7 +42,7 @@ const AttendanceManager: React.FC<Props> = ({
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const [selectedGender, setSelectedGender] = useState<Gender | null>(isSuperAdmin ? null : (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents'));
   const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(
-    activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || null)
+    activeVolunteer.assignedGroup || (activeVolunteer.role.includes('Ladies') ? 'Ladies' : null)
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -53,6 +53,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [editLocation, setEditLocation] = useState('');
   const [editPoint, setEditPoint] = useState('');
   const [editProperUniform, setEditProperUniform] = useState(true);
+  const [editShift, setEditShift] = useState<'DAY' | 'NIGHT' | null>(null);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
 
   // States for adding new sewadar
@@ -62,6 +63,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [newGroup, setNewGroup] = useState<DutyGroup>(
     activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || 'Monday')
   );
+  const [newShift, setNewShift] = useState<'DAY' | 'NIGHT' | undefined>(undefined);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   // Vehicle Form state
@@ -128,6 +130,7 @@ const AttendanceManager: React.FC<Props> = ({
       setEditLocation(incomplete.workshopLocation || '');
       setEditPoint(incomplete.sewaPoint || '');
       setEditProperUniform(incomplete.isProperUniform ?? true);
+      setEditShift(incomplete.shift || null);
       setEditingRecordId(incomplete.id);
     } else {
       resetForm();
@@ -143,6 +146,7 @@ const AttendanceManager: React.FC<Props> = ({
     setEditLocation(availableLocs[0] || '');
     setEditPoint('');
     setEditProperUniform(true);
+    setEditShift(null);
     setEditingRecordId(null);
   };
 
@@ -153,7 +157,8 @@ const AttendanceManager: React.FC<Props> = ({
       outTime: editOutTime,
       sewaPoint: editPoint,
       workshopLocation: editLocation,
-      isProperUniform: editProperUniform
+      isProperUniform: editProperUniform,
+      shift: editShift || undefined
     }, editingRecordId || undefined);
     resetForm();
   };
@@ -165,7 +170,8 @@ const AttendanceManager: React.FC<Props> = ({
       outTime: editOutTime,
       sewaPoint: editPoint,
       workshopLocation: editLocation,
-      isProperUniform: editProperUniform
+      isProperUniform: editProperUniform,
+      shift: editShift || undefined
     }, editingRecordId || undefined);
     setExpandedId(null);
   };
@@ -188,8 +194,9 @@ const AttendanceManager: React.FC<Props> = ({
       return;
     }
 
-    onAddSewadar(trimmedName, newGender, newGroup);
+    onAddSewadar(trimmedName, newGender, newGroup, newShift);
     setNewName('');
+    setNewShift(undefined);
     setDuplicateError(null);
     setShowAddModal(false);
   };
@@ -260,11 +267,36 @@ const AttendanceManager: React.FC<Props> = ({
                           onChange={e => { setNewGroup(e.target.value as DutyGroup); setDuplicateError(null); }}
                         >
                           {newGender === 'Ladies' ? (
-                            <option value="Ladies">Ladies</option>
+                            <>
+                              <option value="Ladies">Ladies</option>
+                              <option value="Monday">Monday</option>
+                            </>
                           ) : (
                             GENTS_GROUPS.map(g => <option key={g} value={g}>{g}</option>)
                           )}
                         </select>
+                     </div>
+                   </div>
+                 )}
+
+                 {newGroup === 'Monday' && newGender === 'Ladies' && (
+                   <div className="space-y-1.5">
+                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Shift</label>
+                     <div className="flex gap-2">
+                       <button 
+                         type="button"
+                         onClick={() => setNewShift('DAY')}
+                         className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${newShift === 'DAY' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                       >
+                         Day
+                       </button>
+                       <button 
+                         type="button"
+                         onClick={() => setNewShift('NIGHT')}
+                         className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${newShift === 'NIGHT' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                       >
+                         Night
+                       </button>
                      </div>
                    </div>
                  )}
@@ -318,7 +350,9 @@ const AttendanceManager: React.FC<Props> = ({
               <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
                 {isCompleted ? '✅ FINALIZED' : hasConfig ? 'Active Session' : 'Pending Config'}
               </p>
-              <h2 className="text-base font-black text-slate-800">{workshopLocation || 'No Location Set'}</h2>
+              <h2 className="text-base font-black text-slate-800">
+                {workshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (workshopLocation || 'No Location Set')}
+              </h2>
               <div className="flex items-center gap-3">
                 <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
                 <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
@@ -331,49 +365,6 @@ const AttendanceManager: React.FC<Props> = ({
           </div>
 
           <div className={`${isLocked && !isCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
-            {isSuperAdmin && (
-              <div className="mb-4 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Gender</label>
-                    <select 
-                      className="w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-indigo-500 transition-all shadow-sm"
-                      value={selectedGender || ''}
-                      onChange={(e) => {
-                        const val = e.target.value as Gender || null;
-                        setSelectedGender(val);
-                        if (val === 'Ladies') setSelectedGroup('Ladies');
-                        else if (val === 'Gents') setSelectedGroup(null);
-                      }}
-                    >
-                      <option value="">All Genders</option>
-                      <option value="Gents">Gents</option>
-                      <option value="Ladies">Ladies</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Group</label>
-                    <select 
-                      className="w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-indigo-500 transition-all shadow-sm"
-                      value={selectedGroup || ''}
-                      onChange={(e) => setSelectedGroup(e.target.value as DutyGroup || null)}
-                    >
-                      <option value="">All Groups</option>
-                      {GENTS_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-                      <option value="Ladies">Ladies</option>
-                    </select>
-                  </div>
-                </div>
-                {(selectedGender || selectedGroup) && (
-                  <button 
-                    onClick={() => { setSelectedGender(null); setSelectedGroup(null); }}
-                    className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-2 hover:text-indigo-800 transition-colors"
-                  >
-                    ✕ Clear Filters
-                  </button>
-                )}
-              </div>
-            )}
             <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 flex gap-2">
                <input 
                 type="text" 
@@ -457,12 +448,20 @@ const AttendanceManager: React.FC<Props> = ({
                                     setEditLocation(rec.workshopLocation || '');
                                     setEditPoint(rec.sewaPoint || '');
                                     setEditProperUniform(rec.isProperUniform ?? true);
+                                    setEditShift(rec.shift || null);
                                     setEditingRecordId(rec.id);
                                   }}
                                   className={`p-4 rounded-2xl flex items-center justify-between border cursor-pointer transition-all ${editingRecordId === rec.id ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-slate-50 border-slate-100 hover:bg-white'}`}
                                 >
                                    <div className="space-y-1">
-                                      <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
+                                       <div className="flex items-center gap-2">
+                                          <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
+                                          {rec.shift && (
+                                            <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${rec.shift === 'DAY' ? 'bg-amber-100 text-amber-700' : 'bg-slate-800 text-white'}`}>
+                                              {rec.shift}
+                                            </span>
+                                          )}
+                                       </div>
                                       <p className="text-[10px] font-bold text-slate-400">{rec.inTime} to {rec.outTime || 'On Duty'}</p>
                                    </div>
                                    <button 
@@ -561,6 +560,26 @@ const AttendanceManager: React.FC<Props> = ({
                                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Out Time</label>
                                     <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editOutTime} onChange={e => setEditOutTime(e.target.value)} />
                                  </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Shift</label>
+                                <div className="flex gap-2">
+                                   <button 
+                                     type="button" 
+                                     onClick={() => setEditShift('DAY')} 
+                                     className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editShift === 'DAY' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                                   >
+                                     DAY
+                                   </button>
+                                   <button 
+                                     type="button" 
+                                     onClick={() => setEditShift('NIGHT')} 
+                                     className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editShift === 'NIGHT' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                                   >
+                                     NIGHT
+                                   </button>
+                                </div>
                               </div>
 
                               <div className="space-y-1.5">

@@ -34,6 +34,7 @@ interface Props {
   notices?: Notice[];
   onAddNotice?: (title: string, content: string, photo?: string) => void;
   onDeleteNotice?: (id: string) => void;
+  onDeleteSession?: (id: string) => void;
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -57,13 +58,17 @@ const Dashboard: React.FC<Props> = ({
   onUploadSecurityPhoto,
   notices = [],
   onAddNotice,
-  onDeleteNotice
+  onDeleteNotice,
+  onDeleteSession
 }) => {
   const [issueDesc, setIssueDesc] = useState('');
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
   const [showNoticeForm, setShowNoticeForm] = useState(false);
   const [newNotice, setNewNotice] = useState({ title: '', content: '', photo: '' });
+
+  const [sessionFilterGender, setSessionFilterGender] = useState<'Gents' | 'Ladies' | 'All'>('All');
+  const [sessionFilterGroup, setSessionFilterGroup] = useState<string>('All');
 
   const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
   
@@ -779,6 +784,82 @@ const Dashboard: React.FC<Props> = ({
               {notices.length === 0 && (
                 <p className="text-center py-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest italic">No notices posted yet.</p>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+            <h3 className="text-xs font-black text-slate-400 uppercase flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+              Session Management
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gender</label>
+                <select 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none"
+                  value={sessionFilterGender}
+                  onChange={e => setSessionFilterGender(e.target.value as any)}
+                >
+                  <option value="All">All Genders</option>
+                  <option value="Gents">Gents</option>
+                  <option value="Ladies">Ladies</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Group</label>
+                <select 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none"
+                  value={sessionFilterGroup}
+                  onChange={e => setSessionFilterGroup(e.target.value)}
+                >
+                  <option value="All">All Groups</option>
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+              {allSessions
+                .filter(s => {
+                  const isLadies = s.group.includes('Ladies');
+                  const genderMatch = sessionFilterGender === 'All' || (sessionFilterGender === 'Ladies' ? isLadies : !isLadies);
+                  const groupMatch = sessionFilterGroup === 'All' || s.group.includes(sessionFilterGroup);
+                  return genderMatch && groupMatch;
+                })
+                .map(s => (
+                  <div key={s.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-black text-slate-900 text-sm">
+                        {(typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/')}
+                      </h4>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                        {s.group} • {s.completed ? 'Finalized' : 'Active'}
+                      </p>
+                      <p className="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[150px]">
+                        {s.location}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => onSessionChange(s.id)}
+                        className={`p-2 rounded-xl transition-all ${selectedSessionId === s.id ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50'}`}
+                        title="View Stats"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                      </button>
+                      <button 
+                        onClick={() => onDeleteSession?.(s.id)}
+                        className="p-2 bg-white text-red-500 border border-red-100 rounded-xl hover:bg-red-50 transition-all"
+                        title="Delete Session"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
 

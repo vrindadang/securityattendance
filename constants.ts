@@ -120,7 +120,76 @@ export const FRIDAY_LIST = [
   "Jitender Arora", "Nanak Chand", "Rajinder Khurana", "Gulab Prasad", "Prem Lal", "Jitender Solanki", "Shiv Ram", "Anil Kumar", "Amit Verma", "Mohan Lal Gumber", "Sunil Nagpal"
 ];
 const SATURDAY_LIST = ["Harbans Lal Gumber", "Rajan Nagpal", "O.P.Batra", "Ajit Singh", "Akash Kheterpal", "Amar Singh", "Amar Singh Yadav", "Amit Bhutani", "Amrit Lal", "Anil Chawla", "Anil Kumar", "Ankit Khetarpal", "Ankur Bhutani", "Arjun Singh", "Arun Kumar", "Ashok Kumar Sharma", "Ashok Sindal", "Avinash Madan", "Bhushan Lal Thukral", "Dara Singh", "Deepak Chhabra", "Deepak Saini", "Devki Nandan", "Dharam Pal", "Dharamveer Gupta", "Dilip Singh", "Gajender Chauhan", "Gulshan Rajpal", "Gurdarshan", "Gurmeet Singh", "H.L Batra", "Harish", "Hemant", "Himanshu Ahuja", "Hitesh Bhatia", "Jatin Batia", "Jitender Kr", "Jitender Singh", "Joginder Pal", "Joginder Singh", "K.K. Kalra", "K P Singh", "K.R Bhatia", "Kapil Khetarpal", "Kishan Lal Ahuja", "Kunal Bhatia", "L K Nagpal", "Madan Mohan", "Manish Kumar", "Manmohan Ahuja", "Naresh Kumar", "Nirmal Kumar Singh", "Pitamber", "Piyush Anand", "Praveen Malik", "Prem Saluja", "Puneet Ahuja", "Rajesh Gandhi", "Raj Bhadur Singh", "Raj Kumar Sikka", "Rajender Kumar", "Rajinder Gulati", "Rakesh Munjal", "Ram Kumar", "Ram Niwas", "Ramesh Chand", "Ramesh Sharma", "Ranjeet Singh", "Ravinder Singh", "Rishikesh", "Roshan Lal", "Sachin Arora", "Sahil Arora", "Sanjeev Dhawan", "Satish Kr", "Shankar Lal Bhatia", "Shri Krishan", "Shubham Virmani", "Shunty Nagpal", "Som Datt", "Subhash Rathor", "Sudesh Yadav", "Sumit Gambhir", "Surender Singh (Ii)", "Surender Verma", "Surinder Singh", "Sushil Malik", "Tara Chand", "Umed Singh", "Vijay Kumar", "Vijay Singh", "Vipul Bhatia", "Yadvinder Singh", "Yogesh Kumar", "Yogesh Matta"];
-const LADIES_LIST = ["KANTA RANI", "JYOTI KHERA", "SUMAN SETHI", "AARTI KOHLI", "ALKA VERMA", "ANITA AHUJA", "ANITA BHARDWAJ", "ANITA SETHI", "ANITA MAKKAR", "ASHA KAPOOR", "BHARTI UDAR", "BHAGWATI SHARMA", "BIMAL KHARBANDA", "BIMLA DHINGRA", "BIMLA DUTT", "BIMLESH SISODIA", "CHANDER ARORA", "CHANCHAL HARJAI", "CHANDRA NAILWAL", "DARSHNA DUA", "DINESH DEVI", "GEETA OHRI", "GEETA PANIPAT", "JYOTI MALHOTRA", "JOLLY JOHAR", "KAMLESH ARORA", "KAMLESH BHARDWAJ", "KAMLESH DEVI", "KAMLESH SAINI", "KAMLESH VERMA", "KANTA ARORA", "KANTA GUPTA", "KANTA SHARMA", "KARMAWALI", "KIRAN BALA", "KRISHNA DEVI", "KUNTI DEVI", "KOSHAL BHUTANI", "KUSUM LATA", "KUSUM LATA RAJPUT", "LALITA GANDHI", "LAJYA WANTI", "LAXMI SOLANKI", "MAMTA AHUJA", "MAMTA SAINI", "MAMTA SHARMA", "MANJU CHAUHAN", "MAYA KAJAL", "MEENAKSHI", "MEHAK CHAWLA", "NEELAM CHOKRA", "NEELAM CHAWLA", "NEELAM GANDHI", "NEELAM NARULA", "NEELAM MIGLANI", "NEELAM VERMA", "NEENA KHARBANDA", "NEERU BHALLA", "NEERU BUDHIRAJA", "NEERU CHOPRA", "NEERU CHOPRA", "NEERU SAINI", "NIRMAL RANA", "NIRMLA DEVI", "NISHA RANI", "OM WATI", "PAWAN KUMARI", "PHOOL WATI", "POONAM KHANDAN", "PINKI CHOPRA", "PUSHPA HANS", "PUSHPA SINGH", "PUSHPA SHARMA", "PUSHPA TANEJA", "RACHNA", "RAJ CHHABRA", "RAM WATI", "RAMA ARORA", "RAMA CHAUHAN", "RANI (NANGLOI)", "RANI GUMBER", "RANI RAJKUMARI", "RANU SINGHLA", "RAVI KANTA", "RENU MALIK", "RESHMA YADAV", "RUCHIKA SONI", "SANTOSH BHANOT", "SANTOSH DEVI", "SANTOSH DUHAN", "SANTOSH MEHRA", "SANTOSH NANDA", "SANTOSH SAHRAWAT", "SANTOSH VERMA", "SANYOGITA AHUJA", "SATYA MANOCHA", "SAVITRI (PALWAL)", "SHAKUNTLA BABBAR", "SHAKUNTLA SINGH", "SHASHI GAMBHIR", "SHASHI MANOCHA", "SHEEL CHAWLA", "SHEEL KHERA", "SHEELA GABA", "SHIKHA AHUJA", "SHRUTI", "SNEH CHUGH", "SUDESH BATRA", "SUDESH ROHILLA", "SUDESH SINGH", "SUMAN BHATIA", "SUMAN SHARMA", "SUNITA DUA", "SUNITA VERMA", "SUNITA MEHRA", "SUNITA SAINI", "SUNITA SAINI MONDAY", "SUMITRA YADAV", "SUSHILA CHAWLA", "SUSHILA SHARMA", "SUSHMA BHUTANI", "SWARNA GANDHI", "TARUNA SETH", "USHA (TIMARPUR)", "USHA ARORA", "USHA DHINGRA", "USHA RANI", "VANISHA GROVER", "VEENA CHAUHAN", "VEENA GHERA", "VEENA MUNJAL", "VIJAY LAXMI", "VISHO DEVI"];
+const LADIES_MONDAY_DAY_LIST = [
+  "KANTA RANI", "JYOTI KHERA", "SUMAN SETHI", "ANITA BHARDWAJ", "CHANCHAL UPPAL (R)", "DAYA SHARMA", "KAMLA RANI (R)", "KAMLESH BHARDWAJ", "KAMLESH DEVI", "KANTA GUPTA", "KIRAN BALA", "KIRAN RAWAL (R)", "KUSUM LATA", "LAXMI GIRI", "MADHU GULATI", "NEELAM CHAWLA", "NEELAM MIGLANI", "NEENA KAUSHIK", "PREM BAJAJ (R)", "PUSHPA TANEJA", "RENU MALIK", "SANTOSH DEVI", "SANTOSH MEHRA", "SAROJ ARORA (R)", "SHAKUNTLA BABBAR", "SHAKUNTLA KHATER(R)", "SHAKUNTLA BAHAL (R)", "SHEELA GABA", "SUDESH ROHILLA", "SUNITA SAINI MONDAY", "SUMAN MIGLANI", "SURESH KUMARI", "SUSHILA CHAWLA", "USHA (TIMARPUR)", "VEENA MUNJAL"
+];
+
+const LADIES_MONDAY_NIGHT_LIST = [
+  "KANTA RANI", "JYOTI KHERA", "SUMAN SETHI", "CHANCHAL HARJAI", "JOLLY JOHAR", "KAMLESH BHARDWAJ", "KAMLESH VERMA", "KIRAN BALA", "KOSHAL BHUTANI", "MANJU CHAUHAN", "MEENAKSHI", "NEERU BHALLA", "PUSHPA TANEJA", "PUSHPA SINGH", "RENU MALIK", "RESHMA YADAV", "SANTOSH MEHRA", "SHAKUNTLA BABBAR", "SHASHI GAMBHIR", "SUDESH BATRA", "SUDESH ROHILLA", "SUNITA VERMA", "USHA (TIMARPUR)"
+];
+
+const LADIES_TUESDAY_DAY_LIST = [
+  "GEETA OHRI", "ANITA SETHI", "ANITA MAKKAR", "BABLI", "CHANDER NAINWALL", "DARSHNA DUA", "JOLLY JOHAR", "JYOTI MALHOTRA", "KAMLESH ARORA", "KANTA GUPTA", "MAHAK CHAWLA", "NEERU CHOPRA", "RENU MANGLAI", "RAM WATI", "RESHMA YADAV"
+];
+
+const LADIES_TUESDAY_NIGHT_LIST = [
+  "SHIKHA", "SUNITA VERMA", "USHA ARORA", "SATYA MANOCHA", "RANI GUMBER", "JYOTI KHERA", "TARUNA", "SANTOSH DUHAN", "PUSHPA SINGH", "NEERU BHALLA", "SANTOSH SEHRAWAT"
+];
+
+const LADIES_WEDNESDAY_DAY_LIST = [
+  "SUMAN SETHI", "KAMLESH VERMA", "PINKI CHOPRA", "RAMA ARORA", "KANTA GUPTA", "SANTOSH MEHRA", "SNEH CHUGH", "KANTA ARORA", "SUMAN SHARMA", "ANITA BHARDWAJ", "KRISHNA DEVI", "BIMLA DATTA", "NEERU CHOPRA", "NIRMALA", "SURESH RANI", "KAMLESH BHARDWAJ", "SUNITA SAINI", "RAJESWARI", "RACHNA", "VIJAY LAXMI", "GEETA OHRI", "SHASHI TULLY", "PUSHPA HANS", "SANTOSH DUHAN", "KOSHAL BUTANI", "SUDESH BATRA"
+];
+
+const LADIES_WEDNESDAY_NIGHT_LIST = [
+  "SUMAN SETHI", "ARATI KOHLI", "PUSHPA SINGH", "MANJU CHAUHAN", "JOLLY", "GEETA OHRI", "RESHMA YADAV", "SUDESH BATRA", "ANITA MAKKAR", "SHASHI MANOCHA", "NEERU CHOPRA", "KAMLESH VERMA", "SANTOSH MEHRA", "NEELAM CHOKRA", "NEELAM VERMA", "SANTOSH DUHAN", "RENU SINGLA", "SUMITRA YADAV", "MEENAKSHI", "PINKI", "JYOTI MALHOTRA", "SHIKHA AHUJA", "SATYA MANOCHA", "VIJAY LAXMI"
+];
+
+const LADIES_THURSDAY_DAY_LIST = [
+  "ASHA KAPOOR", "BHARTI UDAR", "CHANDA GUPTA", "JOLLY JOHAR", "KAMLESH BHARDWAJ",
+  "KANTA SHARMA", "KUSUM LATA RAJPUT", "KANTA GUPTA", "DAYA SHARMA", "BIMLA DHINGRA",
+  "KUNTI DEVI", "MADHU GULATI", "NEELAM MIGLANI", "NIRMLA DEVI", "PUSHPA TANEJA",
+  "RANI GUMBER", "RANI NANGLOI", "RENU MALIK", "RENU GUPTA", "RESHMA YADAV",
+  "SANTOSH DEVI", "SANTOSH DUHAN", "SHASHI GAMBHIR", "SHEELA GABA", "SUMITRA ATRI",
+  "SUSHMA BHUTANI", "VEENA GHERA", "PUSHPA SIKKA", "LAXMI DEVI", "RAJ VEER",
+  "RAJESHWARI", "SAKSHI LUTHRA", "ASHA DEVI", "VIJAY LAXMI", "MEENA",
+  "NEEMA", "KUSUM", "ANJALI", "SUMAN", "PINKI ANSHU"
+];
+
+const LADIES_THURSDAY_NIGHT_LIST = [
+  "PUSHPA TANEJA", "ANITA MAKKAR", "ANITA SETHI", "GEETA OHRI", "SUDESH BATHRA",
+  "SATYA MANOCHA", "SUMAN SETHI", "SANTOSH MEHRA", "SAMITRA YADAV", "CHANDRA NAILWAL",
+  "PUSHPA SINGH", "MANJU CHAUHAN", "SUNITA VERMA", "RASHMA YADAV", "SANTOSH DUHAN",
+  "JYOTI MALHOTRA", "BHUMIKA", "KAMLESH VERMA", "MEENAKSHI", "JOLLY",
+  "YOGITA CHAWLA"
+];
+
+const LADIES_FRIDAY_DAY_LIST = [
+  "Bimla Dutta", "Darshna Dua", "Kamesh Arora", "Kanta Gupta", "Kamesh Saini", 
+  "Kanta Sharma", "Neelam Verma", "Pooja Kheterpal", "Pushpa Singh", "Pushpa Taneja", 
+  "Rani Gumber", "Raj Chabra", "Santosh Duhan", "Shashi Manocha", "Sunita Saini", 
+  "Usha (Timarpur)", "Usha Dhingra", "Usha Arora", "Asha Harang", "Renu Sharma", 
+  "Laxmi", "Neema", "Meena", "Harjeet Kaur", "Suman Sharma"
+];
+
+const LADIES_SATURDAY_DAY_LIST = [
+  "Alka Verma", "Anju Grover", "Babli", "Daya Sharma", "Geeta Ohri", 
+  "Jyoti Malhotra", "Kamlesh Bhardwaj", "Kanta Gupta", "Kusum Lata", "Manju Chauhan", 
+  "Meenakshi", "Meenu Chopra", "Neelam Verma", "Neema", "Neeru Saini", 
+  "Pooja", "Pooja Khetrapal", "Rachna", "Rajeshwari", "Rama Chhabra", 
+  "Ramvati", "Rani Grover", "Rani Raj Kumari", "Reshma Yadav", "Ritu Saluja", 
+  "Sarda Rana", "Santosh", "Santosh Malik", "Satya Manocha", "Shashi Manocha", 
+  "Sudesh Batra", "Suman Sharma", "Sumitra Atri", "Sunita Mehta", "Sunita Verma", 
+  "Sushila Sharma", "Veena Chauhan", "Vimla Datta", "Visho Devi"
+];
+
+const LADIES_SUNDAY_DAY_LIST = [
+  "Jyoti khera", "Anita makkar", "Mamta sharma", "Mehak chawla", "Nee na kharbanda", 
+  "Nisha rani", "Neeru Bhalla", "Rachna kapoor", "Ruchika soni", "Sheel Khera", 
+  "Taruna Seth", "Suman Bhatia", "Neelam Narula", "Asha Rani.", "Preeti Arora", 
+  "Chanderma."
+];
+
+const LADIES_LIST = ["AARTI KOHLI", "ALKA VERMA", "ANITA AHUJA", "ANITA SETHI", "ANITA MAKKAR", "ASHA KAPOOR", "BHARTI UDAR", "BHAGWATI SHARMA", "BIMAL KHARBANDA", "BIMLA DHINGRA", "BIMLA DUTT", "BIMLESH SISODIA", "CHANDER ARORA", "CHANDRA NAILWAL", "DARSHNA DUA", "DINESH DEVI", "GEETA PANIPAT", "JYOTI MALHOTRA", "KAMLESH ARORA", "KAMLESH SAINI", "KANTA ARORA", "KANTA SHARMA", "KARMAWALI", "KRISHNA DEVI", "KUNTI DEVI", "KUSUM LATA RAJPUT", "LALITA GANDHI", "LAJYA WANTI", "LAXMI SOLANKI", "MAMTA AHUJA", "MAMTA SAINI", "MAMTA SHARMA", "MAYA KAJAL", "NEELAM CHOKRA", "NEELAM GANDHI", "NEELAM NARULA", "NEELAM VERMA", "NEENA KHARBANDA", "NEERU BUDHIRAJA", "NEERU CHOPRA", "NEERU SAINI", "NIRMAL RANA", "NIRMLA DEVI", "NISHA RANI", "OM WATI", "PAWAN KUMARI", "PHOOL WATI", "POONAM KHANDAN", "PINKI CHOPRA", "PUSHPA HANS", "PUSHPA SHARMA", "RACHNA", "RAJ CHHABRA", "RAM WATI", "RAMA ARORA", "RAMA CHAUHAN", "RANI (NANGLOI)", "RANI RAJKUMARI", "RANU SINGHLA", "RAVI KANTA", "RUCHIKA SONI", "SANTOSH BHANOT", "SANTOSH DUHAN", "SANTOSH NANDA", "SANTOSH SAHRAWAT", "SANTOSH VERMA", "SANYOGITA AHUJA", "SATYA MANOCHA", "SAVITRI (PALWAL)", "SHAKUNTLA SINGH", "SHASHI MANOCHA", "SHEEL CHAWLA", "SHEEL KHERA", "SHIKHA AHUJA", "SHRUTI", "SNEH CHUGH", "SUDESH SINGH", "SUMAN BHATIA", "SUMAN SHARMA", "SUNITA DUA", "SUNITA MEHRA", "SUNITA SAINI", "SUMITRA YADAV", "SUSHILA SHARMA", "SUSHMA BHUTANI", "SWARNA GANDHI", "TARUNA SETH", "USHA ARORA", "USHA DHINGRA", "USHA RANI", "VANISHA GROVER", "VEENA CHAUHAN", "VEENA GHERA", "VIJAY LAXMI", "VISHO DEVI"];
 
 const GROUP_INCHARGES: Record<string, string[]> = {
   'Monday': MONDAY_LIST.slice(0, 3),
@@ -134,12 +203,12 @@ const GROUP_INCHARGES: Record<string, string[]> = {
 };
 
 const LADIES_GROUP_INCHARGES: Record<string, string[]> = {
-  'Monday': ['Kanta Rani', 'Kiran', 'Sudesh Rohiala'],
-  'Tuesday': ['Kanta Rani', 'Geeta', 'Anita Sethi'],
-  'Wednesday': ['Kanta Rani', 'Suman', 'Kamlesh Verma'],
-  'Thursday': ['Kanta Rani', 'Pushpa', 'Jolly'],
-  'Friday': ['Kanta Rani', 'Rani', 'Pushpa Singh'],
-  'Saturday': ['Kanta Rani', 'Rani', 'Manju', 'Sunita Verma'],
+  'Monday': ['Kanta Rani', 'Kiran Bala', 'Sudesh Rohila'],
+  'Tuesday': ['Kanta Rani', 'Geeta Ohri', 'Anita Sethi'],
+  'Wednesday': ['Kanta Rani', 'Suman Sethi', 'Kamlesh Verma'],
+  'Thursday': ['Kanta Rani', 'Pushpa Taneja', 'Jolly'],
+  'Friday': ['Kanta Rani', 'Rani Gumber', 'Pushpa Singh', 'Manju Chauhan'],
+  'Saturday': ['Kanta Rani', 'Rani Gumber', 'Manju Chauhan', 'Sunita Verma'],
   'Sunday': ['Kanta Rani', 'Jyoti Khera', 'Mehak Chawla']
 };
 
@@ -200,6 +269,61 @@ const generateInitialSewadars = (): Sewadar[] => {
   addList(FRIDAY_LIST, 'Friday');
   addList(SATURDAY_LIST, 'Saturday');
   addList(SUNDAY_LIST, 'Sunday');
+
+  // Monday Ladies Day Shift
+  LADIES_MONDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Monday-Day-${i}`, name: name, gender: 'Ladies', group: 'Monday', shift: 'DAY' });
+  });
+  // Monday Ladies Night Shift
+  LADIES_MONDAY_NIGHT_LIST.forEach((name, i) => {
+    // Check if already added in Day shift to avoid duplicate IDs if name is same, 
+    // but they are different shifts so they should be separate entries if they can work both,
+    // or we just use a unique ID.
+    sewadars.push({ id: `L-Monday-Night-${i}`, name: name, gender: 'Ladies', group: 'Monday', shift: 'NIGHT' });
+  });
+
+  // Tuesday Ladies Day Shift
+  LADIES_TUESDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Tuesday-Day-${i}`, name: name, gender: 'Ladies', group: 'Tuesday', shift: 'DAY' });
+  });
+  // Tuesday Ladies Night Shift
+  LADIES_TUESDAY_NIGHT_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Tuesday-Night-${i}`, name: name, gender: 'Ladies', group: 'Tuesday', shift: 'NIGHT' });
+  });
+
+  // Wednesday Ladies Day Shift
+  LADIES_WEDNESDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Wednesday-Day-${i}`, name: name, gender: 'Ladies', group: 'Wednesday', shift: 'DAY' });
+  });
+  // Wednesday Ladies Night Shift
+  LADIES_WEDNESDAY_NIGHT_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Wednesday-Night-${i}`, name: name, gender: 'Ladies', group: 'Wednesday', shift: 'NIGHT' });
+  });
+
+  // Thursday Ladies Day Shift
+  LADIES_THURSDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Thursday-Day-${i}`, name: name, gender: 'Ladies', group: 'Thursday', shift: 'DAY' });
+  });
+  // Thursday Ladies Night Shift
+  LADIES_THURSDAY_NIGHT_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Thursday-Night-${i}`, name: name, gender: 'Ladies', group: 'Thursday', shift: 'NIGHT' });
+  });
+  
+  // Friday Ladies Day Shift
+  LADIES_FRIDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Friday-Day-${i}`, name: name, gender: 'Ladies', group: 'Friday', shift: 'DAY' });
+  });
+
+  // Saturday Ladies Day Shift
+  LADIES_SATURDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Saturday-Day-${i}`, name: name, gender: 'Ladies', group: 'Saturday', shift: 'DAY' });
+  });
+
+  // Sunday Ladies Day Shift
+  LADIES_SUNDAY_DAY_LIST.forEach((name, i) => {
+    sewadars.push({ id: `L-Sunday-Day-${i}`, name: name, gender: 'Ladies', group: 'Sunday', shift: 'DAY' });
+  });
+
   LADIES_LIST.forEach((name, i) => {
     sewadars.push({ id: `L-Ladies-${i}`, name: name, gender: 'Ladies', group: 'Ladies' });
   });

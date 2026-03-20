@@ -16,6 +16,7 @@ export interface Sewadar {
   name: string;
   gender: Gender;
   group: DutyGroup;
+  shift?: 'DAY' | 'NIGHT';
   isCustom?: boolean;
 }
 
@@ -40,8 +41,8 @@ export interface AttendanceRecord {
   outTime?: string;
   sewaPoint?: string;
   workshopLocation?: string;
-  // Added isProperUniform to fix type errors in App.tsx
   isProperUniform?: boolean;
+  shift?: 'DAY' | 'NIGHT';
 }
 
 export interface VehicleRecord {
