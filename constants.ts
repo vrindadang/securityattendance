@@ -167,7 +167,7 @@ const LADIES_FRIDAY_DAY_LIST = [
   "Bimla Dutta", "Darshna Dua", "Kamesh Arora", "Kanta Gupta", "Kamesh Saini", 
   "Kanta Sharma", "Neelam Verma", "Pooja Kheterpal", "Pushpa Singh", "Pushpa Taneja", 
   "Rani Gumber", "Raj Chabra", "Santosh Duhan", "Shashi Manocha", "Sunita Saini", 
-  "Usha (Timarpur)", "Usha Dhingra", "Usha Arora", "Asha Harang", "Renu Sharma", 
+  "Usha (Timarpur)", "Usha Dhingra", "Usha Arora", "Asha Narang", "Renu Sharma", 
   "Laxmi", "Neema", "Meena", "Harjeet Kaur", "Suman Sharma"
 ];
 

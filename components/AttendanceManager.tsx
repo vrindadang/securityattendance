@@ -79,7 +79,7 @@ const AttendanceManager: React.FC<Props> = ({
   }, [workshopLocation]);
 
   const hasConfig = !!workshopLocation;
-  const isLocked = isCompleted || !hasConfig;
+  const isLocked = !hasConfig;
 
   const filtered = useMemo(() => {
     return sewadars.filter(s => {
@@ -345,10 +345,10 @@ const AttendanceManager: React.FC<Props> = ({
       {mode === 'ATTENDANCE' ? (
         <div className="space-y-4 animate-fade-in">
           {/* Session Config Card */}
-          <div className={`p-6 rounded-[2.5rem] shadow-sm border flex items-center justify-between ${isCompleted ? 'bg-indigo-50 border-indigo-200' : hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
+          <div className={`p-6 rounded-[2.5rem] shadow-sm border flex items-center justify-between ${hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
-                {isCompleted ? '✅ FINALIZED' : hasConfig ? 'Active Session' : 'Pending Config'}
+                {hasConfig ? (sessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config'}
               </p>
               <h2 className="text-base font-black text-slate-800">
                 {workshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (workshopLocation || 'No Location Set')}
@@ -359,12 +359,10 @@ const AttendanceManager: React.FC<Props> = ({
                 <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Marked: {markedCount}</p>
               </div>
             </div>
-            {!isCompleted && (
-              <button onClick={onChangeLocation} className="px-5 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600">Change</button>
-            )}
+            <button onClick={onChangeLocation} className="px-5 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600">Change</button>
           </div>
 
-          <div className={`${isLocked && !isCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
+          <div className={`${isLocked ? 'opacity-40 pointer-events-none' : ''}`}>
             <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 flex gap-2">
                <input 
                 type="text" 

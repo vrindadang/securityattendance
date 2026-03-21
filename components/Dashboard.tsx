@@ -568,14 +568,11 @@ const Dashboard: React.FC<Props> = ({
         <div className="relative z-10">
           <h2 className="text-2xl font-black mb-1">Shift Management</h2>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-            {isSessionCompleted ? 'Shift Record: Finalized' : 'Shift Record: Active'}
+            Shift Record
           </p>
         </div>
         <div className="flex flex-wrap gap-2 relative z-10">
           <button onClick={generateAttendancePDF} className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95">Download PDF</button>
-          {!isSessionCompleted && (
-            <button onClick={() => onCompleteSession(selectedSessionId || '')} className="bg-emerald-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-400 transition-all active:scale-95">Finalize Duty</button>
-          )}
         </div>
         <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
       </div>
@@ -599,11 +596,15 @@ const Dashboard: React.FC<Props> = ({
           onChange={(e) => onSessionChange(e.target.value)}
         >
           {allSessions.length === 0 && <option value="">No sessions found</option>}
-          {allSessions.map(s => (
-            <option key={s.id} value={s.id}>
-              {(typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/')} - {s.location} ({s.completed ? 'Finalized' : 'Active'})
-            </option>
-          ))}
+          {allSessions.map(s => {
+            const today = new Date().toISOString().split('T')[0];
+            const isToday = s.date === today;
+            return (
+              <option key={s.id} value={s.id}>
+                {(typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/')} - {s.location} {isToday ? '(Current session)' : ''}
+              </option>
+            );
+          })}
         </select>
       </div>
 
@@ -836,7 +837,7 @@ const Dashboard: React.FC<Props> = ({
                         {(typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/')}
                       </h4>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                        {s.group} • {s.completed ? 'Finalized' : 'Active'}
+                        {s.group} {s.date === new Date().toISOString().split('T')[0] ? '• Current session' : ''}
                       </p>
                       <p className="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[150px]">
                         {s.location}

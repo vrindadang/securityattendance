@@ -159,12 +159,11 @@ const App: React.FC = () => {
       if (data && data.length > 0) {
         const mappedSessions = data.map((s: any) => ({ ...s, id: String(s.id) }));
         
-        // Deduplicate sessions by date + group. Prioritize completed ones.
+        // Deduplicate sessions by date + group.
         const uniqueSessionsMap: Record<string, DutySession> = {};
         mappedSessions.forEach((s: any) => {
           const key = `${s.date}-${s.group}`;
-          // If we don't have this date/group yet, OR if existing one is active and new one is completed
-          if (!uniqueSessionsMap[key] || (!uniqueSessionsMap[key].completed && s.completed)) {
+          if (!uniqueSessionsMap[key]) {
             uniqueSessionsMap[key] = s;
           }
         });
@@ -174,8 +173,8 @@ const App: React.FC = () => {
 
         setAllSessions(deduplicatedSessions);
         
-        const activeOrFuture = deduplicatedSessions.find(s => !s.completed);
-        setActiveSession(activeOrFuture || null);
+        // Set activeSession to the latest one by default
+        setActiveSession(deduplicatedSessions[0] || null);
 
         if (isInitial) {
           const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
@@ -183,9 +182,9 @@ const App: React.FC = () => {
           
           if (savedSession) {
             setDashboardSelectedSession(savedSession);
-          } else if (activeOrFuture) {
-            setDashboardSelectedSession(activeOrFuture);
-            localStorage.setItem(STORAGE_KEY_SESSION_ID, activeOrFuture.id);
+          } else if (deduplicatedSessions[0]) {
+            setDashboardSelectedSession(deduplicatedSessions[0]);
+            localStorage.setItem(STORAGE_KEY_SESSION_ID, deduplicatedSessions[0].id);
           } else {
             setDashboardSelectedSession(null);
             if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
@@ -903,15 +902,9 @@ const App: React.FC = () => {
   };
 
   const handleCompleteSession = async (sessionId: string) => {
-    try {
-      await updateDoc(doc(db, 'daily_settings', sessionId), { completed: true });
-      setAllSessions(prev => prev.map(s => s.id === sessionId ? { ...s, completed: true } : s));
-      if (activeSession?.id === sessionId) setActiveSession(null);
-      if (dashboardSelectedSession?.id === sessionId) {
-         setDashboardSelectedSession(prev => prev ? { ...prev, completed: true } : null);
-      }
-      setActiveView('Attendance');
-    } catch (err) { alert("Error finalizing duty."); }
+    // Finalization feature removed as per user request.
+    // All sessions are now active and editable.
+    alert("Finalization feature has been removed. All sessions are active.");
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -933,11 +926,13 @@ const App: React.FC = () => {
   const handleSessionChange = (id: string) => {
     const session = allSessions.find(s => s.id === id) || null;
     setDashboardSelectedSession(session);
+    setActiveSession(session);
     if (session) {
       localStorage.setItem(STORAGE_KEY_SESSION_ID, id);
     } else {
       localStorage.removeItem(STORAGE_KEY_SESSION_ID);
     }
+    setActiveView('Attendance');
   };
 
   const handleResetAllData = useCallback(async () => {
