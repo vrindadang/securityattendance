@@ -59,9 +59,20 @@ const App: React.FC = () => {
     if (!activeVolunteer) return [];
     const all = [...INITIAL_SEWADARS, ...customSewadars].filter(s => !deletedSewadarIds.has(s.id));
     if (activeVolunteer.role === 'Super Admin') return all;
+    
     const isLadies = activeVolunteer.role.includes('Ladies');
-    return all.filter(s => isLadies ? s.gender === 'Ladies' : s.gender === 'Gents');
-  }, [activeVolunteer, customSewadars, deletedSewadarIds]);
+    const assignedGroup = activeVolunteer.assignedGroup;
+    
+    return all.filter(s => {
+      const matchGender = isLadies ? s.gender === 'Ladies' : s.gender === 'Gents';
+      const matchGroup = !assignedGroup || s.group === assignedGroup;
+      
+      // Also include if marked in current active session
+      const isMarked = activeAttendance.some(a => a.sewadarId === s.id);
+      
+      return (matchGender && matchGroup) || isMarked;
+    });
+  }, [activeVolunteer, customSewadars, deletedSewadarIds, activeAttendance]);
 
   const hasNewRequirements = useMemo(() => {
     if (!activeVolunteer) return false;
@@ -91,6 +102,19 @@ const App: React.FC = () => {
     d.setDate(d.getDate() + 1);
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().split('T')[0];
+  };
+
+  const normalizeDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split(/[-/]/).map(Number);
+    if (parts.length !== 3) return dateStr;
+    let y, m, d;
+    if (parts[0] > 1000) {
+      [y, m, d] = parts;
+    } else {
+      [d, m, y] = parts;
+    }
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   };
 
   const [configForm, setConfigForm] = useState({
@@ -136,7 +160,7 @@ const App: React.FC = () => {
           if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
             dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
           }
-          return { ...d, id: doc.id, date: String(dateStr || '') };
+          return { ...d, id: doc.id, date: normalizeDate(String(dateStr || '')) };
         })
         .filter((s: any) => {
           if (!activeVolunteer || activeVolunteer.role === 'Super Admin') return true;
@@ -366,7 +390,8 @@ const App: React.FC = () => {
       if (dateStr && typeof dateStr !== 'string' && dateStr.toDate) {
         dateStr = dateStr.toDate().toISOString().split('T')[0];
       }
-      const [y, m, d] = String(dateStr || '').split('-').map(Number);
+      dateStr = normalizeDate(String(dateStr || ''));
+      const [y, m, d] = dateStr.split('-').map(Number);
       if (isNaN(y) || isNaN(m) || isNaN(d)) throw new Error("Invalid session date format");
       
       const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0));
@@ -380,7 +405,7 @@ const App: React.FC = () => {
         if (dateStr && typeof dateStr !== 'string' && (dateStr as any).toDate) {
           dateStr = (dateStr as any).toDate().toISOString().split('T')[0];
         }
-        return { ...d, id: doc.id, date: String(dateStr || '') };
+        return { ...d, id: doc.id, date: normalizeDate(String(dateStr || '')) };
       });
       const attData = allAttData.filter((a: any) => a.group === session.group);
 
@@ -393,7 +418,8 @@ const App: React.FC = () => {
         outTime: a.out_time,
         sewaPoint: a.sewa_points,
         workshopLocation: a.workshop_location,
-        isProperUniform: a.is_proper_uniform 
+        isProperUniform: a.is_proper_uniform,
+        date: normalizeDate(a.date)
       })) : [];
 
       const issuesQ = query(collection(db, 'issues'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
@@ -546,8 +572,8 @@ const App: React.FC = () => {
   };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
-    if (!activeSession || activeSession.completed) return;
-    const sessionDate = activeSession.date;
+    if (!activeSession) return;
+    const sessionDate = normalizeDate(activeSession.date);
     const sessionGroup = activeSession.group;
 
     if (isDelete && recordId) {
@@ -688,7 +714,7 @@ const App: React.FC = () => {
   };
 
   const handleReportIssue = async (description: string, photo?: string) => {
-    if (!activeVolunteer || !activeSession || activeSession.completed) return;
+    if (!activeVolunteer || !activeSession) return;
     const newIssue: Issue = {
       id: generateNumericId(), 
       description, 
@@ -712,7 +738,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveGroupPhoto = async (photo: string) => {
-    if (!activeVolunteer || !activeSession || activeSession.completed) return;
+    if (!activeVolunteer || !activeSession) return;
     const newPhoto: GroupPhoto = {
       id: generateNumericId(),
       photo,
@@ -735,7 +761,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveVehicle = async (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => {
-    if (!activeVolunteer || !activeSession || activeSession.completed) return;
+    if (!activeVolunteer || !activeSession) return;
     
     if (isDelete && id) {
       try {
@@ -853,7 +879,7 @@ const App: React.FC = () => {
       );
       const querySnapshot = await getDocs(q);
       const allExisting = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      const existing = allExisting.filter((s: any) => s.group === groupName && s.completed === false);
+      const existing = allExisting.filter((s: any) => s.group === groupName);
 
       if (existing && existing.length > 0) {
         const payload = {
@@ -870,12 +896,6 @@ const App: React.FC = () => {
         setSaveSuccess(true);
         setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
       } else {
-        // Check if there's any other active session for this group before creating a new one
-        if (activeSession && !activeSession.completed) {
-          alert("A previous session needs to be finalized first before starting another active session.");
-          return;
-        }
-
         const id = generateNumericId();
         const payload = {
           id,
@@ -1075,9 +1095,10 @@ const App: React.FC = () => {
             sessionDate={activeSession?.date || ''} 
             dutyStartTime={activeSession?.start_time || ''} 
             dutyEndTime={activeSession?.end_time || ''} 
-            isCompleted={activeSession?.completed} 
+            isCompleted={!!activeSession?.completed} 
             onChangeLocation={() => setShowSettingsModal(true)} 
             onDeleteSewadar={handleDeleteSewadar}
+            sessionGroup={activeSession?.group as DutyGroup || null}
           />
         ) : activeView === 'VolunteerDetails' ? (
           <VolunteerDetails
@@ -1106,7 +1127,7 @@ const App: React.FC = () => {
             activeVolunteer={activeVolunteer} 
             allSessions={allSessions} 
             selectedSessionId={dashboardSelectedSession?.id || null} 
-            isSessionCompleted={!!dashboardSelectedSession?.completed} 
+            isSessionCompleted={false} 
             onSessionChange={handleSessionChange} 
             onReportIssue={handleReportIssue} 
             onSaveGroupPhoto={handleSaveGroupPhoto}

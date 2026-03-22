@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
-import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, LADIES_GROUPS } from '../constants';
+import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -19,6 +19,7 @@ interface Props {
   dutyEndTime: string;
   isCompleted?: boolean;
   onChangeLocation?: () => void;
+  sessionGroup?: DutyGroup | null;
 }
 
 const AttendanceManager: React.FC<Props> = ({ 
@@ -36,14 +37,11 @@ const AttendanceManager: React.FC<Props> = ({
   dutyStartTime,
   dutyEndTime,
   isCompleted,
-  onChangeLocation 
+  onChangeLocation,
+  sessionGroup
 }) => {
   const [mode, setMode] = useState<'ATTENDANCE' | 'VEHICLES'>('ATTENDANCE');
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
-  const [selectedGender, setSelectedGender] = useState<Gender | null>(isSuperAdmin ? null : (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents'));
-  const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(
-    activeVolunteer.assignedGroup || (activeVolunteer.role.includes('Ladies') ? 'Ladies' : null)
-  );
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -81,30 +79,42 @@ const AttendanceManager: React.FC<Props> = ({
   const hasConfig = !!workshopLocation;
   const isLocked = !hasConfig;
 
+  const normalizeDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split(/[-/]/).map(Number);
+    if (parts.length !== 3) return dateStr;
+    let y, m, d;
+    if (parts[0] > 1000) {
+      [y, m, d] = parts;
+    } else {
+      [d, m, y] = parts;
+    }
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+
+  const normalizedSessionDate = useMemo(() => normalizeDate(sessionDate), [sessionDate]);
+
   const filtered = useMemo(() => {
     return sewadars.filter(s => {
-      const matchGender = !selectedGender || s.gender === selectedGender;
-      const matchGroup = !selectedGroup || s.group === selectedGroup;
-      const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchGender && matchGroup && matchSearch;
+      return s.name.toLowerCase().includes(searchTerm.toLowerCase());
     }).sort((a, b) => {
-      const aMarked = attendance.some(rec => rec.sewadarId === a.id && rec.date === sessionDate);
-      const bMarked = attendance.some(rec => rec.sewadarId === b.id && rec.date === sessionDate);
+      const aMarked = attendance.some(rec => rec.sewadarId === a.id && normalizeDate(rec.date) === normalizedSessionDate);
+      const bMarked = attendance.some(rec => rec.sewadarId === b.id && normalizeDate(rec.date) === normalizedSessionDate);
       
       if (aMarked && !bMarked) return -1;
       if (!aMarked && bMarked) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [sewadars, selectedGender, selectedGroup, searchTerm, attendance, sessionDate]);
+  }, [sewadars, searchTerm, attendance, normalizedSessionDate]);
 
   const markedCount = useMemo(() => {
-    const markedIds = new Set(attendance.filter(a => a.date === sessionDate).map(a => a.sewadarId));
+    const markedIds = new Set(attendance.filter(a => normalizeDate(a.date) === normalizedSessionDate).map(a => a.sewadarId));
     return markedIds.size;
-  }, [attendance, sessionDate]);
+  }, [attendance, normalizedSessionDate]);
 
   const formatConfigHeader = () => {
-    if (!dutyStartTime || !dutyEndTime || !sessionDate) return '-';
-    const d = new Date(sessionDate);
+    if (!dutyStartTime || !dutyEndTime || !normalizedSessionDate) return '-';
+    const d = new Date(normalizedSessionDate);
     const dateStr = d.toLocaleDateString('en-GB');
     const start = new Date(dutyStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const end = new Date(dutyEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -348,7 +358,7 @@ const AttendanceManager: React.FC<Props> = ({
           <div className={`p-6 rounded-[2.5rem] shadow-sm border flex items-center justify-between ${hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
-                {hasConfig ? (sessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config'}
+                {hasConfig ? (normalizedSessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config'}
               </p>
               <h2 className="text-base font-black text-slate-800">
                 {workshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (workshopLocation || 'No Location Set')}
@@ -363,22 +373,44 @@ const AttendanceManager: React.FC<Props> = ({
           </div>
 
           <div className={`${isLocked ? 'opacity-40 pointer-events-none' : ''}`}>
-            <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2 flex gap-2">
-               <input 
-                type="text" 
-                placeholder="Search Sewadars..." 
-                className="flex-1 px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 focus:border-indigo-500 transition-all text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <button onClick={() => { setDuplicateError(null); setShowAddModal(true); }} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-              </button>
+            <div className="sticky top-0 z-20 bg-slate-50 pb-4 pt-2">
+              <div className="flex gap-2">
+                 <input 
+                  type="text" 
+                  placeholder="Search Sewadars..." 
+                  className="flex-1 px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none shadow-sm font-black text-slate-800 focus:border-indigo-500 transition-all text-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <button onClick={() => { setDuplicateError(null); setShowAddModal(true); }} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
-              {filtered.map((s, idx) => {
-                const records = attendance.filter(a => a.sewadarId === s.id && a.date === sessionDate);
+              {filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-slate-400 font-black text-sm uppercase tracking-wider">No Sewadars Found</p>
+                  <p className="text-slate-300 text-[10px] mt-2 font-bold max-w-[200px]">
+                    Try changing the search term. 
+                  </p>
+                  {searchTerm && (
+                    <button 
+                      onClick={() => setSearchTerm('')}
+                      className="mt-6 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 transition-all"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                </div>
+              ) : filtered.map((s, idx) => {
+                const records = attendance.filter(a => a.sewadarId === s.id && normalizeDate(a.date) === normalizedSessionDate);
                 const isExpanded = expandedId === s.id;
                 const isMarked = records.length > 0;
 
@@ -657,8 +689,7 @@ const AttendanceManager: React.FC<Props> = ({
             </div>
           )}
 
-          {!isCompleted && (
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center text-xl shadow-lg">🚔</div>
@@ -708,7 +739,6 @@ const AttendanceManager: React.FC<Props> = ({
                 </button>
               </form>
             </div>
-          )}
 
           {/* Session Vehicle Logs */}
           <div className="space-y-3">
@@ -728,8 +758,7 @@ const AttendanceManager: React.FC<Props> = ({
                        <div className="text-right">
                          <p className="text-[10px] font-black text-slate-300 uppercase">{new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                        </div>
-                       {!isCompleted && (
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button 
                               onClick={() => handleEditVehicle(v)}
                               className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
@@ -743,8 +772,7 @@ const AttendanceManager: React.FC<Props> = ({
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
                             </button>
                          </div>
-                       )}
-                     </div>
+                      </div>
                   </div>
                 ))}
               </div>

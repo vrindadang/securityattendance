@@ -608,8 +608,7 @@ const Dashboard: React.FC<Props> = ({
         </select>
       </div>
 
-      {!isSessionCompleted && (
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase mb-4">Report an Issue</h3>
           <textarea 
             className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all"
@@ -628,7 +627,6 @@ const Dashboard: React.FC<Props> = ({
             Submit Incident Report
           </button>
         </div>
-      )}
 
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
         <div className="flex items-center justify-between">
@@ -636,12 +634,10 @@ const Dashboard: React.FC<Props> = ({
             <h3 className="text-xs font-black text-slate-400 uppercase">Photos of Group</h3>
             <p className="text-[10px] font-bold text-slate-300 mt-1 uppercase tracking-widest">Share moments from your shift</p>
           </div>
-          {!isSessionCompleted && (
-            <label className="cursor-pointer bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all">
-              Add Photo
-              <input type="file" accept="image/*" onChange={handleGroupPhotoChange} className="hidden" />
-            </label>
-          )}
+          <label className="cursor-pointer bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all">
+            Add Photo
+            <input type="file" accept="image/*" onChange={handleGroupPhotoChange} className="hidden" />
+          </label>
         </div>
 
         {groupPhotos.length > 0 ? (
@@ -673,7 +669,7 @@ const Dashboard: React.FC<Props> = ({
                   {new Date(issue.timestamp).toLocaleTimeString()} • Reported by {issue.volunteerName}
                 </p>
               </div>
-              {onDeleteIssue && !isSessionCompleted && (
+              {onDeleteIssue && (
                 <button onClick={() => onDeleteIssue(issue.id)} className="text-red-400 hover:text-red-600 p-2">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
                 </button>
