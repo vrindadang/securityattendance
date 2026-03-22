@@ -57,9 +57,11 @@ const AttendanceManager: React.FC<Props> = ({
   // States for adding new sewadar
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newGender, setNewGender] = useState<Gender>(activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents');
+  const [newGender, setNewGender] = useState<Gender>(
+    activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents'
+  );
   const [newGroup, setNewGroup] = useState<DutyGroup>(
-    activeVolunteer.role.includes('Ladies') ? 'Ladies' : (activeVolunteer.assignedGroup || 'Monday')
+    activeVolunteer.assignedGroup || (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Monday')
   );
   const [newShift, setNewShift] = useState<'DAY' | 'NIGHT' | undefined>(undefined);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
