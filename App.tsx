@@ -57,18 +57,40 @@ const App: React.FC = () => {
 
   const visibleSewadars = useMemo(() => {
     if (!activeVolunteer) return [];
-    const all = [...INITIAL_SEWADARS, ...customSewadars].filter(s => !deletedSewadarIds.has(s.id));
-    if (activeVolunteer.role === 'Super Admin') return all;
+    const all = [...INITIAL_SEWADARS, ...customSewadars];
+    const existingIds = new Set(all.map(s => s.id));
+    
+    // Synthesize missing sewadars from activeAttendance
+    const synthesized: Sewadar[] = [];
+    activeAttendance.forEach(a => {
+      if (!existingIds.has(a.sewadarId)) {
+        synthesized.push({
+          id: a.sewadarId,
+          name: a.name || 'Unknown',
+          gender: a.gender || 'Gents',
+          group: a.group || 'Global'
+        });
+        existingIds.add(a.sewadarId);
+      }
+    });
+    
+    const combined = [...all, ...synthesized];
     
     const isLadies = activeVolunteer.role.includes('Ladies');
     const assignedGroup = activeVolunteer.assignedGroup;
+    const markedIds = new Set(activeAttendance.map(a => a.sewadarId));
     
-    return all.filter(s => {
+    return combined.filter(s => {
+      const isDeleted = deletedSewadarIds.has(s.id);
+      const isMarked = markedIds.has(s.id);
+      
+      // If deleted, only show if marked in current session
+      if (isDeleted && !isMarked) return false;
+      
+      if (activeVolunteer.role === 'Super Admin') return true;
+      
       const matchGender = isLadies ? s.gender === 'Ladies' : s.gender === 'Gents';
       const matchGroup = !assignedGroup || s.group === assignedGroup;
-      
-      // Also include if marked in current active session
-      const isMarked = activeAttendance.some(a => a.sewadarId === s.id);
       
       return (matchGender && matchGroup) || isMarked;
     });
