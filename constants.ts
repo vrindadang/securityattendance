@@ -13,7 +13,8 @@ export const LOCATIONS_LIST = [
   'Kirpal Bagh', 
   'Kirpal Ashram', 
   'Sawan Ashram', 
-  'Sant Darshan Singh Ji Dham'
+  'Sant Darshan Singh Ji Dham',
+  'Faridabad Tour'
 ];
 
 export const KIRPAL_BAGH_POINTS = [

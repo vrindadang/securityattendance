@@ -53,6 +53,7 @@ const Dashboard: React.FC<Props> = ({
   onDeleteIssue,
   dutyStartTime,
   dutyEndTime,
+  onOpenSettings,
   onCompleteSession,
   onResetAllData,
   onUploadSecurityPhoto,
@@ -572,6 +573,7 @@ const Dashboard: React.FC<Props> = ({
           </p>
         </div>
         <div className="flex flex-wrap gap-2 relative z-10">
+          <button onClick={onOpenSettings} className="bg-slate-800/50 border border-white/10 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95">Change Session</button>
           <button onClick={generateAttendancePDF} className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95">Download PDF</button>
         </div>
         <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>

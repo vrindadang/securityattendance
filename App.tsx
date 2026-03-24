@@ -140,7 +140,7 @@ const App: React.FC = () => {
   };
 
   const [configForm, setConfigForm] = useState({
-    locations: [...LOCATIONS_LIST],
+    locations: [] as string[],
     startDate: getLocalDate(),
     startTime: '07:00',
     endDate: getTomorrowDate(),
@@ -149,16 +149,39 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (showSettingsModal && activeVolunteer) {
-      setConfigForm(prev => ({
-        ...prev,
-        locations: [...LOCATIONS_LIST],
-        startDate: getLocalDate(),
-        startTime: '07:00',
-        endDate: getTomorrowDate(),
-        endTime: '07:00'
-      }));
+      const sessionToLoad = activeView === 'Dashboard' ? dashboardSelectedSession : activeSession;
+      if (sessionToLoad) {
+        const start = new Date(sessionToLoad.start_time);
+        const end = new Date(sessionToLoad.end_time);
+        
+        const formatTime = (date: Date) => {
+          return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+        };
+
+        const formatDate = (date: Date) => {
+          const d = new Date(date);
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          return d.toISOString().split('T')[0];
+        };
+
+        setConfigForm({
+          locations: sessionToLoad.location ? sessionToLoad.location.split(', ') : [],
+          startDate: sessionToLoad.date || formatDate(start),
+          startTime: formatTime(start),
+          endDate: formatDate(end),
+          endTime: formatTime(end)
+        });
+      } else {
+        setConfigForm({
+          locations: [],
+          startDate: getLocalDate(),
+          startTime: '07:00',
+          endDate: getTomorrowDate(),
+          endTime: '07:00'
+        });
+      }
     }
-  }, [showSettingsModal, activeVolunteer]);
+  }, [showSettingsModal, activeVolunteer, activeView, dashboardSelectedSession, activeSession]);
 
   const fetchSessions = useCallback(async (isInitial = false) => {
     if (!activeVolunteer) return;
@@ -1069,6 +1092,34 @@ const App: React.FC = () => {
                 </div>
                 <form onSubmit={handleSaveSettings} className="space-y-6">
                   <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Location</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {LOCATIONS_LIST.map(loc => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => {
+                              setConfigForm(prev => {
+                                const exists = prev.locations.includes(loc);
+                                if (exists) {
+                                  return { ...prev, locations: prev.locations.filter(l => l !== loc) };
+                                } else {
+                                  return { ...prev, locations: [...prev.locations, loc] };
+                                }
+                              });
+                            }}
+                            className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
+                              configForm.locations.includes(loc)
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
+                            }`}
+                          >
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
                       <div className="grid grid-cols-2 gap-3">
