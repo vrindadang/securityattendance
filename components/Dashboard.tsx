@@ -506,10 +506,12 @@ const Dashboard: React.FC<Props> = ({
     doc.setFillColor('#ef4444'); doc.circle(legendX, legendY - 0.8, 1, 'F');
     doc.text("<50% Shift", legendX + 3, legendY);
 
+    const sortedAttendance = [...attendance].sort((a, b) => a.name.localeCompare(b.name));
+
     autoTable(doc, {
       startY: 34,
       head: [['#', 'Name', 'In', 'Out', 'Dur', 'Location', 'Spot', 'Verified By', 'Status']],
-      body: attendance.map((a, i) => {
+      body: sortedAttendance.map((a, i) => {
         const verifier = VOLUNTEERS.find(v => v.id === a.volunteerId)?.name || 'Incharge';
         return [i + 1, a.name, a.inTime || '-', a.outTime || '-', calculateDuration(a.inTime, a.outTime), a.workshopLocation || '-', a.sewaPoint || '-', verifier, ''];
       }),
@@ -519,7 +521,7 @@ const Dashboard: React.FC<Props> = ({
       theme: 'grid',
       didDrawCell: (data) => {
         if (data.section === 'body' && data.column.index === 8) {
-          const record = attendance[data.row.index];
+          const record = sortedAttendance[data.row.index];
           if (record.inTime) {
             const dots = getStatusDots(record.inTime, record.outTime);
             const dotRadius = 1.2;
