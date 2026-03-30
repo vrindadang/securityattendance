@@ -99,6 +99,26 @@ export const SDS_DHAM_POINTS = [
   'Mechanical Store'
 ];
 
+export const AHILYANAGAR_TOUR_POINTS = [
+  'Behind Stage Area',
+  'Green Room',
+  'VIP Kitchen',
+  'Gate No 1',
+  'Exhibition Stalls',
+  'Gathri Godam',
+  'Gate No 4',
+  'Car and 2 wheeler Parking',
+  'Chai & Poha Free Stalls',
+  'Piao',
+  'Langer Distribtion',
+  'Jalpan Stalls Area',
+  'Ahilyanagar Ashrams 2 Nos',
+  'Traffic',
+  'Gate No 2',
+  'Gate No 3',
+  'Toilet Block'
+];
+
 export const GAMES = [
   'Daily Attendance',
   'Quiz',
