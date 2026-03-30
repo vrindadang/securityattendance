@@ -40,7 +40,8 @@ export const KIRPAL_BAGH_POINTS = [
   'Round',
   'Gate No. 2 Terrace',
   'Joda Ghar',
-  'Parking'
+  'Parking',
+  'Airport Duty'
 ];
 
 export const KIRPAL_ASHRAM_POINTS = [
@@ -62,13 +63,15 @@ export const KIRPAL_ASHRAM_POINTS = [
   'Photo Section Roof',
   'Front of Banni',
   'Round',
-  'Small Gate of Kothi'
+  'Small Gate of Kothi',
+  'Airport Duty'
 ];
 
 export const SAWAN_ASHRAM_POINTS = [
   'Main Gate',
   'Round',
-  'Kothi'
+  'Kothi',
+  'Airport Duty'
 ];
 
 export const SDS_DHAM_POINTS = [
@@ -96,7 +99,8 @@ export const SDS_DHAM_POINTS = [
   'Green room washroom',
   'Pandal',
   'Round',
-  'Mechanical Store'
+  'Mechanical Store',
+  'Airport Duty'
 ];
 
 export const AHILYANAGAR_TOUR_POINTS = [
@@ -116,7 +120,8 @@ export const AHILYANAGAR_TOUR_POINTS = [
   'Traffic',
   'Gate No 2',
   'Gate No 3',
-  'Toilet Block'
+  'Toilet Block',
+  'Airport Duty'
 ];
 
 export const GAMES = [
