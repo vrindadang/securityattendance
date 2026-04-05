@@ -12,6 +12,7 @@ interface Props {
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
   onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT') => void;
   onDeleteSewadar?: (id: string) => void;
+  onEditSewadar?: (id: string, newName: string) => void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
   sessionDate: string;
@@ -31,6 +32,7 @@ const AttendanceManager: React.FC<Props> = ({
   onSaveVehicle,
   onAddSewadar, 
   onDeleteSewadar,
+  onEditSewadar,
   activeVolunteer, 
   workshopLocation, 
   sessionDate,
@@ -53,6 +55,8 @@ const AttendanceManager: React.FC<Props> = ({
   const [editProperUniform, setEditProperUniform] = useState(true);
   const [editShift, setEditShift] = useState<'DAY' | 'NIGHT' | null>(null);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
 
   // States for adding new sewadar
   const [showAddModal, setShowAddModal] = useState(false);
@@ -149,6 +153,8 @@ const AttendanceManager: React.FC<Props> = ({
     }
     
     setExpandedId(s.id);
+    setIsEditingName(false);
+    setTempName(s.name);
   };
 
   const resetForm = () => {
@@ -465,6 +471,59 @@ const AttendanceManager: React.FC<Props> = ({
                     {isExpanded && (
                       <div className="bg-white border-2 border-indigo-50 rounded-[2.5rem] p-8 shadow-2xl mx-2 space-y-8 animate-in slide-in-from-top-4 duration-300">
                         
+                        {/* Name Editing Section */}
+                        <div className="space-y-4">
+                           <div className="flex items-center justify-between">
+                              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Member Details</h3>
+                              {isSuperAdmin && onEditSewadar && (
+                                <button 
+                                  onClick={() => {
+                                    if (isEditingName) {
+                                      if (tempName.trim() && tempName.trim() !== s.name) {
+                                        onEditSewadar(s.id, tempName.trim());
+                                      }
+                                      setIsEditingName(false);
+                                    } else {
+                                      setTempName(s.name);
+                                      setIsEditingName(true);
+                                    }
+                                  }}
+                                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1"
+                                >
+                                  {isEditingName ? (
+                                    <>
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                      Save Name
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                      Edit Name
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                           </div>
+                           
+                           {isEditingName ? (
+                             <div className="space-y-2">
+                               <input 
+                                 type="text" 
+                                 className="w-full px-5 py-4 bg-slate-50 border-2 border-indigo-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                                 value={tempName}
+                                 onChange={e => setTempName(e.target.value)}
+                                 autoFocus
+                               />
+                               <p className="text-[9px] font-bold text-slate-400 ml-2 italic">* This will update the name across the current session records.</p>
+                             </div>
+                           ) : (
+                             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                               <p className="text-base font-black text-slate-900">{s.name}</p>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{s.gender} • {s.group} {s.shift ? `(${s.shift})` : ''}</p>
+                             </div>
+                           )}
+                        </div>
+
                         {/* List Existing assignments */}
                         {records.length > 0 && (
                           <div className="space-y-4">

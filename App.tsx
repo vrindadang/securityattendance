@@ -57,7 +57,13 @@ const App: React.FC = () => {
 
   const visibleSewadars = useMemo(() => {
     if (!activeVolunteer) return [];
-    const all = [...INITIAL_SEWADARS, ...customSewadars];
+    
+    // Deduplicate INITIAL_SEWADARS and customSewadars by ID, preferring custom ones
+    const deduplicatedMap = new Map<string, Sewadar>();
+    INITIAL_SEWADARS.forEach(s => deduplicatedMap.set(s.id, s));
+    customSewadars.forEach(s => deduplicatedMap.set(s.id, { ...s, isCustom: true }));
+    
+    const all = Array.from(deduplicatedMap.values());
     const existingIds = new Set(all.map(s => s.id));
     
     // Synthesize missing sewadars from activeAttendance
@@ -723,6 +729,46 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEditSewadar = async (id: string, newName: string) => {
+    if (!activeVolunteer || activeVolunteer.role !== 'Super Admin') return;
+    try {
+      const sewadar = visibleSewadars.find(s => s.id === id);
+      if (!sewadar) return;
+
+      // Update custom_sewadars (this also acts as an override for INITIAL_SEWADARS)
+      await setDoc(doc(db, 'custom_sewadars', id), {
+        id,
+        name: newName,
+        gender: sewadar.gender,
+        group: sewadar.group,
+        shift: sewadar.shift || null
+      }, { merge: true });
+
+      // Update local state
+      setCustomSewadars(prev => {
+        const exists = prev.find(s => s.id === id);
+        if (exists) {
+          return prev.map(s => s.id === id ? { ...s, name: newName } : s);
+        } else {
+          return [...prev, { ...sewadar, name: newName, isCustom: true }];
+        }
+      });
+
+      // Update attendance records in current active session to reflect name change
+      const recordsToUpdate = activeAttendance.filter(a => a.sewadarId === id);
+      for (const record of recordsToUpdate) {
+        await updateDoc(doc(db, 'attendance', record.id), { name: newName });
+      }
+      
+      // Update local active attendance
+      setActiveAttendance(prev => prev.map(a => a.sewadarId === id ? { ...a, name: newName } : a));
+
+    } catch (err) {
+      console.error("Edit Sewadar Error:", err);
+      alert("Failed to update name.");
+    }
+  };
+
   const handleSaveRequirement = async (description: string) => {
     if (!activeVolunteer) return;
     const now = Date.now();
@@ -1171,6 +1217,7 @@ const App: React.FC = () => {
             isCompleted={!!activeSession?.completed} 
             onChangeLocation={() => setShowSettingsModal(true)} 
             onDeleteSewadar={handleDeleteSewadar}
+            onEditSewadar={handleEditSewadar}
             sessionGroup={activeSession?.group as DutyGroup || null}
           />
         ) : activeView === 'VolunteerDetails' ? (
@@ -1180,6 +1227,7 @@ const App: React.FC = () => {
             activeVolunteer={activeVolunteer}
             onSaveDetails={handleSaveSewadarDetails}
             onDeleteSewadar={handleDeleteSewadar}
+            onEditSewadar={handleEditSewadar}
           />
         ) : activeView === 'Requirements' ? (
           <RequirementsView

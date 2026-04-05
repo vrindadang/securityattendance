@@ -8,13 +8,14 @@ interface Props {
   activeVolunteer: Volunteer;
   onSaveDetails: (details: SewadarDetails) => Promise<void>;
   onDeleteSewadar?: (id: string) => void;
+  onEditSewadar?: (id: string, newName: string) => void;
 }
 
-const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar }) => {
+const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar, onEditSewadar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
-  const [formData, setFormData] = useState({ address: '', dob: '', phone: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   const filtered = useMemo(() => {
@@ -30,6 +31,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
   const handleEdit = (s: Sewadar) => {
     const sDetails = details[s.id] || { address: '', dob: '', phone: '' };
     setFormData({
+      name: s.name,
       address: sDetails.address,
       dob: sDetails.dob,
       phone: sDetails.phone
@@ -42,6 +44,9 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
     if (!editingSewadar) return;
     setIsSaving(true);
     try {
+      if (isSuperAdmin && onEditSewadar && formData.name.trim() && formData.name.trim() !== editingSewadar.name) {
+        await onEditSewadar(editingSewadar.id, formData.name.trim());
+      }
       await onSaveDetails({
         sewadar_id: editingSewadar.id,
         address: formData.address,
@@ -153,6 +158,19 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isSuperAdmin && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Full Name</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" 
+                    placeholder="Full Name"
+                    value={formData.name}
+                    onChange={e => setFormData(p => ({...p, name: e.target.value}))}
+                  />
+                </div>
+              )}
+              
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Phone Number</label>
                 <input 
