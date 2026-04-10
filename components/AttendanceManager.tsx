@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
-import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, AHILYANAGAR_TOUR_POINTS, GENTS_GROUPS } from '../constants';
+import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -628,16 +628,6 @@ const AttendanceManager: React.FC<Props> = ({
                                       >
                                         <option value="">-- Select Point --</option>
                                         {SDS_DHAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        <option value="Other">Other Duty</option>
-                                      </select>
-                                    ) : editLocation === 'Ahilyanagar Tour' ? (
-                                      <select 
-                                        className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
-                                        value={editPoint}
-                                        onChange={e => setEditPoint(e.target.value)}
-                                      >
-                                        <option value="">-- Select Point --</option>
-                                        {AHILYANAGAR_TOUR_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
                                         <option value="Other">Other Duty</option>
                                       </select>
                                     ) : (

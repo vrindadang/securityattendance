@@ -14,7 +14,7 @@ export const LOCATIONS_LIST = [
   'Kirpal Ashram', 
   'Sawan Ashram', 
   'Sant Darshan Singh Ji Dham',
-  'Ahilyanagar Tour'
+  'Special Event'
 ];
 
 export const KIRPAL_BAGH_POINTS = [
@@ -100,27 +100,6 @@ export const SDS_DHAM_POINTS = [
   'Pandal',
   'Round',
   'Mechanical Store',
-  'Airport Duty'
-];
-
-export const AHILYANAGAR_TOUR_POINTS = [
-  'Behind Stage Area',
-  'Green Room',
-  'VIP Kitchen',
-  'Gate No 1',
-  'Exhibition Stalls',
-  'Gathri Godam',
-  'Gate No 4',
-  'Car and 2 wheeler Parking',
-  'Chai & Poha Free Stalls',
-  'Piao',
-  'Langer Distribtion',
-  'Jalpan Stalls Area',
-  'Ahilyanagar Ashrams 2 Nos',
-  'Traffic',
-  'Gate No 2',
-  'Gate No 3',
-  'Toilet Block',
   'Airport Duty'
 ];
 
