@@ -213,7 +213,7 @@ const LADIES_GROUP_INCHARGES: Record<string, string[]> = {
   'Tuesday': ['Kanta Rani', 'Geeta Ohri', 'Anita Sethi'],
   'Wednesday': ['Kanta Rani', 'Suman Sethi', 'Kamlesh Verma'],
   'Thursday': ['Kanta Rani', 'Pushpa Taneja', 'Jolly'],
-  'Friday': ['Kanta Rani', 'Rani Gumber', 'Pushpa Singh', 'Manju Chauhan'],
+  'Friday': ['Kanta Rani', 'Rani Gumber', 'Pushpa Singh', 'Jyoti Khera'],
   'Saturday': ['Kanta Rani', 'Rani Gumber', 'Manju Chauhan', 'Sunita Verma'],
   'Sunday': ['Kanta Rani', 'Jyoti Khera', 'Mehak Chawla']
 };
