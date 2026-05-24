@@ -18,6 +18,7 @@ export interface Sewadar {
   group: DutyGroup;
   shift?: 'DAY' | 'NIGHT';
   isCustom?: boolean;
+  isRemovedSaturday?: boolean;
 }
 
 export interface SewadarDetails {

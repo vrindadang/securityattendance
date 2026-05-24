@@ -125,7 +125,61 @@ export const FRIDAY_LIST = [
   "Umesh Kumar", "Ajay Malik", "Rajiv Arora", "Lokesh Kumar", "Raj Kumar Sharma", "Lakshaya Saraswat", "D L Kapoor", "S संदीप सरस्वती", "Sandeep Saraswat", "Bhagwat Prasad", "Harish Sethi", 
   "Jitender Arora", "Nanak Chand", "Rajinder Khurana", "Gulab Prasad", "Prem Lal", "Jitender Solanki", "Shiv Ram", "Anil Kumar", "Amit Verma", "Mohan Lal Gumber", "Sunil Nagpal"
 ];
-const SATURDAY_LIST = ["Harbans Lal Gumber", "Rajan Nagpal", "O.P.Batra", "Ajit Singh", "Akash Kheterpal", "Amar Singh", "Amar Singh Yadav", "Amit Bhutani", "Amrit Lal", "Anil Chawla", "Anil Kumar", "Ankit Khetarpal", "Ankur Bhutani", "Arjun Singh", "Arun Kumar", "Ashok Kumar Sharma", "Ashok Sindal", "Avinash Madan", "Bhushan Lal Thukral", "Dara Singh", "Deepak Chhabra", "Deepak Saini", "Devki Nandan", "Dharam Pal", "Dharamveer Gupta", "Dilip Singh", "Gajender Chauhan", "Gulshan Rajpal", "Gurdarshan", "Gurmeet Singh", "H.L Batra", "Harish", "Hemant", "Himanshu Ahuja", "Hitesh Bhatia", "Jatin Batia", "Jitender Kr", "Jitender Singh", "Joginder Pal", "Joginder Singh", "K.K. Kalra", "K P Singh", "K.R Bhatia", "Kapil Khetarpal", "Kishan Lal Ahuja", "Kunal Bhatia", "L K Nagpal", "Madan Mohan", "Manish Kumar", "Manmohan Ahuja", "Naresh Kumar", "Nirmal Kumar Singh", "Pitamber", "Piyush Anand", "Praveen Malik", "Prem Saluja", "Puneet Ahuja", "Rajesh Gandhi", "Raj Bhadur Singh", "Raj Kumar Sikka", "Rajender Kumar", "Rajinder Gulati", "Rakesh Munjal", "Ram Kumar", "Ram Niwas", "Ramesh Chand", "Ramesh Sharma", "Ranjeet Singh", "Ravinder Singh", "Rishikesh", "Roshan Lal", "Sachin Arora", "Sahil Arora", "Sanjeev Dhawan", "Satish Kr", "Shankar Lal Bhatia", "Shri Krishan", "Shubham Virmani", "Shunty Nagpal", "Som Datt", "Subhash Rathor", "Sudesh Yadav", "Sumit Gambhir", "Surender Singh (Ii)", "Surender Verma", "Surinder Singh", "Sushil Malik", "Tara Chand", "Umed Singh", "Vijay Kumar", "Vijay Singh", "Vipul Bhatia", "Yadvinder Singh", "Yogesh Kumar", "Yogesh Matta"];
+const ORIGINAL_SATURDAY_LIST = ["Harbans Lal Gumber", "Rajan Nagpal", "O.P.Batra", "Ajit Singh", "Akash Kheterpal", "Amar Singh", "Amar Singh Yadav", "Amit Bhutani", "Amrit Lal", "Anil Chawla", "Anil Kumar", "Ankit Khetarpal", "Ankur Bhutani", "Arjun Singh", "Arun Kumar", "Ashok Kumar Sharma", "Ashok Sindal", "Avinash Madan", "Bhushan Lal Thukral", "Dara Singh", "Deepak Chhabra", "Deepak Saini", "Devki Nandan", "Dharam Pal", "Dharamveer Gupta", "Dilip Singh", "Gajender Chauhan", "Gulshan Rajpal", "Gurdarshan", "Gurmeet Singh", "H.L Batra", "Harish", "Hemant", "Himanshu Ahuja", "Hitesh Bhatia", "Jatin Batia", "Jitender Kr", "Jitender Singh", "Joginder Pal", "Joginder Singh", "K.K. Kalra", "K P Singh", "K.R Bhatia", "Kapil Khetarpal", "Kishan Lal Ahuja", "Kunal Bhatia", "L K Nagpal", "Madan Mohan", "Manish Kumar", "Manmohan Ahuja", "Naresh Kumar", "Nirmal Kumar Singh", "Pitamber", "Piyush Anand", "Praveen Malik", "Prem Saluja", "Puneet Ahuja", "Rajesh Gandhi", "Raj Bhadur Singh", "Raj Kumar Sikka", "Rajender Kumar", "Rajinder Gulati", "Rakesh Munjal", "Ram Kumar", "Ram Niwas", "Ramesh Chand", "Ramesh Sharma", "Ranjeet Singh", "Ravinder Singh", "Rishikesh", "Roshan Lal", "Sachin Arora", "Sahil Arora", "Sanjeev Dhawan", "Satish Kr", "Shankar Lal Bhatia", "Shri Krishan", "Shubham Virmani", "Shunty Nagpal", "Som Datt", "Subhash Rathor", "Sudesh Yadav", "Sumit Gambhir", "Surender Singh (Ii)", "Surender Verma", "Surinder Singh", "Sushil Malik", "Tara Chand", "Umed Singh", "Vijay Kumar", "Vijay Singh", "Vipul Bhatia", "Yadvinder Singh", "Yogesh Kumar", "Yogesh Matta"];
+
+export const SATURDAY_REMOVED_NAMES = [
+  "Ajun Bhala",
+  "Amar Div Singh",
+  "Bhim Singh",
+  "Bihan Singh",
+  "Dashrath Singh",
+  "Dolat Singh",
+  "Harpal Singh",
+  "Hemant",
+  "Lal Babu Yadav",
+  "Lala Babu Yadav",
+  "Lala Ram",
+  "Maanchand Ji",
+  "Madan Lal",
+  "Mannu Singh",
+  "Naveen Kumar",
+  "Nirmal Kumar Singh",
+  "Jitendra Kumar",
+  "Pawan Sharma",
+  "Prem Saluja",
+  "Raghunath Singh",
+  "Rahul Talwar",
+  "Raj Pal",
+  "Rajan Arora",
+  "Rajan Kumar",
+  "Rajinder Kumar",
+  "Ram Kumar",
+  "Rohit Kapur",
+  "Santokh Singh",
+  "Sat Pal Singh",
+  "Shankar Lal Bhatia",
+  "Surender",
+  "Dilip Singh",
+  "Harbans Lala Batra"
+];
+
+export function normalizeName(name: string): string {
+  if (!name) return "";
+  let n = name.toUpperCase().trim();
+  n = n.replace(/\s+JI$/g, '');
+  n = n.replace(/^DR\s+/g, '');
+  n = n.replace(/^MR\s+/g, '');
+  n = n.replace(/[^A-Z]/g, '');
+  return n;
+}
+
+export const SATURDAY_REMOVED_NORMS = new Set(SATURDAY_REMOVED_NAMES.map(normalizeName));
+
+export function isRemovedSaturday(name: string): boolean {
+  return SATURDAY_REMOVED_NORMS.has(normalizeName(name));
+}
+
+const SATURDAY_LIST = ORIGINAL_SATURDAY_LIST.filter(name => !isRemovedSaturday(name));
 const LADIES_MONDAY_DAY_LIST = [
   "KANTA RANI", "JYOTI KHERA", "SUMAN SETHI", "ANITA BHARDWAJ", "CHANCHAL UPPAL (R)", "DAYA SHARMA", "KAMLA RANI (R)", "KAMLESH BHARDWAJ", "KAMLESH DEVI", "KANTA GUPTA", "KIRAN BALA", "KIRAN RAWAL (R)", "KUSUM LATA", "LAXMI GIRI", "MADHU GULATI", "NEELAM CHAWLA", "NEELAM MIGLANI", "NEENA KAUSHIK", "PREM BAJAJ (R)", "PUSHPA TANEJA", "RENU MALIK", "SANTOSH DEVI", "SANTOSH MEHRA", "SAROJ ARORA (R)", "SHAKUNTLA BABBAR", "SHAKUNTLA KHATER(R)", "SHAKUNTLA BAHAL (R)", "SHEELA GABA", "SUDESH ROHILLA", "SUNITA SAINI MONDAY", "SUMAN MIGLANI", "SURESH KUMARI", "SUSHILA CHAWLA", "USHA (TIMARPUR)", "VEENA MUNJAL"
 ];
