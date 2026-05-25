@@ -129,13 +129,18 @@ const ORIGINAL_SATURDAY_LIST = ["Harbans Lal Gumber", "Rajan Nagpal", "O.P.Batra
 
 export const SATURDAY_REMOVED_NAMES = [
   "Ajun Bhala",
+  "Ajun Bhalla",
   "Amar Div Singh",
   "Bhim Singh",
   "Bihan Singh",
+  "Darshan Kapoor",
   "Dashrath Singh",
   "Dolat Singh",
+  "Gurdarshan",
   "Harpal Singh",
   "Hemant",
+  "Kripal Singh",
+  "Kunal Bhatia",
   "Lal Babu Yadav",
   "Lala Babu Yadav",
   "Lala Ram",
