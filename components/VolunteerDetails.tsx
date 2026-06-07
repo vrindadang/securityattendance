@@ -1,9 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Volunteer, SewadarDetails } from '../types';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Props {
   sewadars: Sewadar[];
+  allSewadars?: Sewadar[];
   details: Record<string, SewadarDetails>;
   activeVolunteer: Volunteer;
   onSaveDetails: (details: SewadarDetails) => Promise<void>;
@@ -11,7 +14,7 @@ interface Props {
   onEditSewadar?: (id: string, newName: string) => void;
 }
 
-const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar, onEditSewadar }) => {
+const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar, onEditSewadar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
@@ -61,6 +64,178 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
     }
   };
 
+  const toProperCase = (str: string): string => {
+    if (!str) return "";
+    // First, replace common word boundary symbols like underscore or hyphen with a space
+    let cleaned = str.replace(/[_\-–]/g, ' ');
+    // Remove other non-alphabetic, non-space special characters like backticks
+    cleaned = cleaned.replace(/[^a-zA-Z\s]/g, '');
+    return cleaned
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const visibleDaysToDownload = useMemo(() => {
+    if (activeVolunteer.role === 'Super Admin' || activeVolunteer.assignedGroup === 'Ladies') {
+      return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    }
+    const assigned = activeVolunteer.assignedGroup;
+    if (assigned) {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const matched = days.filter(d => assigned.toLowerCase().includes(d.toLowerCase()));
+      if (matched.length > 0) {
+        return matched;
+      }
+      return [assigned];
+    }
+    return [];
+  }, [activeVolunteer]);
+
+  const handleDownloadGroupPDF = (groupName: string, gender: 'Gents' | 'Ladies') => {
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const targetSewadars = (allSewadars || sewadars)
+        .filter(s => {
+          const sGroupLower = s.group.toLowerCase();
+          const targetLower = groupName.toLowerCase();
+          const belongsToGroup = sGroupLower === targetLower || sGroupLower === `ladies-${targetLower}`;
+          const matchesGender = s.gender === gender;
+          return belongsToGroup && matchesGender;
+        })
+        .map(s => ({
+          ...s,
+          properName: toProperCase(s.name)
+        }))
+        .sort((a, b) => a.properName.localeCompare(b.properName));
+
+      const tableBody: any[] = [];
+      targetSewadars.forEach((s, index) => {
+        const sDetail = details[s.id] || {};
+        let formattedDob = "";
+        if (sDetail.dob) {
+          try {
+            const dateParts = sDetail.dob.split('-');
+            if (dateParts.length === 3) {
+              formattedDob = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`; // DD/MM/YYYY
+            } else {
+              formattedDob = new Date(sDetail.dob).toLocaleDateString('en-GB');
+            }
+          } catch {
+            formattedDob = sDetail.dob;
+          }
+        }
+        tableBody.push([
+          index + 1,
+          s.properName,
+          "", // Checklist drawn square
+          formattedDob || "",
+          sDetail.phone || "",
+          sDetail.address || "",
+          "" // Remove checklist drawn square
+        ]);
+      });
+
+      // Add exactly 10 empty blank rows
+      const prefilledCount = targetSewadars.length;
+      for (let i = 0; i < 10; i++) {
+        tableBody.push([
+          prefilledCount + i + 1,
+          "", // blank name
+          "",
+          "", // blank DOB
+          "", // blank phone
+          "", // blank address
+          ""
+        ]);
+      }
+
+      autoTable(doc, {
+        startY: 25,
+        margin: { top: 22, bottom: 15, left: 10, right: 10 },
+        theme: 'grid',
+        head: [[
+          'SNo',
+          'Name',
+          'Name Complete / Correct?',
+          'DOB',
+          'Mobile Number',
+          'Address (with PIN code and City Name)',
+          'Remove Name from List?'
+        ]],
+        body: tableBody,
+        styles: {
+          font: 'helvetica',
+          fontSize: 8,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1,
+          textColor: [40, 40, 40],
+          cellPadding: 2
+        },
+        headStyles: {
+          fillColor: [53, 83, 140], // Deep corporate blue
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+          halign: 'center',
+          valign: 'middle'
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10, fontStyle: 'bold' }, // SNo
+          1: { halign: 'left', cellWidth: 42 }, // Name
+          2: { halign: 'center', cellWidth: 20 }, // Checklist
+          3: { halign: 'center', cellWidth: 22 }, // DOB
+          4: { halign: 'center', cellWidth: 28 }, // Mobile
+          5: { halign: 'left', cellWidth: 48 }, // Address
+          6: { halign: 'center', cellWidth: 20 }  // Remove Checklist
+        },
+        didDrawCell: function (data) {
+          // Draw checkboxes in column index 2 and column index 6 for body rows
+          if ((data.column.index === 2 || data.column.index === 6) && data.cell.section === 'body') {
+            const size = 3; // 3mm square
+            const x = data.cell.x + (data.cell.width - size) / 2;
+            const y = data.cell.y + (data.cell.height - size) / 2;
+            
+            doc.setDrawColor(53, 83, 140);
+            doc.setLineWidth(0.25);
+            doc.rect(x, y, size, size); // Draw empty square outline
+          }
+        },
+        didDrawPage: function (data) {
+          // Draw header
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(15);
+          doc.setTextColor(43, 76, 126);
+          doc.text("Volunteer Details Tracker", 10, 15);
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.setTextColor(50, 50, 50);
+          const displayGroup = `${groupName} (${gender})`;
+          doc.text(`Group: ${displayGroup}`, 148, 15);
+
+          // Draw the underline
+          doc.setDrawColor(120, 120, 120);
+          doc.setLineWidth(0.3);
+          doc.line(160, 16.5, 200, 16.5);
+
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(7.5);
+          doc.setTextColor(150, 150, 150);
+          doc.text(`Printed for SKRM Security Sewa - Page ${data.pageNumber}`, 10, 288);
+        }
+      });
+
+      doc.save(`Volunteer_Details_Tracker_${groupName}_${gender}.pdf`);
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      alert("Error generating PDF: " + err);
+    }
+  };
+
   return (
     <>
       <div className="space-y-6 max-w-2xl mx-auto animate-fade-in pb-12">
@@ -73,6 +248,80 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, details, activeVolunteer,
           </div>
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
         </div>
+
+        {/* Printable Volunteer Trackers Collection */}
+        {visibleDaysToDownload.length > 0 && (
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 rounded-[2.5rem] border border-indigo-500/15 text-white shadow-2xl relative overflow-hidden">
+            <div className="relative z-10">
+              <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Verification Tools</div>
+              <h3 className="text-xl font-black mb-1">Printable Volunteer Trackers</h3>
+              <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed mb-5">
+                Generate and download pre-filled tracker sheets in the official paper log format. These forms are used to audit and fill in missing Date of Birth, Mobile, and Address records on active duty.
+              </p>
+              
+              <div className={`grid gap-2 ${visibleDaysToDownload.length > 1 ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-7' : 'grid-cols-1 max-w-xs'}`}>
+                {visibleDaysToDownload.map((day) => {
+                  const countGents = (allSewadars || sewadars).filter(s => {
+                    const sGroupLower = s.group.toLowerCase();
+                    const dayLower = day.toLowerCase();
+                    return (sGroupLower === dayLower || sGroupLower === `ladies-${dayLower}`) && s.gender === 'Gents';
+                  }).length;
+
+                  const countLadies = (allSewadars || sewadars).filter(s => {
+                    const sGroupLower = s.group.toLowerCase();
+                    const dayLower = day.toLowerCase();
+                    return (sGroupLower === dayLower || sGroupLower === `ladies-${dayLower}`) && s.gender === 'Ladies';
+                  }).length;
+
+                  return (
+                    <div
+                      key={day}
+                      className="bg-white/5 border border-white/10 p-3.5 rounded-2xl text-left transition-all group flex flex-col justify-between min-h-[110px]"
+                    >
+                      <div>
+                        <p className="text-xs font-black tracking-tight text-slate-100">{day}</p>
+                        {isSuperAdmin ? (
+                          <p className="text-[7.5px] font-bold text-indigo-300 uppercase mt-0.5 leading-none">
+                            {countGents} Gents | {countLadies} Ladies
+                          </p>
+                        ) : (
+                          <p className="text-[7.5px] font-bold text-indigo-300 uppercase mt-0.5 leading-none">
+                            {activeVolunteer.role.includes('Ladies') ? `${countLadies} Ladies` : `${countGents} Gents`}
+                          </p>
+                        )}
+                      </div>
+                      
+                      {isSuperAdmin ? (
+                        <div className="flex gap-1 mt-2.5">
+                          <button
+                            onClick={() => handleDownloadGroupPDF(day, 'Gents')}
+                            className="flex-1 bg-white/10 hover:bg-emerald-600 border border-white/10 hover:border-transparent py-1 rounded-xl text-[8px] font-black text-center transition-all active:scale-95 text-emerald-300 hover:text-white"
+                          >
+                            Gents 📥
+                          </button>
+                          <button
+                            onClick={() => handleDownloadGroupPDF(day, 'Ladies')}
+                            className="flex-1 bg-white/10 hover:bg-pink-600 border border-white/10 hover:border-transparent py-1 rounded-xl text-[8px] font-black text-center transition-all active:scale-95 text-pink-300 hover:text-white"
+                          >
+                            Ladies 📥
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleDownloadGroupPDF(day, activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents')}
+                          className="w-full bg-indigo-600 hover:bg-indigo-500 py-1.5 rounded-xl text-[8px] font-black text-center transition-all active:scale-95 text-white mt-2.5"
+                        >
+                          Download 📥
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+          </div>
+        )}
 
         <div className="sticky top-0 z-20 bg-slate-50/80 backdrop-blur-sm pb-4 pt-2">
           <input 

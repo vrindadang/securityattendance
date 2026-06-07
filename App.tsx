@@ -102,6 +102,14 @@ const App: React.FC = () => {
     });
   }, [activeVolunteer, customSewadars, deletedSewadarIds, activeAttendance]);
 
+  const allSewadarsList = useMemo(() => {
+    const deduplicatedMap = new Map<string, Sewadar>();
+    INITIAL_SEWADARS.forEach(s => deduplicatedMap.set(s.id, s));
+    customSewadars.forEach(s => deduplicatedMap.set(s.id, { ...s, isCustom: true }));
+    const combined = Array.from(deduplicatedMap.values());
+    return combined.filter(s => !deletedSewadarIds.has(s.id));
+  }, [customSewadars, deletedSewadarIds]);
+
   const normalizeName = useCallback((name: string): string => {
     if (!name) return "";
     let n = name.toUpperCase().trim();
@@ -1303,6 +1311,7 @@ const App: React.FC = () => {
         ) : activeView === 'VolunteerDetails' ? (
           <VolunteerDetails
             sewadars={visibleSewadars}
+            allSewadars={allSewadarsList}
             details={enrichedDetailsMap}
             activeVolunteer={activeVolunteer}
             onSaveDetails={handleSaveSewadarDetails}
