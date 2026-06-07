@@ -10,7 +10,7 @@ interface Props {
   flaggedVehicles?: FlaggedVehicle[];
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
-  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT') => void;
+  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob: string, phone: string, address: string }) => void;
   onDeleteSewadar?: (id: string) => void;
   onEditSewadar?: (id: string, newName: string) => void;
   activeVolunteer: Volunteer;
@@ -68,6 +68,9 @@ const AttendanceManager: React.FC<Props> = ({
     activeVolunteer.assignedGroup || (activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Monday')
   );
   const [newShift, setNewShift] = useState<'DAY' | 'NIGHT' | undefined>(undefined);
+  const [newDob, setNewDob] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newAddress, setNewAddress] = useState('');
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   // Vehicle Form state
@@ -206,6 +209,16 @@ const AttendanceManager: React.FC<Props> = ({
     const trimmedName = newName.trim();
     if (!trimmedName) return;
 
+    if (!newDob || !newPhone.trim() || !newAddress.trim()) {
+      setDuplicateError("All details (DOB, Mobile Number, and Address) are mandatory.");
+      return;
+    }
+
+    if (!/^\d{10}$/.test(newPhone.trim())) {
+      setDuplicateError("Mobile number must be a valid 10-digit number.");
+      return;
+    }
+
     // Fuzzy matching normalization: lowercase and remove non-alphanumeric
     const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
     const normalizedNewName = normalize(trimmedName);
@@ -219,8 +232,16 @@ const AttendanceManager: React.FC<Props> = ({
       return;
     }
 
-    onAddSewadar(trimmedName, newGender, newGroup, newShift);
+    onAddSewadar(trimmedName, newGender, newGroup, newShift, {
+      dob: newDob,
+      phone: newPhone.trim(),
+      address: newAddress.trim()
+    });
+
     setNewName('');
+    setNewDob('');
+    setNewPhone('');
+    setNewAddress('');
     setNewShift(undefined);
     setDuplicateError(null);
     setShowAddModal(false);
@@ -258,12 +279,48 @@ const AttendanceManager: React.FC<Props> = ({
       {/* Add Sewadar Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto no-scrollbar">
               <h2 className="text-2xl font-black text-slate-900">Add New Member</h2>
               <form onSubmit={handleCreateSewadar} className="space-y-4">
                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Name</label>
                     <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => { setNewName(e.target.value); setDuplicateError(null); }} placeholder="Full Name" />
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Date of Birth (DOB)</label>
+                    <input 
+                       type="date" 
+                       required 
+                       className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none" 
+                       value={newDob} 
+                       onChange={e => setNewDob(e.target.value)} 
+                    />
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Mobile Number</label>
+                    <input 
+                       type="tel" 
+                       required 
+                       pattern="[0-9]{10}"
+                       title="10-digit mobile number"
+                       className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none" 
+                       placeholder="10-Digit Mobile Number" 
+                       value={newPhone} 
+                       onChange={e => setNewPhone(e.target.value)} 
+                    />
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Address</label>
+                    <textarea 
+                       required 
+                       className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none min-h-[60px]" 
+                       placeholder="Residential Address" 
+                       value={newAddress} 
+                       onChange={e => setNewAddress(e.target.value)} 
+                    />
                  </div>
                  
                  {isSuperAdmin && (

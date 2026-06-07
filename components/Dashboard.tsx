@@ -4,6 +4,8 @@ import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPh
 import { VOLUNTEERS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -67,6 +69,277 @@ const Dashboard: React.FC<Props> = ({
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
   const [showNoticeForm, setShowNoticeForm] = useState(false);
   const [newNotice, setNewNotice] = useState({ title: '', content: '', photo: '' });
+  const [downloadingMarchMay, setDownloadingMarchMay] = useState(false);
+
+  const generateMarchMayReportPDF = async () => {
+    if (downloadingMarchMay) return;
+    try {
+      setDownloadingMarchMay(true);
+      
+      const snap = await getDocs(collection(db, 'attendance'));
+      const allRecords = snap.docs.map(doc => doc.data());
+      
+      const targetMapping = [
+        {
+          displayName: "Ashwani Narang",
+          aliases: ["ASHWANINARANG", "ASHWANIKUMAR", "ASHWANI"]
+        },
+        {
+          displayName: "Sunil Shadra",
+          aliases: ["SUNILSHADRA", "SUNILKUMAR", "SUNILSHAHDRA", "SUNIL"]
+        },
+        {
+          displayName: "Dinesh Salgotra",
+          aliases: ["DINESHSALGOTRA", "DINESH"]
+        },
+        {
+          displayName: "Manmohan Khurana",
+          aliases: ["MANMOHANKHURANA"]
+        }
+      ];
+
+      const normalizeName = (name: string): string => {
+        if (!name) return "";
+        let n = name.toUpperCase().trim();
+        n = n.replace(/\s+JI$/g, '');
+        n = n.replace(/^DR\s+/g, '');
+        n = n.replace(/^MR\s+/g, '');
+        n = n.replace(/[^A-Z]/g, '');
+        return n;
+      };
+
+      const findTargetVolunteer = (rawName: string): string | null => {
+        const norm = normalizeName(rawName);
+        for (const t of targetMapping) {
+          if (t.aliases.includes(norm)) {
+            return t.displayName;
+          }
+        }
+        return null;
+      };
+
+      const calculateMinutesHelper = (inTime?: string, outTime?: string): number => {
+        if (!inTime || !outTime) return 0;
+        try {
+          const [inH, inM] = inTime.split(':').map(Number);
+          const [outH, outM] = outTime.split(':').map(Number);
+          if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) return 0;
+          let diff = (outH * 60 + outM) - (inH * 60 + inM);
+          if (diff < 0) diff += 24 * 60;
+          return diff;
+        } catch { return 0; }
+      };
+
+      const formatMinutesHelper = (totalMinutes: number): string => {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h}h ${m}m`;
+      };
+
+      interface FormattedRecord {
+        rawName: string;
+        resolvedName: string;
+        group: string;
+        date: string;
+        inTime: string;
+        outTime: string;
+        durationMinutes: number;
+        shift: string;
+      }
+
+      const filtered: FormattedRecord[] = [];
+      
+      allRecords.forEach((r: any) => {
+        const resolvedName = findTargetVolunteer(r.name || r.sewadarName || '');
+        if (!resolvedName) return;
+        
+        let dateStr = "";
+        if (r.date) {
+          if (typeof r.date === 'string') {
+            dateStr = r.date;
+          } else if (r.date.seconds) {
+            const d = new Date(r.date.seconds * 1000);
+            dateStr = d.toISOString().split('T')[0];
+          }
+        }
+        
+        const year = dateStr.split('-')[0];
+        const month = dateStr.split('-')[1];
+        
+        if (year === '2026' && ['03', '04', '05'].includes(month)) {
+          const mins = calculateMinutesHelper(r.in_time, r.out_time);
+          filtered.push({
+            rawName: r.name || '',
+            resolvedName,
+            group: r.group || 'Gents',
+            date: dateStr,
+            inTime: r.in_time || '-',
+            outTime: r.out_time || '-',
+            durationMinutes: mins,
+            shift: r.shift || '-'
+          });
+        }
+      });
+      
+      filtered.sort((a, b) => a.date.localeCompare(b.date));
+
+      const doc = new jsPDF('p', 'mm', 'a4');
+      let currY = 15;
+      
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(110, 110, 110);
+      doc.text("With the blessings of H.H. Sant Rajinder Singh Ji Maharaj", 14, currY);
+      
+      currY += 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(40, 50, 110);
+      doc.text("Targeted Volunteer Attendance Report", 14, currY);
+      
+      currY += 6;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text("Project Report Period: March, April & May 2026", 14, currY);
+      
+      currY += 4;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, currY, 196, currY);
+      
+      currY += 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(30, 30, 30);
+      doc.text("1. Attendance Dashboard Summary", 14, currY);
+      
+      const summaries = targetMapping.map(t => {
+        const vRecords = filtered.filter(f => f.resolvedName === t.displayName);
+        const totalMinutes = vRecords.reduce((sum, r) => sum + r.durationMinutes, 0);
+        const uniqueDays = new Set(vRecords.map(r => r.date)).size;
+        const groups = Array.from(new Set(vRecords.map(r => r.group))).join(', ');
+        
+        return {
+          name: t.displayName,
+          totalShifts: vRecords.length,
+          uniqueDays,
+          totalHours: formatMinutesHelper(totalMinutes),
+          groups: groups || 'Monday'
+        };
+      });
+      
+      const summaryRows = summaries.map((s, idx) => [
+        (idx + 1).toString(),
+        s.name,
+        s.groups,
+        s.uniqueDays.toString(),
+        s.totalShifts.toString(),
+        s.totalHours
+      ]);
+      
+      autoTable(doc, {
+        startY: currY + 4,
+        head: [['S.No', 'Volunteer Name', 'Active Groups', 'Unique Days', 'Total Shifts', 'Total Duration']],
+        body: summaryRows,
+        headStyles: { fillColor: [40, 50, 110], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [247, 248, 252] },
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { fontStyle: 'bold' },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 25, halign: 'center' },
+          4: { cellWidth: 25, halign: 'center' },
+          5: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }
+        }
+      });
+      
+      currY = (doc as any).lastAutoTable.finalY + 15;
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("2. Detailed Attendance Sheets", 14, currY);
+      currY += 2;
+      
+      for (const volunteer of targetMapping) {
+        const vRecords = filtered.filter(f => f.resolvedName === volunteer.displayName);
+        
+        if (currY + 40 > 280) {
+          doc.addPage();
+          currY = 20;
+        } else {
+          currY += 6;
+        }
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(50, 60, 120);
+        doc.text(`${volunteer.displayName} - Log Sheet`, 14, currY);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        const uniqueDatesCount = new Set(vRecords.map(r => r.date)).size;
+        const totalMinutes = vRecords.reduce((sum, r) => sum + r.durationMinutes, 0);
+        doc.text(`Total Shifts Marked: ${vRecords.length} | Unique Days: ${uniqueDatesCount} | Accumulated Hours: ${formatMinutesHelper(totalMinutes)}`, 14, currY + 4);
+        
+        currY += 6;
+        
+        const tableBody = vRecords.map((r, sNo) => {
+          const formattedDate = r.date.split('-').reverse().join('/');
+          return [
+            (sNo + 1).toString(),
+            formattedDate,
+            r.group,
+            r.inTime,
+            r.outTime,
+            formatMinutesHelper(r.durationMinutes)
+          ];
+        });
+        
+        if (tableBody.length === 0) {
+          tableBody.push(['-', 'No records found for March, April, or May 2026', '-', '-', '-', '-']);
+        }
+        
+        autoTable(doc, {
+          startY: currY,
+          head: [['S.No', 'Date (DD/MM/YYYY)', 'Group Name', 'In Time', 'Out Time', 'Duration']],
+          body: tableBody,
+          headStyles: { fillColor: [70, 80, 140], textColor: [255, 255, 255] },
+          theme: 'striped',
+          styles: { fontSize: 8.5, cellPadding: 2, valign: 'middle' },
+          columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 35, halign: 'center' },
+            2: { cellWidth: 35, halign: 'center' },
+            3: { cellWidth: 25, halign: 'center' },
+            4: { cellWidth: 25, halign: 'center' },
+            5: { cellWidth: 30, halign: 'center' }
+          }
+        });
+        
+        currY = (doc as any).lastAutoTable.finalY + 8;
+      }
+      
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount}`, 196, 287, { align: 'right' });
+        doc.text("SKRM Security Attendance Verification System", 14, 287);
+      }
+      
+      doc.save(`March_April_May_Attendance_Report.pdf`);
+    } catch (err) {
+      console.error("Client report generation failed:", err);
+      alert("Error generating March-May Report: " + (err as any).message);
+    } finally {
+      setDownloadingMarchMay(false);
+    }
+  };
 
   const [sessionFilterGender, setSessionFilterGender] = useState<'Gents' | 'Ladies' | 'All'>('All');
   const [sessionFilterGroup, setSessionFilterGroup] = useState<string>('All');
@@ -579,6 +852,26 @@ const Dashboard: React.FC<Props> = ({
           <button onClick={generateAttendancePDF} className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95">Download PDF</button>
         </div>
         <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* March, April & May Special Report Panel */}
+      <div className="bg-gradient-to-r from-[#1d1f3d] to-[#0f1025] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-indigo-500/15">
+        <div className="relative z-10 flex-1">
+          <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Special Report</div>
+          <h3 className="text-xl font-black mb-1">Targeted Volunteer Attendance</h3>
+          <p className="text-indigo-400 text-[11px] font-bold uppercase tracking-widest mb-2">March, April & May 2026</p>
+          <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
+            Consolidated duty log & service hours log for four key volunteers: <strong className="text-white">Ashwani Narang, Sunil Shadra, Dinesh Salgotra, and Manmohan Khurana</strong>.
+          </p>
+        </div>
+        <button 
+          onClick={generateMarchMayReportPDF} 
+          disabled={downloadingMarchMay}
+          className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingMarchMay ? 'bg-indigo-800 text-white/50 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-400 text-white'}`}
+        >
+          {downloadingMarchMay ? 'Generating PDF...' : 'Download March-May Report'}
+        </button>
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

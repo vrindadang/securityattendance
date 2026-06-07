@@ -102,6 +102,49 @@ const App: React.FC = () => {
     });
   }, [activeVolunteer, customSewadars, deletedSewadarIds, activeAttendance]);
 
+  const normalizeName = useCallback((name: string): string => {
+    if (!name) return "";
+    let n = name.toUpperCase().trim();
+    n = n.replace(/\s+JI$/g, '');
+    n = n.replace(/^DR\s+/g, '');
+    n = n.replace(/^MR\s+/g, '');
+    n = n.replace(/[^A-Z]/g, '');
+    return n;
+  }, []);
+
+  const enrichedDetailsMap = useMemo(() => {
+    const map = { ...sewadarDetailsMap };
+    
+    // Build a mapping of normalized name to details
+    const nameToDetailsMap = new Map<string, SewadarDetails>();
+    
+    Object.entries(sewadarDetailsMap).forEach(([id, detail]) => {
+      const sewadar = visibleSewadars.find(s => s.id === id);
+      if (sewadar) {
+        const norm = normalizeName(sewadar.name);
+        if (norm && !nameToDetailsMap.has(norm)) {
+          nameToDetailsMap.set(norm, detail as SewadarDetails);
+        }
+      }
+    });
+    
+    // Copy details dynamically for any other sewadars with the same normalized name
+    visibleSewadars.forEach(s => {
+      if (!map[s.id]) {
+        const norm = normalizeName(s.name);
+        const sharedDetail = nameToDetailsMap.get(norm);
+        if (sharedDetail) {
+          map[s.id] = {
+            ...sharedDetail,
+            sewadar_id: s.id
+          };
+        }
+      }
+    });
+    
+    return map;
+  }, [sewadarDetailsMap, visibleSewadars, normalizeName]);
+
   const hasNewRequirements = useMemo(() => {
     if (!activeVolunteer) return false;
     return requirements.some(req => {
@@ -699,15 +742,44 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveSewadarDetails = async (details: SewadarDetails) => {
+  const handleSaveSewadarDetails = async (details: SewadarDetails, optionalName?: string) => {
     try {
-      await setDoc(doc(db, 'sewadar_details', details.sewadar_id), {
-        sewadar_id: details.sewadar_id,
-        address: details.address,
-        dob: details.dob,
-        phone: details.phone
-      }, { merge: true });
-      setSewadarDetailsMap(prev => ({ ...prev, [details.sewadar_id]: details }));
+      const targetSewadar = visibleSewadars.find(s => s.id === details.sewadar_id);
+      const targetName = targetSewadar?.name || optionalName || '';
+      const targetNorm = normalizeName(targetName);
+
+      // We want to find ALL sewadars with the same normalized name
+      const matchingSewadars = visibleSewadars.filter(s => {
+        return targetNorm && normalizeName(s.name) === targetNorm;
+      });
+
+      const idsToUpdate = new Set<string>();
+      idsToUpdate.add(details.sewadar_id);
+      matchingSewadars.forEach(m => idsToUpdate.add(m.id));
+
+      // Write details for ALL matching sewadars
+      for (const id of idsToUpdate) {
+        await setDoc(doc(db, 'sewadar_details', id), {
+          sewadar_id: id,
+          address: details.address,
+          dob: details.dob,
+          phone: details.phone
+        }, { merge: true });
+      }
+
+      // Update the client state map for all matching IDs
+      setSewadarDetailsMap(prev => {
+        const next = { ...prev };
+        idsToUpdate.forEach(id => {
+          next[id] = {
+            sewadar_id: id,
+            address: details.address,
+            dob: details.dob,
+            phone: details.phone
+          };
+        });
+        return next;
+      });
     } catch (err) {
       console.error("Save Details Error:", err);
       throw err;
@@ -1196,7 +1268,7 @@ const App: React.FC = () => {
             onSaveVehicle={handleSaveVehicle}
             vehicles={activeVehicles}
             flaggedVehicles={flaggedVehicles}
-            onAddSewadar={async (n, g, grp, shift) => {
+            onAddSewadar={async (n, g, grp, shift, details) => {
               const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp, shift };
               try {
                 await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { 
@@ -1206,6 +1278,14 @@ const App: React.FC = () => {
                   group: newSewadar.group,
                   shift: newSewadar.shift || null
                 });
+                if (details) {
+                  await handleSaveSewadarDetails({
+                    sewadar_id: newSewadar.id,
+                    dob: details.dob,
+                    phone: details.phone,
+                    address: details.address
+                  }, newSewadar.name);
+                }
                 setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
               } catch (error) { console.error('Failed to add sewadar:', error); }
             }} 
@@ -1223,7 +1303,7 @@ const App: React.FC = () => {
         ) : activeView === 'VolunteerDetails' ? (
           <VolunteerDetails
             sewadars={visibleSewadars}
-            details={sewadarDetailsMap}
+            details={enrichedDetailsMap}
             activeVolunteer={activeVolunteer}
             onSaveDetails={handleSaveSewadarDetails}
             onDeleteSewadar={handleDeleteSewadar}
