@@ -12,7 +12,7 @@ interface Props {
   latestNotice?: Notice | null;
 }
 
-type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | null;
+type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | 'SUPERADMIN' | null;
 
 const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, latestNotice }) => {
   const [portalType, setPortalType] = useState<PortalType>(null);
@@ -29,21 +29,30 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
 
   const handlePortalSelect = (type: PortalType) => {
     setPortalType(type);
-    if (type === 'BACKOFFICE') {
+    if (type === 'SUPERADMIN') {
       setSelectedGroup(null);
-      // Pre-select Super Admin for Back Office portal
       const sa = VOLUNTEERS.find(v => v.id === 'sa');
       if (sa) setSelectedVolunteer(sa);
+    } else {
+      setSelectedGroup(null);
+      setSelectedVolunteer(null);
     }
   };
 
   const handleGroupSelect = (day: DutyGroup) => {
     setSelectedGroup(day);
+    if (portalType === 'BACKOFFICE') {
+      const adminVol = VOLUNTEERS.find(v => v.id === 'admin');
+      if (adminVol) setSelectedVolunteer(adminVol);
+    }
   };
 
   const availableIncharges = useMemo(() => {
-    if (portalType === 'BACKOFFICE') {
+    if (portalType === 'SUPERADMIN') {
       return VOLUNTEERS.filter(v => v.id === 'sa');
+    }
+    if (portalType === 'BACKOFFICE') {
+      return VOLUNTEERS.filter(v => v.id === 'admin');
     }
     if (!selectedGroup) return [];
     
@@ -59,12 +68,6 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
     setError('');
 
     try {
-      // Special check for Back Office portal password
-      if (portalType === 'BACKOFFICE' && password === 'admin123') {
-        onLogin({ ...selectedVolunteer, password: 'admin123' });
-        return;
-      }
-
       // 1. Check Firestore for overridden password with a 3-second timeout
       const firestorePromise = getDoc(doc(db, 'volunteers', selectedVolunteer.id));
       
@@ -85,7 +88,16 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
       const effectivePassword = data?.password || selectedVolunteer.password;
 
       if (password === effectivePassword) {
-        onLogin({ ...selectedVolunteer, password: effectivePassword });
+        if (portalType === 'BACKOFFICE') {
+          onLogin({ 
+            ...selectedVolunteer, 
+            role: 'Back Office Admin', 
+            assignedGroup: selectedGroup || undefined,
+            password: effectivePassword 
+          });
+        } else {
+          onLogin({ ...selectedVolunteer, password: effectivePassword });
+        }
       } else {
         // Fallback check for Super Admin PIN (original behavior)
         const superAdmin = VOLUNTEERS.find(v => v.id === 'sa');
@@ -96,9 +108,16 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
         }
       }
     } catch (err) {
-      // If error (like record not found), use hardcoded default
       if (password === selectedVolunteer.password) {
-        onLogin(selectedVolunteer);
+        if (portalType === 'BACKOFFICE') {
+          onLogin({
+            ...selectedVolunteer,
+            role: 'Back Office Admin',
+            assignedGroup: selectedGroup || undefined
+          });
+        } else {
+          onLogin(selectedVolunteer);
+        }
       } else {
         setError('Incorrect password.');
       }
@@ -108,18 +127,15 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
   };
 
   const goBackStep = () => {
-    if (portalType === 'BACKOFFICE') {
-      setPortalType(null);
-      setSelectedVolunteer(null);
-    } else if (selectedVolunteer) {
-      setSelectedVolunteer(null);
-    } else if (selectedGroup) {
-      if (portalType === 'LADIES') {
+    if (selectedVolunteer) {
+      if (portalType === 'SUPERADMIN') {
         setPortalType(null);
-        setSelectedGroup(null);
+        setSelectedVolunteer(null);
       } else {
-        setSelectedGroup(null);
+        setSelectedVolunteer(null);
       }
+    } else if (selectedGroup) {
+      setSelectedGroup(null);
     } else {
       setPortalType(null);
     }
@@ -152,6 +168,10 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-3xl">📁</div>
                 <div className="text-left"><h3 className="text-xl font-black text-slate-800">Back Office</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Management Portal</p></div>
               </button>
+              <button onClick={() => handlePortalSelect('SUPERADMIN')} className="group bg-white p-6 rounded-[2rem] border-2 border-red-100 hover:border-red-500 transition-all flex items-center gap-6 active:scale-95">
+                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-3xl">🔑</div>
+                <div className="text-left"><h3 className="text-xl font-black text-slate-800">Super Admin</h3><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Master Portal</p></div>
+              </button>
               <button onClick={onShowNotice} className="relative group bg-emerald-600 p-6 rounded-[2rem] border-2 border-emerald-500 hover:bg-emerald-700 transition-all flex items-center gap-6 active:scale-95 text-white">
                 {latestNotice && (Date.now() - latestNotice.timestamp < 3 * 24 * 60 * 60 * 1000) && (
                   <div className="absolute -top-4 -right-4 bg-white text-emerald-600 px-4 py-2 rounded-full text-[10px] font-black flex items-center gap-1.5 shadow-[0_0_20px_rgba(16,185,129,0.5)] animate-blink border-[3px] border-emerald-400 z-10 scale-110">
@@ -174,7 +194,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               </button>
             </div>
           </div>
-        ) : (portalType === 'GENTS' || portalType === 'LADIES') && !selectedGroup ? (
+        ) : (portalType === 'GENTS' || portalType === 'LADIES' || portalType === 'BACKOFFICE') && !selectedGroup ? (
           <div className="animate-in fade-in slide-in-from-right-4">
             <div className="flex items-center gap-4 mb-8">
               <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
@@ -183,9 +203,19 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               <h2 className="text-2xl font-black text-slate-900">Select Group</h2>
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {(portalType === 'GENTS' ? GENTS_GROUPS : LADIES_GROUPS).map(group => (
-                <button key={group} onClick={() => handleGroupSelect(group)} className={`w-full bg-white p-5 rounded-2xl border-2 transition-all text-left font-black active:scale-95 ${portalType === 'LADIES' ? 'border-pink-50 hover:border-pink-500 text-pink-700' : 'border-slate-100 hover:border-indigo-500 text-slate-700'}`}>{group} Group</button>
-              ))}
+              {portalType === 'BACKOFFICE' ? (
+                ['HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'].map(group => (
+                  <button key={group} onClick={() => handleGroupSelect(group)} className="w-full bg-white p-5 rounded-2xl border-2 border-slate-100 hover:border-slate-800 text-slate-700 transition-all text-left font-black active:scale-95">
+                    {group}
+                  </button>
+                ))
+              ) : (
+                (portalType === 'GENTS' ? GENTS_GROUPS : LADIES_GROUPS)
+                  .filter(group => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(group))
+                  .map(group => (
+                    <button key={group} onClick={() => handleGroupSelect(group)} className={`w-full bg-white p-5 rounded-2xl border-2 transition-all text-left font-black active:scale-95 ${portalType === 'LADIES' ? 'border-pink-50 hover:border-pink-500 text-pink-700' : 'border-slate-100 hover:border-indigo-500 text-slate-700'}`}>{group} Group</button>
+                  ))
+              )}
             </div>
           </div>
         ) : (
@@ -197,7 +227,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               <div>
                 <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
                 <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
-                  {portalType === 'BACKOFFICE' ? 'Management' : `${selectedGroup} Assignment`}
+                  {portalType === 'SUPERADMIN' ? 'Master Admin' : `${selectedGroup} Assignment`}
                 </p>
               </div>
             </div>

@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession, Notice } from '../types';
-import { VOLUNTEERS } from '../constants';
+import { VOLUNTEERS, GENTS_GROUPS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
@@ -1108,7 +1108,7 @@ const Dashboard: React.FC<Props> = ({
                   onChange={e => setSessionFilterGroup(e.target.value)}
                 >
                   <option value="All">All Groups</option>
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(g => (
+                  {GENTS_GROUPS.map(g => (
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>

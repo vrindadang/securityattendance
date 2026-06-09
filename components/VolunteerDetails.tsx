@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Sewadar, Volunteer, SewadarDetails } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { GENTS_GROUPS } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -17,6 +18,7 @@ interface Props {
 const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar, onEditSewadar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
+  const canManageBothGenders = isSuperAdmin || activeVolunteer.role === 'Back Office Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
   const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '' });
   const [isSaving, setIsSaving] = useState(false);
@@ -25,7 +27,12 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
     return sewadars.filter(s => {
       const isSuperAdmin = activeVolunteer.role === 'Super Admin';
       const isLadies = activeVolunteer.role.includes('Ladies');
-      const matchGroup = isSuperAdmin || isLadies || s.group === activeVolunteer.assignedGroup;
+      const assignedLower = activeVolunteer.assignedGroup?.toLowerCase() || '';
+      const sGroupLower = s.group.toLowerCase();
+      const matchGroup = isSuperAdmin || isLadies || 
+        sGroupLower === assignedLower || 
+        sGroupLower === `ladies-${assignedLower}` || 
+        sGroupLower.includes(assignedLower);
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchGroup && matchSearch;
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -81,12 +88,11 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
 
   const visibleDaysToDownload = useMemo(() => {
     if (activeVolunteer.role === 'Super Admin' || activeVolunteer.assignedGroup === 'Ladies') {
-      return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return GENTS_GROUPS;
     }
     const assigned = activeVolunteer.assignedGroup;
     if (assigned) {
-      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const matched = days.filter(d => assigned.toLowerCase().includes(d.toLowerCase()));
+      const matched = GENTS_GROUPS.filter(g => assigned.toLowerCase() === g.toLowerCase() || assigned.toLowerCase().includes(g.toLowerCase()));
       if (matched.length > 0) {
         return matched;
       }
@@ -280,7 +286,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                     >
                       <div>
                         <p className="text-xs font-black tracking-tight text-slate-100">{day}</p>
-                        {isSuperAdmin ? (
+                        {canManageBothGenders ? (
                           <p className="text-[7.5px] font-bold text-indigo-300 uppercase mt-0.5 leading-none">
                             {countGents} Gents | {countLadies} Ladies
                           </p>
@@ -291,7 +297,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                         )}
                       </div>
                       
-                      {isSuperAdmin ? (
+                      {canManageBothGenders ? (
                         <div className="flex gap-1 mt-2.5">
                           <button
                             onClick={() => handleDownloadGroupPDF(day, 'Gents')}

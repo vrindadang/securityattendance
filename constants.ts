@@ -1,12 +1,14 @@
 
-import { Sewadar, DutyGroup, Volunteer } from './types';
+import { Sewadar, DutyGroup, Volunteer, SewadarDetails } from './types';
 
 export const GENTS_GROUPS: DutyGroup[] = [
-  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  'HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'
 ];
 
 export const LADIES_GROUPS: DutyGroup[] = [
-  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  'HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'
 ];
 
 export const LOCATIONS_LIST = [
@@ -279,11 +281,17 @@ const LADIES_GROUP_INCHARGES: Record<string, string[]> = {
 
 const generateVolunteers = (): Volunteer[] => {
   const vols: Volunteer[] = [];
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Ladies'];
+  
   GENTS_GROUPS.forEach(day => {
     const inchargeNames = GROUP_INCHARGES[day] || [`${day} Incharge 1`, `${day} Incharge 2`, `${day} Incharge 3`];
+    const prefix = days.includes(day) 
+      ? day.toLowerCase().substring(0, 3) 
+      : day.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+      
     inchargeNames.forEach((name, i) => {
       vols.push({
-        id: `v_${day.toLowerCase().substring(0, 3)}_${i + 1}`,
+        id: `v_${prefix}_${i + 1}`,
         name: name,
         role: 'Gents Admin',
         password: '111',
@@ -294,9 +302,13 @@ const generateVolunteers = (): Volunteer[] => {
   
   LADIES_GROUPS.forEach(day => {
     const inchargeNames = LADIES_GROUP_INCHARGES[day] || [`Ladies ${day} Incharge 1`];
+    const prefix = days.includes(day) 
+      ? day.toLowerCase().substring(0, 3) 
+      : day.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+      
     inchargeNames.forEach((name, i) => {
       vols.push({
-        id: `v_ladies_${day.toLowerCase().substring(0, 3)}_${i + 1}`,
+        id: `v_ladies_${prefix}_${i + 1}`,
         name: name,
         role: 'Ladies Admin',
         password: '222',
@@ -315,6 +327,7 @@ const generateVolunteers = (): Volunteer[] => {
   });
 
   vols.push({ id: 'sa', name: 'Super Admin', role: 'Super Admin', password: '000' });
+  vols.push({ id: 'admin', name: 'Admin', role: 'Super Admin', password: '123' });
   return vols;
 };
 
@@ -392,7 +405,190 @@ const generateInitialSewadars = (): Sewadar[] => {
   LADIES_LIST.forEach((name, i) => {
     sewadars.push({ id: `L-Ladies-${i}`, name: name, gender: 'Ladies', group: 'Ladies' });
   });
+
+  // Back Office Departments
+  HR_DEPARTMENT_SEWADARS.forEach((s, i) => {
+    sewadars.push({ id: `BO-HR-${i}`, name: s.name, gender: s.gender, group: 'HR Department' });
+  });
+  LOST_AND_FOUND_SEWADARS.forEach((s, i) => {
+    sewadars.push({ id: `BO-LF-${i}`, name: s.name, gender: s.gender, group: 'Lost and Found' });
+  });
+  PR_DEPARTMENT_SEWADARS.forEach((s, i) => {
+    sewadars.push({ id: `BO-PR-${i}`, name: s.name, gender: s.gender, group: 'PR Department' });
+  });
+  LANGAR_DEPARTMENT_SEWADARS.forEach((s, i) => {
+    sewadars.push({ id: `BO-LD-${i}`, name: s.name, gender: s.gender, group: 'Langar Department' });
+  });
+  CCTV_VISION_TEAM_SEWADARS.forEach((s, i) => {
+    sewadars.push({ id: `BO-CV-${i}`, name: s.name, gender: s.gender, group: 'CCTV Vision Team' });
+  });
+  CCTV_MAINTENANCE_SEWADARS.forEach((s, i) => {
+    sewadars.push({ id: `BO-CM-${i}`, name: s.name, gender: s.gender, group: 'CCTV Maintenance' });
+  });
+
   return sewadars;
 };
 
+interface RawDetail {
+  name: string;
+  phone: string;
+  dob?: string;
+}
+
+interface RawSewadar {
+  name: string;
+  gender: 'Gents' | 'Ladies';
+}
+
+const HR_DEPARTMENT_RAW: RawDetail[] = [
+  { name: "Aastha", phone: "9911056336", dob: "1985-07-09" },
+  { name: "Karuna", phone: "8630035012", dob: "1987-03-10" },
+  { name: "Neha", phone: "8076281164", dob: "1975-05-09" },
+  { name: "Sonal Gaba", phone: "7015643384", dob: "1975-05-06" }
+];
+
+const LOST_AND_FOUND_RAW: RawDetail[] = [
+  { name: "Gurdas Kalucha", phone: "991013663" },
+  { name: "Prem Kalucha", phone: "9315290633" },
+  { name: "Vinod Gaba", phone: "9250318917" }
+];
+
+const PR_DEPARTMENT_RAW: RawDetail[] = [
+  { name: "Astha Gaba", phone: "9911056336" },
+  { name: "Karuna", phone: "8630035012" },
+  { name: "Rekha Jangra", phone: "9971346781" }
+];
+
+const LANGAR_DEPARTMENT_RAW: RawDetail[] = [
+  { name: "Devesh", phone: "9268761510" },
+  { name: "Rekha", phone: "9971346781" },
+  { name: "Tanish", phone: "8076078080" }
+];
+
+const CCTV_VISION_TEAM_RAW: RawDetail[] = [
+  { name: "Aman Ahuja", phone: "7982069243" },
+  { name: "Aneesha", phone: "9996992313" },
+  { name: "Ankur", phone: "7060116665" },
+  { name: "Arun", phone: "9990603117" },
+  { name: "Arushi Malhotra", phone: "8459343372" },
+  { name: "Bharti", phone: "9818198952" },
+  { name: "Chandan", phone: "7322957609" },
+  { name: "Garima", phone: "7988697504" },
+  { name: "Gitesh", phone: "8800431669" },
+  { name: "Kamiya", phone: "9873022151" },
+  { name: "Kuldeep", phone: "9990803480" },
+  { name: "Lakshay", phone: "8700891382" },
+  { name: "Meera", phone: "9891120340" },
+  { name: "Nipun", phone: "9205291008" },
+  { name: "Parvati", phone: "8588809815" },
+  { name: "Pency", phone: "9996169757" },
+  { name: "Piyush", phone: "7404205154" },
+  { name: "Prahbjot", phone: "9877129970" },
+  { name: "Ravinder", phone: "9315449243" },
+  { name: "Sumit Bhatia", phone: "8527950443" },
+  { name: "Yogita", phone: "8527461433" }
+];
+
+const CCTV_MAINTENANCE_RAW: RawDetail[] = [
+  { name: "Arun", phone: "9355520022" },
+  { name: "Gagan Arora", phone: "9958791791" },
+  { name: "Manish", phone: "9876151831" },
+  { name: "Naresh", phone: "6367924328" },
+  { name: "Ramesh Chawla", phone: "9996092274" },
+  { name: "Sachin", phone: "9996060550" },
+  { name: "Sahil", phone: "7827530356" },
+  { name: "Sitaram", phone: "8130485736" },
+  { name: "Sunil", phone: "9953350947" },
+  { name: "Sunny", phone: "8570891415" },
+  { name: "Sushil", phone: "9017222930" },
+  { name: "Vikram Saini", phone: "9212718904" },
+  { name: "Vinod", phone: "9215552877" }
+];
+
+const HR_DEPARTMENT_SEWADARS: RawSewadar[] = [
+  { name: "Aastha", gender: "Ladies" },
+  { name: "Karuna", gender: "Ladies" },
+  { name: "Neha", gender: "Ladies" },
+  { name: "Sonal Gaba", gender: "Ladies" }
+];
+
+const LOST_AND_FOUND_SEWADARS: RawSewadar[] = [
+  { name: "Gurdas Kalucha", gender: "Gents" },
+  { name: "Prem Kalucha", gender: "Gents" },
+  { name: "Vinod Gaba", gender: "Gents" }
+];
+
+const PR_DEPARTMENT_SEWADARS: RawSewadar[] = [
+  { name: "Astha Gaba", gender: "Ladies" },
+  { name: "Karuna", gender: "Ladies" },
+  { name: "Rekha Jangra", gender: "Ladies" }
+];
+
+const LANGAR_DEPARTMENT_SEWADARS: RawSewadar[] = [
+  { name: "Devesh", gender: "Gents" },
+  { name: "Rekha", gender: "Ladies" },
+  { name: "Tanish", gender: "Gents" }
+];
+
+const CCTV_VISION_TEAM_SEWADARS: RawSewadar[] = [
+  { name: "Aman Ahuja", gender: "Gents" },
+  { name: "Aneesha", gender: "Ladies" },
+  { name: "Ankur", gender: "Gents" },
+  { name: "Arun", gender: "Gents" },
+  { name: "Arushi Malhotra", gender: "Ladies" },
+  { name: "Bharti", gender: "Ladies" },
+  { name: "Chandan", gender: "Gents" },
+  { name: "Garima", gender: "Ladies" },
+  { name: "Gitesh", gender: "Gents" },
+  { name: "Kamiya", gender: "Ladies" },
+  { name: "Kuldeep", gender: "Gents" },
+  { name: "Lakshay", gender: "Gents" },
+  { name: "Meera", gender: "Ladies" },
+  { name: "Nipun", gender: "Gents" },
+  { name: "Parvati", gender: "Ladies" },
+  { name: "Pency", gender: "Ladies" },
+  { name: "Piyush", gender: "Gents" },
+  { name: "Prahbjot", gender: "Gents" },
+  { name: "Ravinder", gender: "Gents" },
+  { name: "Sumit Bhatia", gender: "Gents" },
+  { name: "Yogita", gender: "Ladies" }
+];
+
+const CCTV_MAINTENANCE_SEWADARS: RawSewadar[] = [
+  { name: "Arun", gender: "Gents" },
+  { name: "Gagan Arora", gender: "Gents" },
+  { name: "Manish", gender: "Gents" },
+  { name: "Naresh", gender: "Gents" },
+  { name: "Ramesh Chawla", gender: "Gents" },
+  { name: "Sachin", gender: "Gents" },
+  { name: "Sahil", gender: "Gents" },
+  { name: "Sitaram", gender: "Gents" },
+  { name: "Sunil", gender: "Gents" },
+  { name: "Sunny", gender: "Gents" },
+  { name: "Sushil", gender: "Gents" },
+  { name: "Vikram Saini", gender: "Gents" },
+  { name: "Vinod", gender: "Gents" }
+];
+
 export const INITIAL_SEWADARS = generateInitialSewadars();
+
+export const INITIAL_SEWADAR_DETAILS: Record<string, SewadarDetails> = {};
+
+HR_DEPARTMENT_RAW.forEach((r, i) => {
+  INITIAL_SEWADAR_DETAILS[`BO-HR-${i}`] = { sewadar_id: `BO-HR-${i}`, address: '', dob: r.dob || '', phone: r.phone };
+});
+LOST_AND_FOUND_RAW.forEach((r, i) => {
+  INITIAL_SEWADAR_DETAILS[`BO-LF-${i}`] = { sewadar_id: `BO-LF-${i}`, address: '', dob: r.dob || '', phone: r.phone };
+});
+PR_DEPARTMENT_RAW.forEach((r, i) => {
+  INITIAL_SEWADAR_DETAILS[`BO-PR-${i}`] = { sewadar_id: `BO-PR-${i}`, address: '', dob: r.dob || '', phone: r.phone };
+});
+LANGAR_DEPARTMENT_RAW.forEach((r, i) => {
+  INITIAL_SEWADAR_DETAILS[`BO-LD-${i}`] = { sewadar_id: `BO-LD-${i}`, address: '', dob: r.dob || '', phone: r.phone };
+});
+CCTV_VISION_TEAM_RAW.forEach((r, i) => {
+  INITIAL_SEWADAR_DETAILS[`BO-CV-${i}`] = { sewadar_id: `BO-CV-${i}`, address: '', dob: r.dob || '', phone: r.phone };
+});
+CCTV_MAINTENANCE_RAW.forEach((r, i) => {
+  INITIAL_SEWADAR_DETAILS[`BO-CM-${i}`] = { sewadar_id: `BO-CM-${i}`, address: '', dob: r.dob || '', phone: r.phone };
+});

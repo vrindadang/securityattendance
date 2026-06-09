@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto, DutySession, FlaggedVehicle, Notice } from './types';
-import { INITIAL_SEWADARS, LOCATIONS_LIST } from './constants';
+import { INITIAL_SEWADARS, LOCATIONS_LIST, INITIAL_SEWADAR_DETAILS } from './constants';
 import AttendanceManager from './components/AttendanceManager';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
@@ -44,7 +44,7 @@ const App: React.FC = () => {
 
   const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
   const [deletedSewadarIds, setDeletedSewadarIds] = useState<Set<string>>(new Set());
-  const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>({});
+  const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>(INITIAL_SEWADAR_DETAILS);
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
@@ -94,6 +94,11 @@ const App: React.FC = () => {
       if (isDeleted && !isMarked) return false;
       
       if (activeVolunteer.role === 'Super Admin') return true;
+      
+      if (activeVolunteer.role === 'Back Office Admin') {
+        const matchGroup = !assignedGroup || s.group === assignedGroup;
+        return matchGroup || isMarked;
+      }
       
       const matchGender = isLadies ? s.gender === 'Ladies' : s.gender === 'Gents';
       const matchGroup = !assignedGroup || s.group === assignedGroup;
@@ -331,8 +336,8 @@ const App: React.FC = () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'sewadar_details'));
       const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      const map: Record<string, SewadarDetails> = { ...INITIAL_SEWADAR_DETAILS };
       if (data) {
-        const map: Record<string, SewadarDetails> = {};
         data.forEach((d: any) => {
           map[d.sewadar_id] = {
             sewadar_id: d.sewadar_id,
@@ -341,10 +346,11 @@ const App: React.FC = () => {
             phone: d.phone || ''
           };
         });
-        setSewadarDetailsMap(map);
       }
+      setSewadarDetailsMap(map);
     } catch (err) {
       console.error("Fetch Details Error:", err);
+      setSewadarDetailsMap({ ...INITIAL_SEWADAR_DETAILS });
     }
   }, []);
 
