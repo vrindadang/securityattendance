@@ -104,7 +104,10 @@ const AttendanceManager: React.FC<Props> = ({
   const normalizedSessionDate = useMemo(() => normalizeDate(sessionDate), [sessionDate]);
 
   const isGentsSaturday = useMemo(() => {
-    return !activeVolunteer.role.includes('Ladies') && sessionGroup === 'Saturday';
+    const isSaturdayGroup = sessionGroup === 'Saturday';
+    const isGentsSaturdayVolunteer = activeVolunteer.role === 'Gents Admin' && activeVolunteer.assignedGroup === 'Saturday';
+    const isSuperAdmin = activeVolunteer.role === 'Super Admin';
+    return isSaturdayGroup && (isGentsSaturdayVolunteer || isSuperAdmin);
   }, [activeVolunteer, sessionGroup]);
 
   const filtered = useMemo(() => {

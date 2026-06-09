@@ -12,10 +12,20 @@ interface Props {
   latestNotice?: Notice | null;
 }
 
+const DEPARTMENT_PASSWORDS: Record<string, string> = {
+  'HR Department': 'hr123',
+  'Lost and Found': 'lofo123',
+  'PR Department': 'pr123',
+  'Langar Department': 'lan123',
+  'CCTV Vision Team': 'ccv123',
+  'CCTV Maintenance': 'ccm123',
+};
+
 type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | 'SUPERADMIN' | null;
 
 const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, latestNotice }) => {
   const [portalType, setPortalType] = useState<PortalType>(null);
+  const [backOfficeAuthorized, setBackOfficeAuthorized] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<DutyGroup | null>(null);
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [password, setPassword] = useState('');
@@ -29,6 +39,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
 
   const handlePortalSelect = (type: PortalType) => {
     setPortalType(type);
+    setBackOfficeAuthorized(false);
     if (type === 'SUPERADMIN') {
       setSelectedGroup(null);
       const sa = VOLUNTEERS.find(v => v.id === 'sa');
@@ -62,6 +73,42 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (portalType === 'BACKOFFICE') {
+      if (!backOfficeAuthorized) {
+        if (password === '123') {
+          setBackOfficeAuthorized(true);
+          setPassword('');
+          setError('');
+        } else {
+          setError('Incorrect password.');
+        }
+        return;
+      }
+
+      if (selectedGroup) {
+        const expected = DEPARTMENT_PASSWORDS[selectedGroup];
+        if (expected && password === expected) {
+          const adminVol = VOLUNTEERS.find(v => v.id === 'admin') || {
+            id: 'admin',
+            name: 'Admin',
+            role: 'Back Office Admin',
+            password: '123'
+          };
+          onLogin({
+            ...adminVol,
+            name: `${selectedGroup} Admin`,
+            role: 'Back Office Admin',
+            assignedGroup: selectedGroup,
+            password: password
+          });
+        } else {
+          setError('Incorrect password.');
+        }
+        return;
+      }
+    }
+
     if (!selectedVolunteer) return;
 
     setIsAuthenticating(true);
@@ -88,16 +135,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
       const effectivePassword = data?.password || selectedVolunteer.password;
 
       if (password === effectivePassword) {
-        if (portalType === 'BACKOFFICE') {
-          onLogin({ 
-            ...selectedVolunteer, 
-            role: 'Back Office Admin', 
-            assignedGroup: selectedGroup || undefined,
-            password: effectivePassword 
-          });
-        } else {
-          onLogin({ ...selectedVolunteer, password: effectivePassword });
-        }
+        onLogin({ ...selectedVolunteer, password: effectivePassword });
       } else {
         // Fallback check for Super Admin PIN (original behavior)
         const superAdmin = VOLUNTEERS.find(v => v.id === 'sa');
@@ -109,15 +147,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
       }
     } catch (err) {
       if (password === selectedVolunteer.password) {
-        if (portalType === 'BACKOFFICE') {
-          onLogin({
-            ...selectedVolunteer,
-            role: 'Back Office Admin',
-            assignedGroup: selectedGroup || undefined
-          });
-        } else {
-          onLogin(selectedVolunteer);
-        }
+        onLogin(selectedVolunteer);
       } else {
         setError('Incorrect password.');
       }
@@ -127,7 +157,16 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
   };
 
   const goBackStep = () => {
-    if (selectedVolunteer) {
+    if (portalType === 'BACKOFFICE') {
+      if (selectedGroup) {
+        setSelectedGroup(null);
+        setSelectedVolunteer(null);
+      } else if (backOfficeAuthorized) {
+        setBackOfficeAuthorized(false);
+      } else {
+        setPortalType(null);
+      }
+    } else if (selectedVolunteer) {
       if (portalType === 'SUPERADMIN') {
         setPortalType(null);
         setSelectedVolunteer(null);
@@ -146,7 +185,8 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 font-sans">
       <div className="max-w-md w-full py-8">
-        {!portalType ? (
+        {/* 1. Main Portal Selection Screen */}
+        {!portalType && (
           <div className="animate-in fade-in slide-in-from-bottom-4">
             <div className="text-center mb-10">
               <div className="w-20 h-20 bg-indigo-900 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl">
@@ -194,7 +234,37 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               </button>
             </div>
           </div>
-        ) : (portalType === 'GENTS' || portalType === 'LADIES' || portalType === 'BACKOFFICE') && !selectedGroup ? (
+        )}
+
+        {/* 2. Back Office Stage 1 Password Authorization (Requires "123") */}
+        {portalType === 'BACKOFFICE' && !backOfficeAuthorized && (
+          <div className="animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              </button>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 leading-none">Management Access</h2>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                  Back Office Portal
+                </p>
+              </div>
+            </div>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Admin Password</label>
+                <input type="password" required className="w-full px-5 py-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-slate-800" placeholder="••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+              <button type="submit" className="w-full py-4 bg-slate-805 bg-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                Authorize
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 3. Group Selection Screen (Gents Groups, Ladies Groups, or Back Office Departments) */}
+        {portalType && (portalType !== 'SUPERADMIN' && (portalType !== 'BACKOFFICE' || backOfficeAuthorized)) && !selectedGroup && (
           <div className="animate-in fade-in slide-in-from-right-4">
             <div className="flex items-center gap-4 mb-8">
               <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
@@ -218,7 +288,37 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               )}
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* 4. Back Office Stage 2 Password Authorization (Department-specific) */}
+        {portalType === 'BACKOFFICE' && backOfficeAuthorized && selectedGroup && (
+          <div className="animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              </button>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
+                  {selectedGroup} Admin Login
+                </p>
+              </div>
+            </div>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pin / Password</label>
+                <input type="password" required className="w-full px-5 py-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500" placeholder="••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+              <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                Unlock Portal
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 5. Gents / Ladies / Super Admin Login Form */}
+        {portalType && portalType !== 'BACKOFFICE' && (portalType === 'SUPERADMIN' || selectedGroup) && (
           <div className="animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-4 mb-8">
               <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
