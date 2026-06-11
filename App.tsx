@@ -209,6 +209,19 @@ const App: React.FC = () => {
     endTime: '07:00'
   });
 
+  const isPermanentKirpalBagh = useMemo(() => {
+    if (!activeVolunteer) return false;
+    const targetGroup = activeVolunteer.role.includes('Ladies') 
+      ? `Ladies-${activeVolunteer.assignedGroup}` 
+      : (activeVolunteer.assignedGroup || 'Global');
+    return [
+      'HR Department',
+      'PR Department',
+      'Lost and Found',
+      'Langar Department'
+    ].includes(targetGroup);
+  }, [activeVolunteer]);
+
   useEffect(() => {
     if (showSettingsModal && activeVolunteer) {
       const sessionToLoad = activeView === 'Dashboard' ? dashboardSelectedSession : activeSession;
@@ -227,7 +240,7 @@ const App: React.FC = () => {
         };
 
         setConfigForm({
-          locations: sessionToLoad.location ? sessionToLoad.location.split(', ') : [],
+          locations: isPermanentKirpalBagh ? ['Kirpal Bagh'] : (sessionToLoad.location ? sessionToLoad.location.split(', ') : []),
           startDate: sessionToLoad.date || formatDate(start),
           startTime: formatTime(start),
           endDate: formatDate(end),
@@ -235,7 +248,7 @@ const App: React.FC = () => {
         });
       } else {
         setConfigForm({
-          locations: [],
+          locations: isPermanentKirpalBagh ? ['Kirpal Bagh'] : [],
           startDate: getLocalDate(),
           startTime: '07:00',
           endDate: getTomorrowDate(),
@@ -243,7 +256,7 @@ const App: React.FC = () => {
         });
       }
     }
-  }, [showSettingsModal, activeVolunteer, activeView, dashboardSelectedSession, activeSession]);
+  }, [showSettingsModal, activeVolunteer, activeView, dashboardSelectedSession, activeSession, isPermanentKirpalBagh]);
 
   const fetchSessions = useCallback(async (isInitial = false) => {
     if (!activeVolunteer) return;
@@ -1021,7 +1034,8 @@ const App: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (configForm.locations.length === 0) {
+    const finalLocations = isPermanentKirpalBagh ? ['Kirpal Bagh'] : configForm.locations;
+    if (finalLocations.length === 0) {
       alert("Please select at least one location.");
       return;
     }
@@ -1060,7 +1074,7 @@ const App: React.FC = () => {
 
       if (existing && existing.length > 0) {
         const payload = {
-          location: configForm.locations.join(', '),
+          location: finalLocations.join(', '),
           start_time: getISO(configForm.startDate, configForm.startTime),
           end_time: getISO(configForm.endDate, configForm.endTime),
         };
@@ -1078,7 +1092,7 @@ const App: React.FC = () => {
           id,
           date: Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0)), 
           group: groupName,
-          location: configForm.locations.join(', '),
+          location: finalLocations.join(', '),
           start_time: getISO(configForm.startDate, configForm.startTime),
           end_time: getISO(configForm.endDate, configForm.endTime),
           completed: false
@@ -1227,30 +1241,42 @@ const App: React.FC = () => {
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Location</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {LOCATIONS_LIST.map(loc => (
-                          <button
-                            key={loc}
-                            type="button"
-                            onClick={() => {
-                              setConfigForm(prev => {
-                                const exists = prev.locations.includes(loc);
-                                if (exists) {
-                                  return { ...prev, locations: prev.locations.filter(l => l !== loc) };
-                                } else {
-                                  return { ...prev, locations: [...prev.locations, loc] };
-                                }
-                              });
-                            }}
-                            className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
-                              configForm.locations.includes(loc)
-                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
-                                : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
-                            }`}
-                          >
-                            {loc}
-                          </button>
-                        ))}
+                        {LOCATIONS_LIST.filter(loc => !isPermanentKirpalBagh || loc === 'Kirpal Bagh').map(loc => {
+                          const isSelected = isPermanentKirpalBagh 
+                            ? loc === 'Kirpal Bagh' 
+                            : configForm.locations.includes(loc);
+
+                          return (
+                            <button
+                              key={loc}
+                              type="button"
+                              onClick={() => {
+                                if (isPermanentKirpalBagh) return;
+                                setConfigForm(prev => {
+                                  const exists = prev.locations.includes(loc);
+                                  if (exists) {
+                                    return { ...prev, locations: prev.locations.filter(l => l !== loc) };
+                                  } else {
+                                    return { ...prev, locations: [...prev.locations, loc] };
+                                  }
+                                });
+                              }}
+                              className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${isPermanentKirpalBagh ? 'col-span-2 w-full text-center' : ''} ${
+                                isSelected
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 font-bold'
+                                  : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
+                              }`}
+                            >
+                              {loc}
+                            </button>
+                          );
+                        })}
                       </div>
+                      {isPermanentKirpalBagh && (
+                        <p className="text-[9px] font-bold text-indigo-500 mt-1 ml-1 uppercase tracking-wider">
+                          * Location permanently locked to Kirpal Bagh for your department
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
