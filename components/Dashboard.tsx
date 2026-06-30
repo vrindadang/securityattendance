@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { generateGroupPerformanceReport, generateGentsRawDataReport } from './GroupReportPDFGenerator';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -34,7 +35,8 @@ interface Props {
   onResetAllData?: () => void;
   onUploadSecurityPhoto?: (photo: string) => void;
   notices?: Notice[];
-  onAddNotice?: (title: string, content: string, photo?: string) => void;
+  onAddNotice?: (title: string, content: string, photo?: string, pdf?: string) => void;
+  onUpdateNotice?: (id: string, title: string, content: string, photo?: string, pdf?: string) => void;
   onDeleteNotice?: (id: string) => void;
   onDeleteSession?: (id: string) => void;
 }
@@ -61,6 +63,7 @@ const Dashboard: React.FC<Props> = ({
   onUploadSecurityPhoto,
   notices = [],
   onAddNotice,
+  onUpdateNotice,
   onDeleteNotice,
   onDeleteSession
 }) => {
@@ -68,8 +71,45 @@ const Dashboard: React.FC<Props> = ({
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
   const [showReportConfirmModal, setShowReportConfirmModal] = useState(false);
   const [showNoticeForm, setShowNoticeForm] = useState(false);
-  const [newNotice, setNewNotice] = useState({ title: '', content: '', photo: '' });
+  const [newNotice, setNewNotice] = useState({ title: '', content: '', photo: '', pdf: '' });
+  const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null);
   const [downloadingMarchMay, setDownloadingMarchMay] = useState(false);
+  const [downloadingGroupPerformance, setDownloadingGroupPerformance] = useState<'Gents' | 'Ladies' | null>(null);
+  const [groupPerformanceProgress, setGroupPerformanceProgress] = useState('');
+  const [downloadingGentsRaw, setDownloadingGentsRaw] = useState(false);
+  const [gentsRawProgress, setGentsRawProgress] = useState('');
+
+  const handleDownloadGentsRaw = async () => {
+    if (downloadingGentsRaw) return;
+    try {
+      setDownloadingGentsRaw(true);
+      await generateGentsRawDataReport((msg) => {
+        setGentsRawProgress(msg);
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error generating Gents Raw Data Report: " + (err as any).message);
+    } finally {
+      setDownloadingGentsRaw(false);
+      setGentsRawProgress('');
+    }
+  };
+
+  const handleDownloadGroupPerformance = async (gender: 'Gents' | 'Ladies') => {
+    if (downloadingGroupPerformance) return;
+    try {
+      setDownloadingGroupPerformance(gender);
+      await generateGroupPerformanceReport(gender, (msg) => {
+        setGroupPerformanceProgress(msg);
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`Error generating ${gender} Group Performance Report: ` + (err as any).message);
+    } finally {
+      setDownloadingGroupPerformance(null);
+      setGroupPerformanceProgress('');
+    }
+  };
 
   const generateMarchMayReportPDF = async () => {
     if (downloadingMarchMay) return;
@@ -874,6 +914,64 @@ const Dashboard: React.FC<Props> = ({
         <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
       </div>
 
+      {/* Group Performance Report for Super Admin ONLY */}
+      {isSuperAdmin && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-teal-950 to-[#0c1f1b] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-emerald-500/15">
+            <div className="relative z-10 flex-1">
+              <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Super Admin Report</div>
+              <h3 className="text-xl font-black mb-1">Group Performance Reports</h3>
+              <p className="text-emerald-400 text-[11px] font-bold uppercase tracking-widest mb-2">Q2 Executive Evaluation (April & May 2026)</p>
+              <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
+                Consolidated operational report for security cohorts. Select below to evaluate gents or ladies participation indices, service commitment trends, quality benchmarks, and recognition laurels.
+              </p>
+              {groupPerformanceProgress && (
+                <p className="text-emerald-300 text-xs mt-3 animate-pulse font-mono">{groupPerformanceProgress}</p>
+              )}
+            </div>
+            <div className="relative z-10 flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <button 
+                onClick={() => handleDownloadGroupPerformance('Gents')} 
+                disabled={!!downloadingGroupPerformance}
+                className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingGroupPerformance ? 'bg-emerald-800 text-white/50 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+              >
+                {downloadingGroupPerformance === 'Gents' ? 'Processing Gents...' : 'Gents Performance Report'}
+              </button>
+              <button 
+                onClick={() => handleDownloadGroupPerformance('Ladies')} 
+                disabled={!!downloadingGroupPerformance}
+                className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingGroupPerformance ? 'bg-emerald-800 text-white/50 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-500 text-white'}`}
+              >
+                {downloadingGroupPerformance === 'Ladies' ? 'Processing Ladies...' : 'Ladies Performance Report'}
+              </button>
+            </div>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl"></div>
+          </div>
+
+          <div className="bg-gradient-to-r from-slate-900 to-slate-950 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-white/10">
+            <div className="relative z-10 flex-1">
+              <div className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Super Admin Raw Audit</div>
+              <h3 className="text-xl font-black mb-1">Gents Raw Group Data Report</h3>
+              <p className="text-blue-400 text-[11px] font-bold uppercase tracking-widest mb-2">April & May 2026 Raw Audit</p>
+              <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
+                Comparative metrics sheet of total registered sewadar names vs. unique marked active volunteers on a per-group and totality basis.
+              </p>
+              {gentsRawProgress && (
+                <p className="text-blue-300 text-xs mt-3 animate-pulse font-mono">{gentsRawProgress}</p>
+              )}
+            </div>
+            <button 
+              onClick={handleDownloadGentsRaw} 
+              disabled={downloadingGentsRaw}
+              className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap relative z-10 ${downloadingGentsRaw ? 'bg-blue-900 text-white/50 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+            >
+              {downloadingGentsRaw ? 'Processing Raw...' : 'Download Gents Raw Report'}
+            </button>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Total Present</p>
@@ -992,7 +1090,13 @@ const Dashboard: React.FC<Props> = ({
                 Manage Notices
               </h3>
               <button 
-                onClick={() => setShowNoticeForm(!showNoticeForm)}
+                onClick={() => {
+                  if (showNoticeForm) {
+                    setEditingNoticeId(null);
+                    setNewNotice({ title: '', content: '', photo: '', pdf: '' });
+                  }
+                  setShowNoticeForm(!showNoticeForm);
+                }}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
               >
                 {showNoticeForm ? 'Close Form' : '+ Add Notice'}
@@ -1037,17 +1141,65 @@ const Dashboard: React.FC<Props> = ({
                     className="w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white file:text-indigo-600 shadow-sm" 
                   />
                 </div>
-                <button 
-                  onClick={() => {
-                    if (!newNotice.title || !newNotice.content) return alert("Title and content are required.");
-                    onAddNotice?.(newNotice.title, newNotice.content, newNotice.photo);
-                    setNewNotice({ title: '', content: '', photo: '' });
-                    setShowNoticeForm(false);
-                  }}
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
-                >
-                  Post Notice
-                </button>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notice PDF (Optional)</label>
+                  <input 
+                    type="file" 
+                    accept="application/pdf" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setNewNotice(p => ({...p, pdf: reader.result as string}));
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white file:text-indigo-600 shadow-sm" 
+                  />
+                  {newNotice.pdf && (
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
+                      <span>📄 PDF Loaded Successfully</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setNewNotice(p => ({...p, pdf: ''}))}
+                        className="text-red-500 hover:underline capitalize"
+                      >
+                        (Remove)
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  {editingNoticeId && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setEditingNoticeId(null);
+                        setNewNotice({ title: '', content: '', photo: '', pdf: '' });
+                        setShowNoticeForm(false);
+                      }}
+                      className="flex-1 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all active:scale-95"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      if (!newNotice.title || !newNotice.content) return alert("Title and content are required.");
+                      if (editingNoticeId) {
+                        onUpdateNotice?.(editingNoticeId, newNotice.title, newNotice.content, newNotice.photo, newNotice.pdf);
+                      } else {
+                        onAddNotice?.(newNotice.title, newNotice.content, newNotice.photo, newNotice.pdf);
+                      }
+                      setEditingNoticeId(null);
+                      setNewNotice({ title: '', content: '', photo: '', pdf: '' });
+                      setShowNoticeForm(false);
+                    }}
+                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                  >
+                    {editingNoticeId ? 'Update Notice' : 'Post Notice'}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1055,24 +1207,52 @@ const Dashboard: React.FC<Props> = ({
               {notices.map(notice => (
                 <div key={notice.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    {notice.photo && (
+                    {notice.photo ? (
                       <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0">
                         <img src={notice.photo} className="w-full h-full object-cover" />
                       </div>
-                    )}
+                    ) : notice.pdf ? (
+                      <div className="w-12 h-12 rounded-xl bg-red-50 border-2 border-red-100 shadow-sm shrink-0 flex flex-col items-center justify-center text-red-500 text-[10px] font-black uppercase tracking-tighter">
+                        <span>PDF</span>
+                      </div>
+                    ) : null}
                     <div>
-                      <h4 className="font-black text-slate-900 text-sm">{notice.title}</h4>
+                      <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
+                        {notice.title}
+                        {notice.pdf && <span className="bg-emerald-100 text-emerald-800 text-[8px] font-black uppercase px-1.5 py-0.5 rounded">📄 PDF</span>}
+                      </h4>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                         {new Date(notice.timestamp).toLocaleDateString()} • {notice.authorName}
                       </p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => onDeleteNotice?.(notice.id)}
-                    className="p-2 text-red-400 hover:text-red-600 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button 
+                      onClick={() => {
+                        setEditingNoticeId(notice.id);
+                        setNewNotice({
+                          title: notice.title,
+                          content: notice.content,
+                          photo: notice.photo || '',
+                          pdf: notice.pdf || ''
+                        });
+                        setShowNoticeForm(true);
+                      }}
+                      className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                      title="Edit notice"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => onDeleteNotice?.(notice.id)}
+                      className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                      title="Delete notice"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
                 </div>
               ))}
               {notices.length === 0 && (

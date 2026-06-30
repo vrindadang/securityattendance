@@ -119,6 +119,7 @@ export interface Notice {
   title: string;
   content: string;
   photo?: string;
+  pdf?: string;
   timestamp: number;
   authorName: string;
 }

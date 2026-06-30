@@ -428,13 +428,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddNotice = async (title: string, content: string, photo?: string) => {
+  const handleAddNotice = async (title: string, content: string, photo?: string, pdf?: string) => {
     if (!activeVolunteer) return;
     try {
       const newNotice = {
         title,
         content,
         photo: photo || '',
+        pdf: pdf || '',
         timestamp: Date.now(),
         authorName: activeVolunteer.name
       };
@@ -452,6 +453,23 @@ const App: React.FC = () => {
       await deleteDoc(doc(db, 'notices', id));
     } catch (err) {
       console.error("Delete Notice Error:", err);
+    }
+  };
+
+  const handleUpdateNotice = async (id: string, title: string, content: string, photo?: string, pdf?: string) => {
+    if (!activeVolunteer || activeVolunteer.role !== 'Super Admin') return;
+    try {
+      const noticeRef = doc(db, 'notices', id);
+      await updateDoc(noticeRef, {
+        title,
+        content,
+        photo: photo || '',
+        pdf: pdf || '',
+        timestamp: Date.now()
+      });
+    } catch (err) {
+      console.error("Update Notice Error:", err);
+      alert("Failed to update notice.");
     }
   };
 
@@ -1385,6 +1403,7 @@ const App: React.FC = () => {
             onResetAllData={handleResetAllData} 
             notices={notices}
             onAddNotice={handleAddNotice}
+            onUpdateNotice={handleUpdateNotice}
             onDeleteNotice={handleDeleteNotice}
             onDeleteSession={handleDeleteSession}
           />

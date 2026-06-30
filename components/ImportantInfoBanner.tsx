@@ -51,11 +51,11 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 no-scrollbar">
+             <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 no-scrollbar">
               {notices.length > 0 ? (
                 notices.map((notice, idx) => (
                   <div key={notice.id} className={`flex flex-col md:flex-row gap-8 items-start ${idx !== 0 ? 'pt-8 border-t border-slate-300' : ''}`}>
-                    {notice.photo && (
+                    {notice.photo ? (
                       <div className="w-full md:w-48 shrink-0">
                         <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-xl">
                           <img 
@@ -66,7 +66,27 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
                           />
                         </div>
                       </div>
-                    )}
+                    ) : notice.pdf ? (
+                      <div className="w-full md:w-48 shrink-0">
+                        <a 
+                          href={notice.pdf} 
+                          download={`${notice.title.replace(/[^a-zA-Z0-9]/g, '_')}_document.pdf`}
+                          className="block aspect-[3/4] bg-red-50 hover:bg-red-100 rounded-2xl overflow-hidden border-4 border-red-200 shadow-xl relative transition-all group active:scale-95 cursor-pointer"
+                          title="Click to download PDF"
+                        >
+                          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center space-y-3">
+                            <svg className="w-12 h-12 text-red-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h1.5m1 0H13m-3 4h3m-6-4h.01M9 17h6" />
+                            </svg>
+                            <span className="text-[10px] font-black text-red-700 tracking-wider uppercase">PDF DOCUMENT</span>
+                            <span className="text-[9px] font-black text-red-500 bg-red-100 px-2 py-0.5 rounded-full group-hover:bg-red-200 transition-colors">
+                              Download
+                            </span>
+                          </div>
+                        </a>
+                      </div>
+                    ) : null}
                     
                     <div className="flex-1 space-y-4">
                       <div className="flex items-center justify-between">
@@ -81,6 +101,22 @@ const ImportantInfoBanner: React.FC<Props> = ({ photo, externalShowModal, onOpen
                       <div className="text-slate-600 leading-relaxed font-medium text-base whitespace-pre-wrap">
                         {notice.content}
                       </div>
+
+                      {notice.pdf && (
+                        <div className="pt-1">
+                          <a 
+                            href={notice.pdf} 
+                            download={`${notice.title.replace(/[^a-zA-Z0-9]/g, '_')}_document.pdf`}
+                            className="inline-flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 px-4 py-2 rounded-xl border border-emerald-200 font-bold text-xs transition-colors shadow-sm cursor-pointer"
+                          >
+                            <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download PDF Attachment
+                          </a>
+                        </div>
+                      )}
+
                       <div className="pt-4 flex items-center gap-2">
                         <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs">👤</div>
                         <div>
