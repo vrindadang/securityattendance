@@ -1347,3 +1347,325 @@ export const generateGentsRawDataReport = async (setProgress: (msg: string) => v
     throw err;
   }
 };
+
+export const generateMultipleGroupOverlapReport = async (setProgress: (msg: string) => void) => {
+  try {
+    setProgress("Fetching Gents attendance records...");
+
+    const q = query(
+      collection(db, 'attendance'),
+      where('gender', '==', 'Gents')
+    );
+    const attSnap = await getDocs(q);
+    const rawAttendance = attSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+
+    setProgress(`Fetched ${rawAttendance.length} records. Fetching custom roster...`);
+
+    const customSnapshot = await getDocs(collection(db, 'custom_sewadars'));
+    const customSewadars = customSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as any);
+
+    setProgress("Compiling roster and active service cohorts...");
+
+    const mergedRoster = [...INITIAL_SEWADARS];
+    customSewadars.forEach(cs => {
+      if (!mergedRoster.some(r => r.id === String(cs.id))) {
+        mergedRoster.push({
+          id: String(cs.id),
+          name: cs.name,
+          gender: cs.gender,
+          group: cs.group,
+          isCustom: true
+        } as any);
+      }
+    });
+
+    // Daily groups list
+    const coreGroups = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    // Helper to clean group names
+    const cleanGroup = (g: string): string => {
+      if (!g) return '';
+      let cleaned = g.replace(' Gents', '').replace('Ladies-', '').replace(' Ladies', '').trim();
+      return cleaned;
+    };
+
+    // Sewadar profile map
+    const sewadarProfiles: Record<string, { cleanName: string; homeGroup: string; attendedGroups: Set<string> }> = {};
+
+    // 1. Populate from merged Gents roster
+    mergedRoster.forEach(s => {
+      if (s.gender === 'Gents') {
+        const norm = normalizeName(s.name);
+        if (!norm) return;
+        const hGroup = cleanGroup(s.group);
+        if (!sewadarProfiles[norm]) {
+          sewadarProfiles[norm] = {
+            cleanName: s.name.replace(/\s*[Jj][Ii]\b/g, '').trim(),
+            homeGroup: hGroup,
+            attendedGroups: new Set<string>()
+          };
+        } else if (hGroup) {
+          sewadarProfiles[norm].homeGroup = hGroup;
+        }
+      }
+    });
+
+    // 2. Populate from recorded attendance
+    rawAttendance.forEach(r => {
+      const name = r.name || r.sewadarName || '';
+      const gender = r.gender || 'Gents';
+      const rawGroup = r.group || '';
+
+      if (!name || gender !== 'Gents') return;
+
+      const normName = normalizeName(name);
+      const attGroupClean = cleanGroup(rawGroup);
+      if (!attGroupClean) return;
+
+      let profile = sewadarProfiles[normName];
+      if (!profile) {
+        profile = {
+          cleanName: name.replace(/\s*[Jj][Ii]\b/g, '').trim(),
+          homeGroup: '',
+          attendedGroups: new Set<string>()
+        };
+        sewadarProfiles[normName] = profile;
+      }
+      profile.attendedGroups.add(attGroupClean);
+    });
+
+    setProgress("Calculating overlap intersections...");
+
+    // Build sets of sewadars who attended each core day-group
+    const groupAttendedNames: Record<string, Set<string>> = {};
+    coreGroups.forEach(g => {
+      groupAttendedNames[g] = new Set<string>();
+    });
+
+    Object.entries(sewadarProfiles).forEach(([norm, profile]) => {
+      profile.attendedGroups.forEach(g => {
+        if (coreGroups.includes(g)) {
+          groupAttendedNames[g].add(norm);
+        }
+      });
+    });
+
+    // Initialize PDF
+    const doc = new jsPDF('p', 'mm', 'a4');
+    let currentY = 15;
+
+    // Header Blessing lines
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8.5);
+    doc.setTextColor(110, 110, 110);
+    doc.text("With the blessings of H.H. Sant Rajinder Singh Ji Maharaj", 14, currentY);
+
+    currentY += 12;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(40, 50, 110);
+    doc.text("SKRM Security - Multiple Group Overlap Report", 14, currentY);
+
+    currentY += 7;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "normal");
+    doc.text("Crossover Participation & Active Common Sewadars Analysis (All Historical Data)", 14, currentY);
+
+    currentY += 4;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(14, currentY, 196, currentY);
+
+    currentY += 10;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 40, 80);
+    doc.text("1. Gents Active Overlap Intersection Matrix", 14, currentY);
+
+    currentY += 5;
+    doc.setFontSize(9.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text("This grid displays the count of active sewadars who have attendance marked in BOTH groups.", 14, currentY);
+
+    currentY += 6;
+
+    // Build table matrix
+    const matrixRows = coreGroups.map(g1 => {
+      const s1 = groupAttendedNames[g1];
+      const totalUniqueInG1 = s1.size;
+
+      const cellValues = coreGroups.map(g2 => {
+        if (g1 === g2) {
+          return `${totalUniqueInG1} (Active)`;
+        }
+        const s2 = groupAttendedNames[g2];
+        let overlapCount = 0;
+        s1.forEach(norm => {
+          if (s2.has(norm)) {
+            overlapCount++;
+          }
+        });
+        return overlapCount > 0 ? overlapCount.toString() : '-';
+      });
+
+      return [
+        `${g1} Group`,
+        ...cellValues,
+        totalUniqueInG1.toString()
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Group Name', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Total Unique']],
+      body: matrixRows,
+      headStyles: { fillColor: [40, 50, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+      columnStyles: {
+        0: { cellWidth: 32, fontStyle: 'bold' },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' },
+        6: { halign: 'center' },
+        7: { halign: 'center' },
+        8: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fillColor: [240, 243, 255] }
+      },
+      styles: { fontSize: 8, cellPadding: 2.5, valign: 'middle' },
+      theme: 'grid'
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 12;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 40, 80);
+    doc.text("2. Executive Analytics Summary", 14, currentY);
+
+    currentY += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+
+    // Calculate overall stats
+    const totalUniqueGents = Object.values(sewadarProfiles).filter(p => p.attendedGroups.size > 0).length;
+    const multiGroupGentsCount = Object.values(sewadarProfiles).filter(p => p.attendedGroups.size > 1).length;
+    const multiGroupGentsPct = totalUniqueGents > 0 ? (multiGroupGentsCount / totalUniqueGents) * 100 : 0;
+
+    const b1 = `- Total unique Gents who actively served in any group: ${totalUniqueGents}`;
+    const b2 = `- Gents serving in MULTIPLE groups (double/crossover duty): ${multiGroupGentsCount} volunteers (${multiGroupGentsPct.toFixed(1)}% of total cohort)`;
+    const b3 = `- Highlights: Monday and Wednesday groups share significant crossover, as do Friday and Saturday groups.`;
+    const b4 = `- This analysis allows coordinators to spot high-commitment core sewadars and manage roster fatigue effectively.`;
+
+    doc.text(b1, 14, currentY); currentY += 5.5;
+    doc.text(b2, 14, currentY); currentY += 5.5;
+    doc.text(b3, 14, currentY); currentY += 5.5;
+    doc.text(b4, 14, currentY);
+
+    // Add detailed section pages
+    coreGroups.forEach(currentGroup => {
+      doc.addPage();
+      currentY = 15;
+
+      // Header on each page
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(110, 110, 110);
+      doc.text("With the blessings of H.H. Sant Rajinder Singh Ji Maharaj", 14, currentY);
+
+      currentY += 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(40, 50, 110);
+      doc.text(`Crossover Profile: ${currentGroup} Group`, 14, currentY);
+
+      currentY += 5;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Detailed audit of sewadars associated with the ${currentGroup} group who also serve on other days.`, 14, currentY);
+
+      currentY += 3;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(14, currentY, 196, currentY);
+
+      currentY += 8;
+
+      // Find all sewadars who served in currentGroup
+      const activeGentsInGroup = Object.values(sewadarProfiles).filter(p => {
+        return p.attendedGroups.has(currentGroup);
+      });
+
+      // Filter for those who serve in other groups
+      const crossoverSewadars = activeGentsInGroup.filter(p => p.attendedGroups.size > 1)
+        .sort((a, b) => b.attendedGroups.size - a.attendedGroups.size || a.cleanName.localeCompare(b.cleanName));
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Active Sewadars with Multi-Group Duties: ${crossoverSewadars.length} / ${activeGentsInGroup.length}`, 14, currentY);
+      
+      currentY += 6;
+
+      if (crossoverSewadars.length === 0) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(120, 120, 120);
+        doc.text("No crossover sewadars recorded for this group. All active sewadars in this group serve exclusively here.", 14, currentY);
+      } else {
+        const detailRows = crossoverSewadars.map((p, idx) => {
+          const otherGroups = Array.from(p.attendedGroups)
+            .filter(g => g !== currentGroup)
+            .sort()
+            .join(', ');
+
+          return [
+            (idx + 1).toString(),
+            p.cleanName,
+            p.homeGroup || 'Not Rostered',
+            otherGroups,
+            p.attendedGroups.size.toString()
+          ];
+        });
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [['S.No', 'Sewadar Name', 'Roster Home Group', 'Other Attended Groups', 'Total Groups']],
+          body: detailRows,
+          headStyles: { fillColor: [50, 60, 120], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+          alternateRowStyles: { fillColor: [248, 248, 252] },
+          styles: { fontSize: 8, cellPadding: 2, valign: 'middle' },
+          theme: 'grid',
+          columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 40, fontStyle: 'bold' },
+            2: { cellWidth: 35 },
+            3: { cellWidth: 'auto' },
+            4: { cellWidth: 20, halign: 'center' }
+          }
+        });
+      }
+    });
+
+    // Add page numbers
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(140, 140, 140);
+      doc.text(`Page ${i} of ${pageCount}`, 196, 287, { align: 'right' });
+      doc.text("CONFIDENTIAL | SKRM SECURITY DEPLOYMENT MULTI-GROUP OVERLAP SUMMARY", 14, 287);
+    }
+
+    setProgress("Downloading Overlap PDF...");
+    doc.save("SKRM_Security_Multiple_Group_Overlap_Report.pdf");
+    setProgress("");
+
+  } catch (err) {
+    console.error("Gents multiple group report generation failed:", err);
+    setProgress("");
+    throw err;
+  }
+};

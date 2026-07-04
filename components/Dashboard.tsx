@@ -6,7 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
-import { generateGroupPerformanceReport, generateGentsRawDataReport } from './GroupReportPDFGenerator';
+import { generateGroupPerformanceReport, generateGentsRawDataReport, generateMultipleGroupOverlapReport } from './GroupReportPDFGenerator';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -78,6 +78,24 @@ const Dashboard: React.FC<Props> = ({
   const [groupPerformanceProgress, setGroupPerformanceProgress] = useState('');
   const [downloadingGentsRaw, setDownloadingGentsRaw] = useState(false);
   const [gentsRawProgress, setGentsRawProgress] = useState('');
+  const [downloadingOverlap, setDownloadingOverlap] = useState(false);
+  const [overlapProgress, setOverlapProgress] = useState('');
+
+  const handleDownloadOverlap = async () => {
+    if (downloadingOverlap) return;
+    try {
+      setDownloadingOverlap(true);
+      await generateMultipleGroupOverlapReport((msg) => {
+        setOverlapProgress(msg);
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error generating Multiple Group Overlap Report: " + (err as any).message);
+    } finally {
+      setDownloadingOverlap(false);
+      setOverlapProgress('');
+    }
+  };
 
   const handleDownloadGentsRaw = async () => {
     if (downloadingGentsRaw) return;
@@ -968,6 +986,28 @@ const Dashboard: React.FC<Props> = ({
               {downloadingGentsRaw ? 'Processing Raw...' : 'Download Gents Raw Report'}
             </button>
             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+          </div>
+
+          <div className="bg-gradient-to-r from-slate-900 to-slate-950 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-white/10">
+            <div className="relative z-10 flex-1">
+              <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Super Admin Overlap Analysis</div>
+              <h3 className="text-xl font-black mb-1">Gents Multiple Group Overlap Report</h3>
+              <p className="text-indigo-400 text-[11px] font-bold uppercase tracking-widest mb-2">Cohort Crossover & Common Sewadars Analysis</p>
+              <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
+                Comprehensive crossover service analysis of gents who serve across multiple daily cohorts (e.g. Monday gents participating in other groups) with a detailed overlap intersection matrix and group-wise rosters.
+              </p>
+              {overlapProgress && (
+                <p className="text-indigo-300 text-xs mt-3 animate-pulse font-mono">{overlapProgress}</p>
+              )}
+            </div>
+            <button 
+              onClick={handleDownloadOverlap} 
+              disabled={downloadingOverlap}
+              className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap relative z-10 ${downloadingOverlap ? 'bg-indigo-900 text-white/50 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
+            >
+              {downloadingOverlap ? 'Processing Overlap...' : 'Download Overlap Report'}
+            </button>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
           </div>
         </div>
       )}

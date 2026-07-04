@@ -144,4 +144,4 @@ export interface WeeklyReport {
   timestamp: number;
 }
 
-export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports';
+export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports' | 'RosterManagement';
