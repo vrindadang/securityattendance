@@ -8,7 +8,6 @@ import Login from './components/Login';
 import VolunteerDetails from './components/VolunteerDetails';
 import RequirementsView from './components/RequirementsView';
 import WeeklyReportsView from './components/WeeklyReportsView';
-import { RosterManagement } from './components/RosterManagement';
 import ImportantInfoBanner from './components/ImportantInfoBanner';
 import { db } from './firebase';
 import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
@@ -887,47 +886,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRegisterSewadar = async (
-    name: string,
-    gender: Gender,
-    group: DutyGroup,
-    shift?: 'DAY' | 'NIGHT',
-    details?: Partial<SewadarDetails>
-  ) => {
-    const newSewadarId = generateNumericId();
-    const newSewadar: Sewadar = {
-      id: newSewadarId,
-      name,
-      gender,
-      group,
-      shift: shift || undefined,
-      isCustom: true
-    };
-    try {
-      await setDoc(doc(db, 'custom_sewadars', newSewadarId), {
-        id: newSewadarId,
-        name: newSewadar.name,
-        gender: newSewadar.gender,
-        group: newSewadar.group,
-        shift: newSewadar.shift || null
-      });
-
-      if (details) {
-        await handleSaveSewadarDetails({
-          sewadar_id: newSewadarId,
-          dob: details.dob || '',
-          phone: details.phone || '',
-          address: details.address || ''
-        }, newSewadar.name);
-      }
-
-      setCustomSewadars(prev => [...prev, newSewadar]);
-    } catch (err) {
-      console.error('Failed to register sewadar:', err);
-      throw err;
-    }
-  };
-
   const handleSaveRequirement = async (description: string) => {
     if (!activeVolunteer) return;
     const now = Date.now();
@@ -1368,7 +1326,27 @@ const App: React.FC = () => {
             onSaveVehicle={handleSaveVehicle}
             vehicles={activeVehicles}
             flaggedVehicles={flaggedVehicles}
-            onAddSewadar={handleRegisterSewadar} 
+            onAddSewadar={async (n, g, grp, shift, details) => {
+              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp, shift };
+              try {
+                await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { 
+                  id: newSewadar.id, 
+                  name: newSewadar.name, 
+                  gender: newSewadar.gender, 
+                  group: newSewadar.group,
+                  shift: newSewadar.shift || null
+                });
+                if (details) {
+                  await handleSaveSewadarDetails({
+                    sewadar_id: newSewadar.id,
+                    dob: details.dob,
+                    phone: details.phone,
+                    address: details.address
+                  }, newSewadar.name);
+                }
+                setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
+              } catch (error) { console.error('Failed to add sewadar:', error); }
+            }} 
             activeVolunteer={activeVolunteer} 
             workshopLocation={activeSession?.location || null} 
             sessionDate={activeSession?.date || ''} 
@@ -1399,15 +1377,6 @@ const App: React.FC = () => {
           />
         ) : activeView === 'WeeklyReports' ? (
           <WeeklyReportsView activeVolunteer={activeVolunteer} />
-        ) : activeView === 'RosterManagement' ? (
-          <RosterManagement
-            sewadars={visibleSewadars}
-            details={enrichedDetailsMap}
-            activeVolunteer={activeVolunteer}
-            onAddSewadar={handleRegisterSewadar}
-            onDeleteSewadar={handleDeleteSewadar}
-            onSaveDetails={handleSaveSewadarDetails}
-          />
         ) : (
           <Dashboard 
             attendance={attendance} 
@@ -1456,16 +1425,10 @@ const App: React.FC = () => {
           </button>
           <button onClick={() => setActiveView('Dashboard')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 00-2-2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Reports</span></button>
           {activeVolunteer.role === 'Super Admin' && (
-            <>
-              <button onClick={() => setActiveView('WeeklyReports')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'WeeklyReports' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                <span className="text-[8px] font-black uppercase">Weekly</span>
-              </button>
-              <button onClick={() => setActiveView('RosterManagement')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'RosterManagement' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                <span className="text-[8px] font-black uppercase">Roster</span>
-              </button>
-            </>
+            <button onClick={() => setActiveView('WeeklyReports')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'WeeklyReports' ? 'text-indigo-600' : 'text-slate-400'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <span className="text-[8px] font-black uppercase">Weekly</span>
+            </button>
           )}
         </nav>
       )}
