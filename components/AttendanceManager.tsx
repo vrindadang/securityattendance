@@ -81,8 +81,13 @@ const AttendanceManager: React.FC<Props> = ({
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
 
   const availableLocs = useMemo(() => {
-    const list = workshopLocation?.split(',').map(l => l.trim()).filter(Boolean) || [];
+    const list = workshopLocation?.split(',').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)) || [];
     return list.length > 0 ? list : LOCATIONS_LIST;
+  }, [workshopLocation]);
+
+  const cleanWorkshopLocation = useMemo(() => {
+    if (!workshopLocation) return '';
+    return workshopLocation.split(',').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)).join(', ');
   }, [workshopLocation]);
 
   const hasConfig = !!workshopLocation;
@@ -436,7 +441,7 @@ const AttendanceManager: React.FC<Props> = ({
                 {hasConfig ? (normalizedSessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config'}
               </p>
               <h2 className="text-base font-black text-slate-800">
-                {workshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (workshopLocation || 'No Location Set')}
+                {cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set')}
               </h2>
               <div className="flex items-center gap-3">
                 <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>

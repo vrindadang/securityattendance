@@ -21,15 +21,36 @@ const db = getFirestore(app);
  * Robust normalization to merge variations like:
  * "D.L.KAPOOR JI", "D L KAPOOR", "DL KAPOOR"
  */
+/**
+ * Robust normalization to merge variations and map specific spelling errors to database records
+ */
 function normalizeName(name: string): string {
   if (!name) return "";
   let n = name.toUpperCase().trim();
-  // Remove suffixes/prefixes
+  
+  // Strip common prefixes/suffixes and spaces
+  n = n.replace(/^DR\.?\s*/g, '');
+  n = n.replace(/^MR\.?\s*/g, '');
   n = n.replace(/\s+JI$/g, '');
-  n = n.replace(/^DR\s+/g, '');
-  n = n.replace(/^MR\s+/g, '');
+  n = n.replace(/\bJI\b/g, '');
+  
   // Remove all non-alphabetical characters to merge dots/spaces/brackets/braces
   n = n.replace(/[^A-Z]/g, '');
+
+  // Custom mapping rules to align different spellings with actual database entries
+  if (n === "RAJKOHLI") return "RAJKHOLI";                     // Map Raj Kohli to Raj Kholi
+  if (n === "RAJNISH") return "RAJNEESH";                     // Map Rajnish to Rajneesh
+  if (n === "YOGESHMADAAN") return "YOGESHMADAN";             // Map Yogesh Madaan to Yogesh Madan
+  if (n === "MEVARAM") return "MEWARAM";                       // Map Meva Ram to Mewa Ram
+  if (n === "HCBAJAJ" || n === "HARICHANDBAJAJ") return "HARICHANDBAJAJ"; // Map H.C. Bajaj to Hari Chand Bajaj
+  if (n === "RAVISHASTRI" || n === "RVSHASTRI" || n === "DRRAVISHASTRI" || n === "DRRVSHASTRI") {
+    return "RVSHASTRI"; // Standardize all Shastri variations to "RVSHASTRI"
+  }
+  if (n === "DAVENDERKUMAR" || n === "DEVENDERKUMAR") return "DEVENDERKUMAR"; // Map Davender to Devender
+  if (n === "MAHENDERPUNIYANISONU" || n === "MAHENDERPUNIANISONU" || n === "MAHENDERPUNIANI") return "MAHENDERPUNIANI"; // Map Mahender Puniyani Sonu to Mahender Puniani
+  if (n === "PAWAN" || n === "PAWANSHARMA") return "PAWANSHARMA"; // Map Pawan/Pawan Ji to Pawan Sharma (since he serves in Mon/Wed)
+  if (n === "PUNIT" || n === "PUNEET" || n === "PUNEETKUMAR") return "PUNEETKUMAR"; // Map Punit/Puneet to Puneet Kumar
+
   return n;
 }
 
@@ -45,16 +66,16 @@ function stripJi(name: string): string {
   return cleaned;
 }
 
-// Targeted list provided by the user
+// Targeted list of 40 unique volunteers provided by the user (with NARESH SAINI included, S.L. AHUJA removed)
 const whitelistedNamesRaw = [
-  "SUNIL KUMAR JI", "DINESH SALGOTRA JI", "ASHWANI NARANG JI", "PAWAN JI", "RAJ KOHLI JI",
-  "MANMOHAN KHURANA JI", "D.L.KAPOOR JI", "S.N.OJHA JI", "PREM KALUCHA JI", "SUKHDEV SINGH JI",
-  "ASHOK KUMAR JI", "R.V.SHASTRI JI", "PUNEET KUMAR JI", "PRINCE JI", "AMAN SHARMA JI",
-  "ARUN JI", "RAJESH NAYAK JI", "MEVA RAM JI", "RAVI SHASTRI JI", "MAHENDER PUNIYANI JI {SONU}",
-  "SHIV RAM JI", "NAVEEN GUPTA JI", "HARI PRAKASH JI", "GULSHAN GABA JI", "GURDAS KALUCHA JI",
-  "BHOLA SHANKAR JI", "H.C.BAJAJ JI", "RAVI TYAGI JI", "DAVENDER KUMAR JI", "KRISHAN KUMAR JI",
-  "VIJENDER SOLANKI JI", "RAJINDER MALIK JI", "RAJU SAINI JI", "DEVKI NANDAN JI", "HEMANT JI",
-  "MIRAS JI", "RAJNISH JI", "CHAMAN LAL JI", "YOGESH MADAAN JI"
+  "SUNIL KUMAR JI", "DINESH SALGOTRA JI", "ASHWANI NARANG JI", "PAWAN JI", "NARESH SAINI JI",
+  "RAJ KOHLI JI", "MANMOHAN KHURANA JI", "D.L.KAPOOR JI", "S.N.OJHA JI", "PREM KALUCHA JI",
+  "NAVEEN GUPTA JI", "SUKHDEV SINGH JI", "ASHOK KUMAR JI", "R.V.SHASTRI JI", "PUNEET KUMAR JI",
+  "PRINCE JI", "AMAN SHARMA JI", "ARUN JI", "RAJESH NAYAK JI", "MEVA RAM JI",
+  "RAVI SHASTRI JI", "MAHENDER PUNIYANI JI {SONU}", "SHIV RAM JI", "HARI PRAKASH JI", "GULSHAN GABA JI",
+  "GURDAS KALUCHA JI", "BHOLA SHANKAR JI", "H.C.BAJAJ JI", "RAVI TYAGI JI", "DAVENDER KUMAR JI",
+  "KRISHAN KUMAR JI", "VIJENDER SOLANKI JI", "RAJINDER MALIK JI", "RAJU SAINI JI", "DEVKI NANDAN JI",
+  "HEMANT JI", "MIRAS JI", "RAJNISH JI", "CHAMAN LAL JI", "YOGESH MADAAN JI"
 ];
 
 const whitelistedNormMap = new Map<string, string>();
@@ -259,6 +280,15 @@ async function generateReport() {
 
     const pdfBuffer = doc.output('arraybuffer');
     fs.writeFileSync('Multiple_Group_Attendance_Report.pdf', Buffer.from(pdfBuffer));
+    try {
+      if (!fs.existsSync('public')) {
+        fs.mkdirSync('public');
+      }
+      fs.writeFileSync('public/Multiple_Group_Attendance_Report.pdf', Buffer.from(pdfBuffer));
+      console.log("PDF Report written to public/Multiple_Group_Attendance_Report.pdf");
+    } catch (e) {
+      console.log("Could not write to public folder:", e);
+    }
     
     console.log("PDF Report updated for targeted list: Multiple_Group_Attendance_Report.pdf");
   } catch (error) {

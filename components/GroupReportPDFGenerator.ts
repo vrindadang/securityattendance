@@ -4,14 +4,34 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { INITIAL_SEWADARS } from '../constants';
 
-// Helper to normalize names for merging comparison
+// Helper to normalize names for merging comparison and map specific spelling errors to database records
 function normalizeName(name: string): string {
   if (!name) return "";
   let n = name.toUpperCase().trim();
+  
+  // Strip common prefixes/suffixes and spaces
+  n = n.replace(/^DR\.?\s*/g, '');
+  n = n.replace(/^MR\.?\s*/g, '');
   n = n.replace(/\s+JI$/g, '');
-  n = n.replace(/^DR\s+/g, '');
-  n = n.replace(/^MR\s+/g, '');
+  n = n.replace(/\bJI\b/g, '');
+  
+  // Remove all non-alphabetical characters to merge dots/spaces/brackets/braces
   n = n.replace(/[^A-Z]/g, '');
+
+  // Custom mapping rules to align different spellings with actual database entries
+  if (n === "RAJKOHLI") return "RAJKHOLI";                     // Map Raj Kohli to Raj Kholi
+  if (n === "RAJNISH") return "RAJNEESH";                     // Map Rajnish to Rajneesh
+  if (n === "YOGESHMADAAN") return "YOGESHMADAN";             // Map Yogesh Madaan to Yogesh Madan
+  if (n === "MEVARAM") return "MEWARAM";                       // Map Meva Ram to Mewa Ram
+  if (n === "HCBAJAJ" || n === "HARICHANDBAJAJ") return "HARICHANDBAJAJ"; // Map H.C. Bajaj to Hari Chand Bajaj
+  if (n === "RAVISHASTRI" || n === "RVSHASTRI" || n === "DRRAVISHASTRI" || n === "DRRVSHASTRI") {
+    return "RVSHASTRI"; // Standardize all Shastri variations to "RVSHASTRI"
+  }
+  if (n === "DAVENDERKUMAR" || n === "DEVENDERKUMAR") return "DEVENDERKUMAR"; // Map Davender to Devender
+  if (n === "MAHENDERPUNIYANISONU" || n === "MAHENDERPUNIANISONU" || n === "MAHENDERPUNIANI") return "MAHENDERPUNIANI"; // Map Mahender Puniyani Sonu to Mahender Puniani
+  if (n === "PAWAN" || n === "PAWANSHARMA") return "PAWANSHARMA"; // Map Pawan/Pawan Ji to Pawan Sharma (since he serves in Mon/Wed)
+  if (n === "PUNIT" || n === "PUNEET" || n === "PUNEETKUMAR") return "PUNEETKUMAR"; // Map Punit/Puneet to Puneet Kumar
+
   return n;
 }
 
