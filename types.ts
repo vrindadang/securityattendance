@@ -19,6 +19,7 @@ export interface Sewadar {
   shift?: 'DAY' | 'NIGHT';
   isCustom?: boolean;
   isRemovedSaturday?: boolean;
+  isRemovedTuesday?: boolean;
 }
 
 export interface SewadarDetails {

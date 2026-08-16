@@ -115,7 +115,7 @@ export const GAMES = [
 
 const SUNDAY_LIST = ["Manish Munjal", "Surinder Raheja", "Parvesh Bhatia", "Amar Nath", "Ganpat Bhatia", "Ajit Singh", "Vinod Gaba", "Abhishek Chawla", "Anand Sharma", "Anil Kapoor", "Ankush Malik", "Arshit Raheja", "Ashish Rathore", "Ashok Harjai", "Ashok Kapoor", "Ashok Saini", "Ashok Sharma", "Atul Bansal", "B.B Khanna", "Baldev Gandhi", "Chaman Lal", "Dashrath Parsad", "Fakir Chand", "Gulshan Arora", "Harender Singh", "Harish Kumar", "Harvansh Verma", "Hemant", "Jai Kishan Arora", "Janak Raj Sharma", "Joginder Lal", "Kapil Budhiraja", "Kapil Mehndru", "Laxmi Chand", "Maange Ram", "Madan Gopal Sharma", "Madhuker Bhanot", "Madhusudan Malik", "Manmohan Arora", "Miras", "Mohak Bahel", "Parvesh Kumar", "Prem Gandhi", "Purshotam Gulati", "Rahul Gandhi", "Rajnish Kumar", "Rakesh Gulati", "Rakshit Gupta", "Ram Chander", "Ramesh Chand", "Sachin Arora", "Sachin Budhiraja", "Sachin Verma", "Sahil Malik", "Sahil Tiwari", "Sailesh", "Sandeep Ahuja", "Sandeep Manocha", "Satish Saini", "Saurav", "Sheetal Parsad", "Shyam Murari", "Suraj Parkash", "Tarun Bhudiraja", "Tilak Raj", "Upender Parsad", "Ved Dua", "Vinod Kumar", "Vinod Kumar", "Vipin Khanna", "Vishal Dawar", "Yogesh Madan"];
 const MONDAY_LIST = ["Anil Gulati", "Dinesh Kapoor", "Angad Soni", "Aman Chauhan", "Ajit Singh", "Vinod Gaba", "Aakash Kumar", "Abhisekh Tyagi", "Abhishek Kumar", "Ajay Arora", "Aman Kapoor", "Aman Sharma", "Amit Kumar", "Anil Kumar", "Anil Verma", "Ankit Ahuja", "Ankit Gulati", "Ankit Rana", "Ankit Saluja", "Ankush Lamba", "Anmol Agrawal", "Anuj Soni", "Arun Kumar", "Aseem Kapoor", "Ashok Kumar", "Ashu", "Ashwani Narang", "Bharti Chugh", "Bobby Narang", "Brijmohan", "Chaman Lal", "Deepak Takkar", "Devan Kathuria", "Devisharan", "Devki Nandan", "Dimple(Sushil)", "Dinesh Salgotra", "Dr. Ravi Shastri", "D.L Kapoor", "Gagan", "Gagan (Montu)", "Gagan Arora", "Gagan Saluja", "Gurmeet Singh", "Gurvinder Singh", "Happy Bhutani", "Harish Dhingra", "Harish Malhotra(Rohtak)", "Inder Prakash", "Inderpal Singh", "Ishwar Lal", "Jagdish Saddana", "Jay Aprakash", "Kamal", "Karan Pal Singh", "Kartik Takkar", "Kastury Lal", "Kunal", "Lalman Pal", "Lekhraj", "Lokinder Singh", "Madan Baira", "Madan Gopal", "Mahender Kumar", "Mahender Bora", "Mahesh Aneja", "Man Singh", "Manish Sharma", "Manish Sharma(Rohtak)", "Manmohan Khurana", "Manoj Kumar", "Manoj Pal", "Mewa Ram", "Mohan Soni", "Monu", "Mukesh Kumar", "Narender Punyani", "Naresh Saini", "Naveen Kumar", "Naveen Sapra", "Nitender Kumar", "Om Prakash", "Om Prakesh (Vishwas Nag)", "Paras", "Paras Arora", "Paritosh Pal", "Pawan Khasa", "Pawan Sharma", "Pradeep Kumar", "Prem Chawala", "Prem Kumar", "Prem Singh", "Raj Kholi", "Rajan", "Rajender Bhati", "Rajender Singh", "Rajender Chawla", "Rajesh Manchanda", "Rajesh Pawar", "Rajesh Verma", "Rajinder Gandhi", "Rajkumar Dashturiya", "Rajkumar Malik", "Raju Gaba", "Raju Verma", "Rakesh Kumar", "Rakesh Madan", "Ram", "Ram Nivash", "Ramesh Chawla", "Rampal", "Randhir Singh", "Ranjeet Singh", "Rattan Dheeraj", "Ravinder", "Rohit Pal", "Ruchir Sharma", "Sachin Arora", "Sachin Wadhwa", "Sachin Yadav", "Sajjan Jain", "Sandeep Khanna", "Sanjay", "Sanjay Goutam", "Sanny Mittal", "Satish Sarma", "Shakti Kapoor", "Shivam Gandhi", "Shivam Singh", "Shwet Rathor", "Shyam Madan", "Shyam Sunder Chhabra", "S.N. Ojha", "Sonu Soni", "Sourav Takkar", "Subhash Dhingra", "Subhash Nandwani", "Sumit Chawla", "Sumit Sachdeva", "Sumit Sethi", "Sunder Singh", "Suneel Chawla", "Sunil Chawla", "Sunil Makhija", "Sunil Makkar", "Sunil Shadra", "Sunil Verma", "Sunny", "Suresh Pnp", "Sushil Chawla", "Sushil Garg", "Tarun", "Varun Verma", "Vicky", "Vikram Pal", "Vikram Singh Saini", "Vimal Singh", "Vinay Saini", "Vinod Khanna", "Vinod Khattar", "Vishnu Soni"];
-const TUESDAY_LIST = ["S K Gaba", "Narinder Chopra", "Surinder Chugh", "Ajit Singh", "Vinod Gaba", "Aman Sharma", "Amar Singh Rathore", "Anand Thakur", "Anil Mahajan", "Ankur Mittal", "Anmol Bhatia", "Anmol Chopra", "Arvind Solanki", "Ashok Khera", "Ashok Kumar", "Baljeet Singh", "Bhola Shankar", "Bhoop Singh", "Chaman Lal", "Chander Pal", "Chetan Kumar Verma", "D L Kapoor", "D.V. Singh", "Devendar", "Devendra Garg", "Devi Sarann", "Devki Nandan", "Gulshan Nagpal", "Gurmeet Singh", "Gurpreet Singh Vohra", "Hari Chand Bajaj", "Hari Prakash", "Harpreet Singh", "Hemant", "Hutesh Kumar", "Jai Prakash Singh", "Kamal Gurnani", "Karan Rajput", "Kasturi Lal", "Krishana Kumar Sharma", "Manmohan Khurana", "Miras", "Naresh Kumar", "Naveen Gupta", "Nishant Puri", "Parveen Kumar", "Pawan Kumar Sharma", "Pooran Chand", "Pradeep Gangwani", "Pradeep Kaushik", "Pradeep Kumar", "Pranit Kalucha", "Prem Kalucha", "Prince", "Prince Batra", "Pritam Batra", "Puneet Kumar", "R P Singh", "R V Shastri", "R.A Pal", "Rahul Juneja", "Raj Kumar Gupta", "Rajender Malik", "Rajender Singh", "Rajendra Singh Gzb.", "Rajesh Gupta", "Rajneesh", "Raju Saini", "Rahul Garg", "Ram Avtar", "Ram Kumar", "Rati Bhan Singh", "Rattan Singh", "Roshan Lal", "S N Ojha", "S S Manoj", "Sahil Babbar", "Sahil Bansal", "Sandeep Bhandari", "Sanjay Khurana", "Sanjeev Kumar", "Satinder K Bhatnagar", "Shakti Singh", "Shyam Sundar", "Sukhdev Singh", "Sunil Sachdeva", "Surinder Kumar Knl.", "Suresh Kumar", "Susheel Verma", "Tilak Raj Arora", "Tarun Sharma", "Vinay Kumar", "Yogesh Madan"];
+const ORIGINAL_TUESDAY_LIST = ["S K Gaba", "Narinder Chopra", "Surinder Chugh", "Ajit Singh", "Vinod Gaba", "Aman Sharma", "Amar Singh Rathore", "Anand Thakur", "Anil Mahajan", "Ankur Mittal", "Anmol Bhatia", "Anmol Chopra", "Arvind Solanki", "Ashok Khera", "Ashok Kumar", "Baljeet Singh", "Bhola Shankar", "Bhoop Singh", "Chaman Lal", "Chander Pal", "Chetan Kumar Verma", "D L Kapoor", "D.V. Singh", "Devendar", "Devendra Garg", "Devi Sarann", "Devki Nandan", "Gulshan Nagpal", "Gurmeet Singh", "Gurpreet Singh Vohra", "Hari Chand Bajaj", "Hari Prakash", "Harpreet Singh", "Hemant", "Hutesh Kumar", "Jai Prakash Singh", "Kamal Gurnani", "Karan Rajput", "Kasturi Lal", "Krishana Kumar Sharma", "Manmohan Khurana", "Miras", "Naresh Kumar", "Naveen Gupta", "Nishant Puri", "Parveen Kumar", "Pawan Kumar Sharma", "Pooran Chand", "Pradeep Gangwani", "Pradeep Kaushik", "Pradeep Kumar", "Pranit Kalucha", "Prem Kalucha", "Prince", "Prince Batra", "Pritam Batra", "Puneet Kumar", "R P Singh", "R V Shastri", "R.A Pal", "Rahul Juneja", "Raj Kumar Gupta", "Rajender Malik", "Rajender Singh", "Rajendra Singh Gzb.", "Rajesh Gupta", "Rajneesh", "Raju Saini", "Rahul Garg", "Ram Avtar", "Ram Kumar", "Rati Bhan Singh", "Rattan Singh", "Roshan Lal", "S N Ojha", "S S Manoj", "Sahil Babbar", "Sahil Bansal", "Sandeep Bhandari", "Sanjay Khurana", "Sanjeev Kumar", "Satinder K Bhatnagar", "Shakti Singh", "Shyam Sundar", "Sukhdev Singh", "Sunil Sachdeva", "Surinder Kumar Knl.", "Suresh Kumar", "Susheel Verma", "Tilak Raj Arora", "Tarun Sharma", "Vinay Kumar", "Yogesh Madan"];
 const WEDNESDAY_LIST = ["Surjit Singh", "Gautam Kapoor", "Jatin Batra", "Ajit Singh", "Vinod Gaba", "Aalok Khurana", "Akash", "Akshay Verma", "Aman Arora", "Amit Sachdeva", "Anil Kumar", "Anil Pandit", "Ankur Minocha", "Ankush Wadhwa", "Anmol", "Anmol Thakur", "Arshdeep Singh", "Arun", "Arun Saini", "Arun Varma", "Ashish Kumar Yadav", "Ashok Arora", "Ashok Chawla", "Ashok Kumar", "Ashwani Narang", "Badal Manchanda", "B.C.Kandpal", "Brijesh", "Chander Chhokra", "Davinder Singh", "Deepak Miglani", "Deepak Panchal", "Deepak Seelam Pur", "Devinder Singh Panesar", "Dharam Singh Fbd", "Dinesh Salgotra", "Dr R.V Shastri", "Gagan Deep", "Gaurav Babbar", "Gaurav Batra", "Gaurav Bhati", "Ghanshyam", "Gulshan Gaba", "Gulshan Makkar", "Harbans Lal", "Harish Malik", "Harkesh", "Harsh Sethi", "Inderjeet Singh", "Indrajeet", "Ishan Khurana", "J.K Chawla", "J.K. Bajaj", "Jaipal", "Jasvinder Singh", "Kalp Nath", "Kanhya Lal", "Kapil Arora", "Kapil Dhawan", "Kartik Kohli", "Kaushal Kumar", "Khemchand Solanki", "Krishan Khurana", "Kuldeep Kumar", "Laxman", "Lokesh Kohli", "Lovekush", "Mahender Puniani", "Mahendra Walia", "Manish Bhati", "Mali Ram", "Manoj Anand", "Manoj Narula", "Manoj Sharma", "Mohit Chawla", "Naresh Singh", "Narsingh Sharma", "Neeraj Nagar", "Om Prakash", "Pankaj Gaba", "Paras Gulati", "Parkash Arora", "Parkash Sachdeva", "Partaap", "Parvesh Kumar", "Phoolchand", "Pradeep Kumar", "Praveen Bhutani", "Praveen Sachdeva", "Praveen Sharma", "Praveen(Rohtak)", "Prem Prakash", "Rajan", "Rajeev", "Rajesh Nayak", "Rajesh Thakur", "Rajesh Verma", "Rajesh(Rohtak)", "Rajinder Bajaj", "Rajinder Manocha", "Rajiv Arora", "Rajpal Arora", "Raju Babbar", "Rakesh Kohli", "Rakesh Munjal", "Ram Swaroop", "Ram Swaroop Solanki", "Ramesh Chand", "Ramesh Mittal", "Ramesh Virmani", "Rameshwar Solanki", "Ramji Das Khurana", "Ramswaroop Solanki", "Ritik Kaushik", "Rohit Gaba", "Roshan Lal", "Sagar Kumar", "Saksham Chawla", "Sandeep Malhotra", "Sanjeev Kumar Saini", "Sanjeev Sharma", "Santosh Kumar", "Sat Narain", "Satish (D.P)", "Satish Kumar", "Satyavir Solanki", "Satyawan", "Shiv Kumar", "Shiv Ram", "Shiv Shanker", "Shivam Gulati", "Shivam Khurana", "Sita Ram", "Som Nath", "Subhash Khetrpal", "Sumit Bhatti", "Sumit Bhatia", "Sunder Lal", "Sunil Baweja", "Sunil Kalra", "Sunil Khurana", "Sunil Shadra", "Sunny Ahuja", "Suresh Aneja", "Suresh Kajal", "Surinder Khurana", "Surinder Singh", "Sushil Bansal", "Sushil Narang", "Tejvir Singh", "Umesh Kumar", "Ved Chawla", "Vijay Kumar", "Vinod Gupta", "Vinod Khattar", "Vinod Tuli", "Yogesh Khattar", "Yugam Ganotra"];
 const THURSDAY_LIST = ["Gaurav Gaba", "Sanjay Grover", "Satish Aggarwal", "Gurdas Kalucha", "Adarsh Verma", "Akash Babbar", "Aakash Munjal", "Akshay Dhingra", "Akshay Puniyani", "Anil", "Anilkumar", "Anil Pal -Ii", "Ankit Arora", "Ankush Gandhi", "Ankush Grover", "Ankush Shishodia", "Anmol Nagpal", "Anuj Arora", "Anuj Giri", "Ashok Ji", "Bhagwan Singh", "Bijender Singh", "Brij Bhushangiri", "D.L Kapoor", "Deepak Ahuja", "Deepak Khatri", "Dev Malhotra", "Dev Narayan Gaur", "Dharmbir Singh", "Dr. R V Shastri", "Dr. Satyapal Singh", "Dwarka Parsad Rai", "Gulab Singh", "Gulab Prasad", "Hari Chand", "Hari Prakash", "Hat Ram Singh", "Hemant Pahwa", "Hemant Yadav", "Inder Malik", "Jagjeevan Yadav", "Jaipal Singh Rana", "Jitender Kumar", "Jitender Purthi", "Karan Mujal", "Kartik Goswami", "Ketan Gandhi", "Kishore Dhingra", "Lakhpat Raj", "Lokesh Sharma", "Lokman Singh", "Lucky Malhotra", "Mahender Arora", "Manish Agarwal", "Manoj Punyani", "Narayan Kushwaha", "Narendra Kumar", "Naresh Nagpal", "Nav Bahar Singh", "Naveen Gupta", "Ohm Raj Singh", "Pankaj Batra", "Partap Singh", "Parvinder Singh (Manni)", "Pawan Arora", "Pawan Kumar", "Pradeep Kumar Gupta", "Prem Kalucha", "Puneet Giri", "R.L. Soni", "Raj Kumar Sharma", "Rajat Uppal", "Rajeev", "Rajesh Sharma", "Rajesh Verma", "Rakesh Arora", "Rakesh Babber", "Rakesh Kumar", "Ram Kishore", "Ramesh Arora", "Rhitik", "Rohtash", "Sahil Gandhi", "Sahil Punyani", "Satish Saini", "Satish Suryavanshi", "Satnam Sarna", "Satpal", "Satya Prakash", "Shiva", "Shyam Sunder", "Shyam Sunder - Ii", "Sita Ram", "S.N.导", "Sukhdev Singh", "Sumit Suneja", "Surinder Gandhi", "Surinder Sethi", "Tarun Goel", "Tarun Takkar", "Umesh Sharma", "Vicky Verma", "Vijay Popli", "Virender Khurana", "Vikram Kumar", "Yash Pal Ratra", "Yogendra Kumar Rana", "Yogesh Sharma"];
 
@@ -185,6 +185,134 @@ export function isRemovedSaturday(name: string): boolean {
 }
 
 const SATURDAY_LIST = ORIGINAL_SATURDAY_LIST.filter(name => !isRemovedSaturday(name));
+
+export const TUESDAY_REMOVED_NAMES = [
+  "Anmol Chopra",
+  "Ashish Gandhi",
+  "Ashok Sapra",
+  "Ashwani Kumar",
+  "Bhim Saini",
+  "Bijender Solanki",
+  "Chand Singh",
+  "Dashrath",
+  "Delays Ram",
+  "Devi Saran",
+  "Devi Sarann",
+  "Gurdas",
+  "Gurdwara Kumar",
+  "K P Singh Ji",
+  "Lal Babu",
+  "Mukund",
+  "Pawan Kumar Sharma",
+  "Pritam Singh",
+  "Puran Chand",
+  "Ra Pal",
+  "Radhe Shyam",
+  "Radhesh Sham",
+  "Rahul Garg (Duplicate)",
+  "Rajender Songh",
+  "Rajinder Malik",
+  "Rakesh Saini",
+  "Rakesh Yadav",
+  "Ram Nivas",
+  "Ram Niwas",
+  "Rattan Singh",
+  "Ravi Tyagi",
+  "Roshan Lal",
+  "S S Chhabra",
+  "Sanjay Khurana",
+  "Sant Singh",
+  "Santa",
+  "Shivpal Singh",
+  "Shushil Sethi",
+  "Shyam Sunder Chabra Ji",
+  "Sorabh Dubey",
+  "Surender Khurana Ji",
+  "Surinder Singh",
+  "Susheel Sethi",
+  "Sushil Sethi",
+  "Ujagar Singh",
+  "Unaware Singh",
+  "Vinod Gaba"
+];
+
+export const TUESDAY_REMOVED_MATCH_LIST = [
+  "Anmol Chopra",
+  "Ashish Gandhi",
+  "Ashok Sapra",
+  "Ashwani Kumar",
+  "Bhim Saini",
+  "Bijender Solanki",
+  "Chand Singh",
+  "Dashrath",
+  "Delays Ram",
+  "Devi Saran",
+  "Devi Sarann",
+  "Gurdas",
+  "Gurdwara Kumar",
+  "K P Singh Ji",
+  "Lal Babu",
+  "Mukund",
+  "Pawan Kumar Sharma",
+  "Pritam Singh",
+  "Puran Chand",
+  "Ra Pal",
+  "R.A Pal",
+  "Radhe Shyam",
+  "Radhesh Sham",
+  "Rajender Songh",
+  "Rajinder Malik",
+  "Rakesh Saini",
+  "Rakesh Yadav",
+  "Ram Nivas",
+  "Ram Niwas",
+  "Rattan Singh",
+  "Ravi Tyagi",
+  "Roshan Lal",
+  "S S Chhabra",
+  "S. S. Chhabra",
+  "Sanjay Khurana",
+  "Sant Singh",
+  "Santa",
+  "Shivpal Singh",
+  "Shushil Sethi",
+  "Shyam Sunder Chabra Ji",
+  "Shyam sunder chabra ji",
+  "Sorabh Dubey",
+  "Surender Khurana Ji",
+  "Surinder Singh",
+  "Susheel Sethi",
+  "Sushil Sethi",
+  "Ujagar Singh",
+  "Unaware Singh",
+  "Vinod Gaba"
+];
+
+export const TUESDAY_REMOVED_NORMS = new Set(TUESDAY_REMOVED_MATCH_LIST.map(normalizeName));
+
+export const TUESDAY_REMOVED_CUSTOM_IDS = new Set([
+  '1771364626542670', // Rahul garg (duplicate entry that has NO phone number saved)
+]);
+
+export function isRemovedTuesday(sewadarOrName: any): boolean {
+  if (!sewadarOrName) return false;
+  if (typeof sewadarOrName === 'object') {
+    if (sewadarOrName.id && TUESDAY_REMOVED_CUSTOM_IDS.has(sewadarOrName.id)) {
+      return true;
+    }
+    const name = sewadarOrName.name || '';
+    const norm = normalizeName(name);
+    if (norm === 'RAHULGARG') {
+      return sewadarOrName.id === '1771364626542670';
+    }
+    return TUESDAY_REMOVED_NORMS.has(norm);
+  }
+  const norm = normalizeName(String(sewadarOrName));
+  if (norm === 'RAHULGARG') return false;
+  return TUESDAY_REMOVED_NORMS.has(norm);
+}
+
+const TUESDAY_LIST = ORIGINAL_TUESDAY_LIST.filter(name => !isRemovedTuesday(name));
 const LADIES_MONDAY_DAY_LIST = [
   "KANTA RANI", "JYOTI KHERA", "SUMAN SETHI", "ANITA BHARDWAJ", "CHANCHAL UPPAL (R)", "DAYA SHARMA", "KAMLA RANI (R)", "KAMLESH BHARDWAJ", "KAMLESH DEVI", "KANTA GUPTA", "KIRAN BALA", "KIRAN RAWAL (R)", "KUSUM LATA", "LAXMI GIRI", "MADHU GULATI", "NEELAM CHAWLA", "NEELAM MIGLANI", "NEENA KAUSHIK", "PREM BAJAJ (R)", "PUSHPA TANEJA", "RENU MALIK", "SANTOSH DEVI", "SANTOSH MEHRA", "SAROJ ARORA (R)", "SHAKUNTLA BABBAR", "SHAKUNTLA KHATER(R)", "SHAKUNTLA BAHAL (R)", "SHEELA GABA", "SUDESH ROHILLA", "SUNITA SAINI MONDAY", "SUMAN MIGLANI", "SURESH KUMARI", "SUSHILA CHAWLA", "USHA (TIMARPUR)", "VEENA MUNJAL"
 ];
@@ -590,3 +718,7 @@ CCTV_VISION_TEAM_RAW.forEach((r, i) => {
 CCTV_MAINTENANCE_RAW.forEach((r, i) => {
   INITIAL_SEWADAR_DETAILS[`BO-CM-${i}`] = { sewadar_id: `BO-CM-${i}`, address: '', dob: r.dob || '', phone: r.phone };
 });
+
+// Rahul Garg (Tuesday Gents) phone details
+INITIAL_SEWADAR_DETAILS['G-Tuesday-68'] = { sewadar_id: 'G-Tuesday-68', address: '', dob: '', phone: '9625102745' };
+

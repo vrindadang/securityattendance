@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
-import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday } from '../constants';
+import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -115,9 +115,19 @@ const AttendanceManager: React.FC<Props> = ({
     return isSaturdayGroup && (isGentsSaturdayVolunteer || isSuperAdmin);
   }, [activeVolunteer, sessionGroup]);
 
+  const isGentsTuesday = useMemo(() => {
+    const isTuesdayGroup = sessionGroup === 'Tuesday';
+    const isGentsTuesdayVolunteer = activeVolunteer.role === 'Gents Admin' && activeVolunteer.assignedGroup === 'Tuesday';
+    const isSuperAdmin = activeVolunteer.role === 'Super Admin';
+    return isTuesdayGroup && (isGentsTuesdayVolunteer || isSuperAdmin);
+  }, [activeVolunteer, sessionGroup]);
+
   const filtered = useMemo(() => {
     return sewadars.filter(s => {
       if (isGentsSaturday && isRemovedSaturday(s.name)) {
+        return false;
+      }
+      if (isGentsTuesday && isRemovedTuesday(s)) {
         return false;
       }
       return s.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -129,7 +139,7 @@ const AttendanceManager: React.FC<Props> = ({
       if (!aMarked && bMarked) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [sewadars, searchTerm, attendance, normalizedSessionDate, isGentsSaturday]);
+  }, [sewadars, searchTerm, attendance, normalizedSessionDate, isGentsSaturday, isGentsTuesday]);
 
   const markedCount = useMemo(() => {
     const markedIds = new Set(attendance.filter(a => normalizeDate(a.date) === normalizedSessionDate).map(a => a.sewadarId));
@@ -805,6 +815,33 @@ const AttendanceManager: React.FC<Props> = ({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {SATURDAY_REMOVED_NAMES.filter(name => 
+                    name.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((name, i) => (
+                    <div key={i} className="flex items-center justify-between bg-slate-50/50 px-5 py-4 rounded-2xl border border-slate-100/80 transition-all hover:bg-slate-50/80">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[9px] font-bold text-slate-300 w-5 text-center">{i + 1}</span>
+                        <span className="font-semibold text-sm text-slate-400 line-through decoration-slate-300">{name}</span>
+                      </div>
+                      <span className="text-[8px] bg-red-50 text-red-500 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Removed</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isGentsTuesday && (
+              <div className="mt-8 border-t border-slate-100 pt-8 pb-4">
+                <div className="flex items-center justify-between mb-4 px-2">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full"></span>
+                    Removed Tuesday Members
+                  </h3>
+                  <span className="text-[9px] bg-red-50 text-red-500 font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                    Total Removed: {TUESDAY_REMOVED_NAMES.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {TUESDAY_REMOVED_NAMES.filter(name => 
                     name.toLowerCase().includes(searchTerm.toLowerCase())
                   ).map((name, i) => (
                     <div key={i} className="flex items-center justify-between bg-slate-50/50 px-5 py-4 rounded-2xl border border-slate-100/80 transition-all hover:bg-slate-50/80">
