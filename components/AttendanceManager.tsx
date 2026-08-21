@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
-import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday } from '../constants';
+import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday, normalizeName } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -10,7 +10,7 @@ interface Props {
   flaggedVehicles?: FlaggedVehicle[];
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
-  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob: string, phone: string, address: string }) => void;
+  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob: string, phone: string, address: string }, isRestored?: boolean) => void;
   onDeleteSewadar?: (id: string) => void;
   onEditSewadar?: (id: string, newName: string) => void;
   activeVolunteer: Volunteer;
@@ -72,6 +72,13 @@ const AttendanceManager: React.FC<Props> = ({
   const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [restorePrompt, setRestorePrompt] = useState<{
+    name: string;
+    gender: Gender;
+    group: DutyGroup;
+    shift?: 'DAY' | 'NIGHT';
+    details: { dob: string; phone: string; address: string };
+  } | null>(null);
 
   // Vehicle Form state
   const [vType, setVType] = useState<'2-wheeler' | '4-wheeler'>('4-wheeler');
@@ -122,8 +129,19 @@ const AttendanceManager: React.FC<Props> = ({
     return isTuesdayGroup && (isGentsTuesdayVolunteer || isSuperAdmin);
   }, [activeVolunteer, sessionGroup]);
 
+  const activeRestoredNorms = useMemo(() => {
+    return new Set(
+      sewadars
+        .filter(s => s.isRestored && s.group === sessionGroup)
+        .map(s => normalizeName(s.name))
+    );
+  }, [sewadars, sessionGroup]);
+
   const filtered = useMemo(() => {
     return sewadars.filter(s => {
+      if (s.isRestored) {
+        return s.name.toLowerCase().includes(searchTerm.toLowerCase());
+      }
       if (isGentsSaturday && isRemovedSaturday(s.name)) {
         return false;
       }
@@ -250,6 +268,25 @@ const AttendanceManager: React.FC<Props> = ({
       return;
     }
 
+    // Check if sewadar is in removed list for this group
+    const isRemoved = (newGroup === 'Saturday' && newGender === 'Gents' && isRemovedSaturday(trimmedName)) ||
+                      (newGroup === 'Tuesday' && newGender === 'Gents' && isRemovedTuesday(trimmedName));
+
+    if (isRemoved) {
+      setRestorePrompt({
+        name: trimmedName,
+        gender: newGender,
+        group: newGroup,
+        shift: newShift,
+        details: {
+          dob: newDob,
+          phone: newPhone.trim(),
+          address: newAddress.trim()
+        }
+      });
+      return;
+    }
+
     onAddSewadar(trimmedName, newGender, newGroup, newShift, {
       dob: newDob,
       phone: newPhone.trim(),
@@ -263,6 +300,26 @@ const AttendanceManager: React.FC<Props> = ({
     setNewShift(undefined);
     setDuplicateError(null);
     setShowAddModal(false);
+  };
+
+  const handleConfirmRestore = () => {
+    if (!restorePrompt) return;
+    onAddSewadar(
+      restorePrompt.name,
+      restorePrompt.gender,
+      restorePrompt.group,
+      restorePrompt.shift,
+      restorePrompt.details,
+      true
+    );
+    setNewName('');
+    setNewDob('');
+    setNewPhone('');
+    setNewAddress('');
+    setNewShift(undefined);
+    setDuplicateError(null);
+    setShowAddModal(false);
+    setRestorePrompt(null);
   };
 
   const handleVehicleSubmit = (e: React.FormEvent) => {
@@ -294,6 +351,44 @@ const AttendanceManager: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 font-sans max-w-2xl mx-auto">
+      {/* Restore Confirmation Prompt Modal */}
+      {restorePrompt && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 text-center">
+            <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto text-2xl shadow-inner border border-amber-100">
+              ⚠️
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">Restore Member</h3>
+              <p className="text-sm font-bold text-slate-700">
+                This person was previously marked as removed. Would you like to restore them to the active list?
+              </p>
+              <div className="mt-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs font-black text-indigo-900">
+                Member: <span className="text-slate-900 font-extrabold">{restorePrompt.name}</span> ({restorePrompt.group} {restorePrompt.gender})
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button 
+                type="button" 
+                onClick={() => setRestorePrompt(null)} 
+                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-xs transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleConfirmRestore} 
+                className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-indigo-200 transition-all active:scale-95"
+              >
+                Yes, Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Sewadar Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
@@ -810,11 +905,12 @@ const AttendanceManager: React.FC<Props> = ({
                     Removed Saturday Members
                   </h3>
                   <span className="text-[9px] bg-red-50 text-red-500 font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                    Total Removed: {SATURDAY_REMOVED_NAMES.length}
+                    Total Removed: {SATURDAY_REMOVED_NAMES.filter(name => !activeRestoredNorms.has(normalizeName(name))).length}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {SATURDAY_REMOVED_NAMES.filter(name => 
+                    !activeRestoredNorms.has(normalizeName(name)) &&
                     name.toLowerCase().includes(searchTerm.toLowerCase())
                   ).map((name, i) => (
                     <div key={i} className="flex items-center justify-between bg-slate-50/50 px-5 py-4 rounded-2xl border border-slate-100/80 transition-all hover:bg-slate-50/80">
@@ -837,11 +933,12 @@ const AttendanceManager: React.FC<Props> = ({
                     Removed Tuesday Members
                   </h3>
                   <span className="text-[9px] bg-red-50 text-red-500 font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                    Total Removed: {TUESDAY_REMOVED_NAMES.length}
+                    Total Removed: {TUESDAY_REMOVED_NAMES.filter(name => !activeRestoredNorms.has(normalizeName(name))).length}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {TUESDAY_REMOVED_NAMES.filter(name => 
+                    !activeRestoredNorms.has(normalizeName(name)) &&
                     name.toLowerCase().includes(searchTerm.toLowerCase())
                   ).map((name, i) => (
                     <div key={i} className="flex items-center justify-between bg-slate-50/50 px-5 py-4 rounded-2xl border border-slate-100/80 transition-all hover:bg-slate-50/80">

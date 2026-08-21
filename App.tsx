@@ -690,7 +690,9 @@ const App: React.FC = () => {
           name: s.name,
           gender: s.gender as Gender,
           group: s.group as DutyGroup,
-          isCustom: true
+          shift: s.shift || undefined,
+          isCustom: true,
+          isRestored: Boolean(s.isRestored)
         })));
       }
 
@@ -1350,15 +1352,16 @@ const App: React.FC = () => {
             onSaveVehicle={handleSaveVehicle}
             vehicles={activeVehicles}
             flaggedVehicles={flaggedVehicles}
-            onAddSewadar={async (n, g, grp, shift, details) => {
-              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp, shift };
+            onAddSewadar={async (n, g, grp, shift, details, isRestored) => {
+              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp, shift, isRestored: Boolean(isRestored) };
               try {
                 await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { 
                   id: newSewadar.id, 
                   name: newSewadar.name, 
                   gender: newSewadar.gender, 
                   group: newSewadar.group,
-                  shift: newSewadar.shift || null
+                  shift: newSewadar.shift || null,
+                  isRestored: Boolean(isRestored)
                 });
                 if (details) {
                   await handleSaveSewadarDetails({

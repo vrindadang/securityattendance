@@ -20,6 +20,7 @@ export interface Sewadar {
   isCustom?: boolean;
   isRemovedSaturday?: boolean;
   isRemovedTuesday?: boolean;
+  isRestored?: boolean;
 }
 
 export interface SewadarDetails {
