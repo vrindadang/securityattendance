@@ -138,8 +138,8 @@ const AttendanceManager: React.FC<Props> = ({
   }, [sewadars, sessionGroup]);
 
   const filtered = useMemo(() => {
-    return sewadars.filter(s => {
-      if (s.isRestored) {
+    const list = sewadars.filter(s => {
+      if (s.isRestored || activeRestoredNorms.has(normalizeName(s.name))) {
         return s.name.toLowerCase().includes(searchTerm.toLowerCase());
       }
       if (isGentsSaturday && isRemovedSaturday(s.name)) {
@@ -149,7 +149,19 @@ const AttendanceManager: React.FC<Props> = ({
         return false;
       }
       return s.name.toLowerCase().includes(searchTerm.toLowerCase());
-    }).sort((a, b) => {
+    });
+
+    // Deduplicate in case a restored member exists as both custom and legacy
+    const uniqueMap = new Map<string, Sewadar>();
+    for (const s of list) {
+      const key = `${s.group}_${normalizeName(s.name)}`;
+      const existing = uniqueMap.get(key);
+      if (!existing || (!existing.isRestored && s.isRestored)) {
+        uniqueMap.set(key, s);
+      }
+    }
+
+    return Array.from(uniqueMap.values()).sort((a, b) => {
       const aMarked = attendance.some(rec => rec.sewadarId === a.id && normalizeDate(rec.date) === normalizedSessionDate);
       const bMarked = attendance.some(rec => rec.sewadarId === b.id && normalizeDate(rec.date) === normalizedSessionDate);
       
@@ -157,7 +169,7 @@ const AttendanceManager: React.FC<Props> = ({
       if (!aMarked && bMarked) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [sewadars, searchTerm, attendance, normalizedSessionDate, isGentsSaturday, isGentsTuesday]);
+  }, [sewadars, searchTerm, attendance, normalizedSessionDate, isGentsSaturday, isGentsTuesday, activeRestoredNorms]);
 
   const markedCount = useMemo(() => {
     const markedIds = new Set(attendance.filter(a => normalizeDate(a.date) === normalizedSessionDate).map(a => a.sewadarId));
@@ -245,34 +257,38 @@ const AttendanceManager: React.FC<Props> = ({
     const trimmedName = newName.trim();
     if (!trimmedName) return;
 
-    if (!newDob || !newPhone.trim() || !newAddress.trim()) {
-      setDuplicateError("All details (DOB, Mobile Number, and Address) are mandatory.");
-      return;
-    }
-
-    if (!/^\d{10}$/.test(newPhone.trim())) {
+    // Optional phone validation: only validate if phone is provided
+    if (newPhone.trim() && !/^\d{10}$/.test(newPhone.trim())) {
       setDuplicateError("Mobile number must be a valid 10-digit number.");
       return;
     }
 
-    // Fuzzy matching normalization: lowercase and remove non-alphanumeric
-    const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normalizedNewName = normalize(trimmedName);
-
-    const isDuplicate = sewadars.some(s => 
-      s.group === newGroup && normalize(s.name) === normalizedNewName
-    );
-
-    if (isDuplicate) {
-      setDuplicateError(`A member with a similar name already exists in the ${newGroup} group.`);
-      return;
-    }
+    const normalizedNewName = normalizeName(trimmedName);
 
     // Check if sewadar is in removed list for this group
     const isRemoved = (newGroup === 'Saturday' && newGender === 'Gents' && isRemovedSaturday(trimmedName)) ||
                       (newGroup === 'Tuesday' && newGender === 'Gents' && isRemovedTuesday(trimmedName));
 
-    if (isRemoved) {
+    // Find any existing sewadars in this group with matching normalized name
+    const existingMatching = sewadars.filter(s => 
+      s.group === newGroup && normalizeName(s.name) === normalizedNewName
+    );
+
+    // A sewadar is genuinely an active duplicate if it's currently active (not in removed list, or marked isRestored)
+    const isAlreadyActive = existingMatching.some(s => {
+      if (s.isRestored) return true;
+      if (newGroup === 'Saturday' && newGender === 'Gents' && isRemovedSaturday(s.name)) return false;
+      if (newGroup === 'Tuesday' && newGender === 'Gents' && isRemovedTuesday(s)) return false;
+      return true;
+    });
+
+    if (isAlreadyActive) {
+      setDuplicateError(`A member with a similar name already exists and is active in the ${newGroup} group.`);
+      return;
+    }
+
+    // If member is removed (in removed lists or was hidden in existing sewadars)
+    if (isRemoved || existingMatching.length > 0) {
       setRestorePrompt({
         name: trimmedName,
         gender: newGender,
@@ -401,10 +417,9 @@ const AttendanceManager: React.FC<Props> = ({
                  </div>
 
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Date of Birth (DOB)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Date of Birth (DOB) (Optional)</label>
                     <input 
                        type="date" 
-                       required 
                        className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none" 
                        value={newDob} 
                        onChange={e => setNewDob(e.target.value)} 
@@ -412,12 +427,10 @@ const AttendanceManager: React.FC<Props> = ({
                  </div>
 
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Mobile Number</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Mobile Number (Optional)</label>
                     <input 
                        type="tel" 
-                       required 
-                       pattern="[0-9]{10}"
-                       title="10-digit mobile number"
+                       maxLength={10}
                        className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none" 
                        placeholder="10-Digit Mobile Number" 
                        value={newPhone} 
@@ -426,9 +439,8 @@ const AttendanceManager: React.FC<Props> = ({
                  </div>
 
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Address</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Address (Optional)</label>
                     <textarea 
-                       required 
                        className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none min-h-[60px]" 
                        placeholder="Residential Address" 
                        value={newAddress} 
