@@ -610,6 +610,7 @@ const AttendanceManager: React.FC<Props> = ({
                 const records = attendance.filter(a => a.sewadarId === s.id && normalizeDate(a.date) === normalizedSessionDate);
                 const isExpanded = expandedId === s.id;
                 const isMarked = records.length > 0;
+                const isWorkshopMarked = records.some(r => r.workshopLocation === 'Workshop');
 
                 return (
                   <div key={s.id} className="flex flex-col gap-1">
@@ -625,11 +626,18 @@ const AttendanceManager: React.FC<Props> = ({
                           <div className="flex items-center gap-4">
                             <div className="text-[9px] font-black text-emerald-300 w-5 text-center">{idx + 1}</div>
                             <div className="text-left">
-                               <p className="font-black text-sm text-slate-800 leading-tight">
-                                 {s.name} 
-                                 <span className="ml-2 text-[10px] font-bold text-emerald-600/60">
-                                   ({records.map(r => r.sewaPoint || 'General').join(', ')} • {records.every(r => r.isProperUniform !== false) ? 'Uniform' : <span className="text-red-600 font-black">No Dress</span>})
-                                 </span>
+                               <div className="flex items-center flex-wrap gap-1.5">
+                                 <p className="font-black text-sm text-slate-800 leading-tight">
+                                   {s.name}
+                                 </p>
+                                 {isWorkshopMarked && (
+                                   <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                     Marked via Workshop
+                                   </span>
+                                 )}
+                               </div>
+                               <p className="text-[10px] font-bold text-emerald-600/70 mt-0.5">
+                                 {records.map(r => r.sewaPoint || (r.workshopLocation === 'Workshop' ? 'Workshop' : 'General')).join(', ')} • {records.every(r => r.isProperUniform !== false) ? 'Uniform' : <span className="text-red-600 font-black">No Dress</span>}
                                </p>
                             </div>
                           </div>
@@ -734,8 +742,13 @@ const AttendanceManager: React.FC<Props> = ({
                                   className={`p-4 rounded-2xl flex items-center justify-between border cursor-pointer transition-all ${editingRecordId === rec.id ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-slate-50 border-slate-100 hover:bg-white'}`}
                                 >
                                    <div className="space-y-1">
-                                       <div className="flex items-center gap-2">
+                                       <div className="flex items-center gap-2 flex-wrap">
                                           <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
+                                          {rec.workshopLocation === 'Workshop' && (
+                                            <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase bg-indigo-100 text-indigo-700">
+                                              Marked via Workshop
+                                            </span>
+                                          )}
                                           {rec.shift && (
                                             <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${rec.shift === 'DAY' ? 'bg-amber-100 text-amber-700' : 'bg-slate-800 text-white'}`}>
                                               {rec.shift}

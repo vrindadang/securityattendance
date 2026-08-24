@@ -19,6 +19,7 @@ const DEPARTMENT_PASSWORDS: Record<string, string> = {
   'Langar Department': 'lan123',
   'CCTV Vision Team': 'ccv123',
   'CCTV Maintenance': 'ccm123',
+  'Workshop Coordinator': 'coord123',
 };
 
 type PortalType = 'GENTS' | 'LADIES' | 'BACKOFFICE' | 'SUPERADMIN' | null;
@@ -95,13 +96,24 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
             role: 'Back Office Admin',
             password: '123'
           };
-          onLogin({
-            ...adminVol,
-            name: `${selectedGroup} Admin`,
-            role: 'Back Office Admin',
-            assignedGroup: selectedGroup,
-            password: password
-          });
+          if (selectedGroup === 'Workshop Coordinator') {
+            onLogin({
+              ...adminVol,
+              id: 'workshop_coordinator',
+              name: 'Workshop Coordinator',
+              role: 'Back Office Admin',
+              assignedGroup: undefined,
+              password: password
+            });
+          } else {
+            onLogin({
+              ...adminVol,
+              name: `${selectedGroup} Admin`,
+              role: 'Back Office Admin',
+              assignedGroup: selectedGroup,
+              password: password
+            });
+          }
         } else {
           setError('Incorrect password.');
         }
@@ -274,7 +286,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
             </div>
             <div className="grid grid-cols-1 gap-3">
               {portalType === 'BACKOFFICE' ? (
-                ['HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'].map(group => (
+                ['HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Workshop Coordinator'].map(group => (
                   <button key={group} onClick={() => handleGroupSelect(group)} className="w-full bg-white p-5 rounded-2xl border-2 border-slate-100 hover:border-slate-800 text-slate-700 transition-all text-left font-black active:scale-95">
                     {group}
                   </button>

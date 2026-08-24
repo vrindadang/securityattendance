@@ -8,6 +8,9 @@ import Login from './components/Login';
 import VolunteerDetails from './components/VolunteerDetails';
 import RequirementsView from './components/RequirementsView';
 import WeeklyReportsView from './components/WeeklyReportsView';
+import WorkshopAttendanceView from './components/WorkshopAttendanceView';
+import WorkshopLeaderboardView from './components/WorkshopLeaderboardView';
+import WorkshopReportView from './components/WorkshopReportView';
 import ImportantInfoBanner from './components/ImportantInfoBanner';
 import { db } from './firebase';
 import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
@@ -241,6 +244,22 @@ const App: React.FC = () => {
       'Langar Department'
     ].includes(targetGroup);
   }, [activeVolunteer]);
+
+  const isWorkshopCoordinator = useMemo(() => {
+    if (!activeVolunteer) return false;
+    return (
+      activeVolunteer.role === 'Super Admin' ||
+      activeVolunteer.id === 'workshop_coordinator' ||
+      activeVolunteer.name === 'Workshop Coordinator'
+    );
+  }, [activeVolunteer]);
+
+  // Guard against non-workshop users landing on workshop views
+  useEffect(() => {
+    if (!isWorkshopCoordinator && (activeView === 'WorkshopAttendance' || activeView === 'WorkshopLeaderboard')) {
+      setActiveView('Attendance');
+    }
+  }, [isWorkshopCoordinator, activeView]);
 
   useEffect(() => {
     if (showSettingsModal && activeVolunteer) {
@@ -1246,7 +1265,7 @@ const App: React.FC = () => {
                 <p className="text-[10px] font-black text-slate-900">{activeVolunteer.name}</p>
                 <p className="text-[8px] font-bold text-indigo-500 uppercase">{activeVolunteer.role}</p>
               </div>
-              <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); localStorage.removeItem(STORAGE_KEY_SESSION_ID); setActiveVolunteer(null); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
+              <button onClick={() => { localStorage.removeItem(STORAGE_KEY_VOLUNTEER); localStorage.removeItem(STORAGE_KEY_SESSION_ID); setActiveVolunteer(null); setActiveView('Attendance'); }} className="p-2.5 bg-slate-50 rounded-xl hover:text-red-500"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
             </div>
           </header>
         )}
@@ -1259,9 +1278,15 @@ const App: React.FC = () => {
               try {
                 setActiveVolunteer(v); 
                 localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
+                if (v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator') {
+                  setActiveView('WorkshopAttendance');
+                } else {
+                  setActiveView('Attendance');
+                }
               } catch (e) {
                 console.error("Storage error:", e);
                 setActiveVolunteer(v);
+                setActiveView(v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator' ? 'WorkshopAttendance' : 'Attendance');
               }
             }} 
             onShowNotice={() => setShowNoticeModal(true)}
@@ -1404,6 +1429,27 @@ const App: React.FC = () => {
           />
         ) : activeView === 'WeeklyReports' ? (
           <WeeklyReportsView activeVolunteer={activeVolunteer} />
+        ) : activeView === 'WorkshopAttendance' && isWorkshopCoordinator ? (
+          <WorkshopAttendanceView 
+            allSewadars={allSewadarsList}
+            activeVolunteer={activeVolunteer}
+            normalizeName={normalizeName}
+            onNavigateToStandings={() => setActiveView('WorkshopLeaderboard')}
+            onNavigateToReport={() => setActiveView('WorkshopReport')}
+          />
+        ) : activeView === 'WorkshopLeaderboard' && isWorkshopCoordinator ? (
+          <WorkshopLeaderboardView 
+            onNavigateToAttendance={() => setActiveView('WorkshopAttendance')}
+            onNavigateToReport={() => setActiveView('WorkshopReport')}
+          />
+        ) : activeView === 'WorkshopReport' && isWorkshopCoordinator ? (
+          <WorkshopReportView
+            allSewadars={allSewadarsList}
+            activeVolunteer={activeVolunteer}
+            normalizeName={normalizeName}
+            onNavigateToAttendance={() => setActiveView('WorkshopAttendance')}
+            onNavigateToStandings={() => setActiveView('WorkshopLeaderboard')}
+          />
         ) : (
           <Dashboard 
             attendance={attendance} 
@@ -1455,6 +1501,17 @@ const App: React.FC = () => {
             <button onClick={() => setActiveView('WeeklyReports')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'WeeklyReports' ? 'text-indigo-600' : 'text-slate-400'}`}>
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               <span className="text-[8px] font-black uppercase">Weekly</span>
+            </button>
+          )}
+          {(activeVolunteer.role === 'Super Admin' || activeVolunteer.id === 'workshop_coordinator' || activeVolunteer.name === 'Workshop Coordinator') && (
+            <button onClick={() => setActiveView(activeView === 'WorkshopAttendance' ? 'WorkshopLeaderboard' : 'WorkshopAttendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'WorkshopAttendance' || activeView === 'WorkshopLeaderboard' || activeView === 'WorkshopReport' ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>
+              <div className="relative">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <span className="absolute -top-1 -right-2 px-1 py-0.2 bg-amber-500 text-white rounded-full text-[7px] font-black">30 Aug</span>
+              </div>
+              <span className="text-[8px] font-black uppercase text-center truncate max-w-[60px]">
+                {activeView === 'WorkshopLeaderboard' ? 'Standings' : activeView === 'WorkshopReport' ? 'Report' : 'Workshop'}
+              </span>
             </button>
           )}
         </nav>

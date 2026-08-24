@@ -146,4 +146,19 @@ export interface WeeklyReport {
   timestamp: number;
 }
 
-export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports';
+export interface WorkshopPoint {
+  id: string;
+  sewadarId: string;
+  sewadarName: string;
+  gender: Gender;
+  group: string;
+  team: string; // 'Ladies' for all ladies, or 'Monday', 'Tuesday', etc. for gents
+  points: number; // 100 for early, 50 for late
+  reason: string; // 'Attendance – Early' or 'Attendance – Late'
+  checkInTime: string; // 'HH:mm'
+  timestamp: number;
+  date: string; // '2026-08-30'
+  awardedBy: string;
+}
+
+export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports' | 'WorkshopAttendance' | 'WorkshopLeaderboard' | 'WorkshopReport';

@@ -27,9 +27,10 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
     return sewadars.filter(s => {
       const isSuperAdmin = activeVolunteer.role === 'Super Admin';
       const isLadies = activeVolunteer.role.includes('Ladies');
+      const isGlobalAdmin = isSuperAdmin || !activeVolunteer.assignedGroup;
       const assignedLower = activeVolunteer.assignedGroup?.toLowerCase() || '';
       const sGroupLower = s.group.toLowerCase();
-      const matchGroup = isSuperAdmin || isLadies || 
+      const matchGroup = isGlobalAdmin || isLadies || 
         sGroupLower === assignedLower || 
         sGroupLower === `ladies-${assignedLower}` || 
         sGroupLower.includes(assignedLower);
@@ -87,7 +88,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
   };
 
   const visibleDaysToDownload = useMemo(() => {
-    if (activeVolunteer.role === 'Super Admin' || activeVolunteer.assignedGroup === 'Ladies') {
+    if (activeVolunteer.role === 'Super Admin' || activeVolunteer.assignedGroup === 'Ladies' || !activeVolunteer.assignedGroup) {
       return GENTS_GROUPS;
     }
     const assigned = activeVolunteer.assignedGroup;
@@ -249,7 +250,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
           <div className="relative z-10">
             <h2 className="text-2xl font-black mb-1">Member Directory</h2>
             <p className="text-indigo-300 text-[10px] font-black uppercase tracking-widest">
-              {activeVolunteer.role === 'Super Admin' ? 'Master Records' : `${activeVolunteer.assignedGroup} Group Profiles`}
+              {activeVolunteer.role === 'Super Admin' || !activeVolunteer.assignedGroup ? 'Master Records' : `${activeVolunteer.assignedGroup} Group Profiles`}
             </p>
           </div>
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
