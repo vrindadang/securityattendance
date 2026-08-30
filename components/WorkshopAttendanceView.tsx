@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Sewadar, AttendanceRecord, DutyGroup, Gender, WorkshopPoint } from '../types';
 import { GENTS_GROUPS, LADIES_GROUPS } from '../constants';
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   getWorkshopTestMode,
@@ -24,6 +24,64 @@ interface WorkshopAttendanceViewProps {
 }
 
 const WORKSHOP_DATE = '2026-08-30';
+
+// Strict validator to ensure ONLY 30 August 2026 records are used in Workshop
+export const isWorkshopDate = (dateVal: any): boolean => {
+  if (!dateVal) return false;
+  
+  // 1. Firestore Timestamp
+  if (typeof dateVal === 'object' && typeof dateVal.toDate === 'function') {
+    try {
+      const d = dateVal.toDate();
+      const iso = d.toISOString().split('T')[0];
+      if (iso === WORKSHOP_DATE) return true;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      if (`${y}-${m}-${day}` === WORKSHOP_DATE) return true;
+      const uY = d.getUTCFullYear();
+      const uM = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const uD = String(d.getUTCDate()).padStart(2, '0');
+      if (`${uY}-${uM}-${uD}` === WORKSHOP_DATE) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Numeric timestamp
+  if (typeof dateVal === 'number') {
+    try {
+      const d = new Date(dateVal > 1e11 ? dateVal : dateVal * 1000);
+      const iso = d.toISOString().split('T')[0];
+      if (iso === WORKSHOP_DATE) return true;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      if (`${y}-${m}-${day}` === WORKSHOP_DATE) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 3. String date
+  if (typeof dateVal === 'string') {
+    const clean = dateVal.split('T')[0].trim();
+    if (clean === WORKSHOP_DATE) return true;
+    const parts = clean.split(/[-/]/).map(Number);
+    if (parts.length === 3) {
+      let y, m, dNum;
+      if (parts[0] > 1000) {
+        [y, m, dNum] = parts;
+      } else {
+        [dNum, m, y] = parts;
+      }
+      const formatted = `${y}-${String(m).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
+      if (formatted === WORKSHOP_DATE) return true;
+    }
+  }
+
+  return false;
+};
 
 // Helper to determine team from gender + group
 export const getWorkshopTeam = (gender: Gender, group: string): string => {
@@ -59,9 +117,9 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
     checkAndAutoResetTestData();
   }, []);
 
-  // Fetch 30 Aug attendance and points records (Live vs Test Mode)
-  const fetchWorkshopData = async (testModeActive: boolean) => {
-    if (testModeActive) {
+  // Fetch 30 Aug attendance and points records with real-time live synchronization
+  useEffect(() => {
+    if (isTestMode) {
       setLoading(true);
       const testAtt = getStoredTestAttendance();
       const testPts = getStoredTestPoints();
@@ -71,76 +129,105 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
       return;
     }
 
-    try {
-      setLoading(true);
-      const [y, m, d] = WORKSHOP_DATE.split('-').map(Number);
-      const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0));
-      const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d, 23, 59, 59));
+    setLoading(true);
+    const [y, m, d] = WORKSHOP_DATE.split('-').map(Number);
+    // Buffer Timestamp range to cover timezone variations while strictly validating date below
+    const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d - 1, 18, 0, 0));
+    const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d + 1, 6, 0, 0));
 
-      // 1. Fetch live attendance from Firestore
-      const qAtt = query(
-        collection(db, 'attendance'),
-        where('date', '>=', startOfDay),
-        where('date', '<=', endOfDay)
-      );
-      const snapshotAtt = await getDocs(qAtt);
-      const records: AttendanceRecord[] = snapshotAtt.docs.map(docSnap => {
-        const data = docSnap.data();
-        let dStr = data.date;
-        if (dStr && typeof dStr !== 'string' && (dStr as any).toDate) {
-          dStr = (dStr as any).toDate().toISOString().split('T')[0];
-        }
-        return {
-          id: docSnap.id,
-          sewadarId: data.sewadar_id,
-          name: data.name,
-          group: data.group,
-          gender: data.gender,
-          date: dStr || WORKSHOP_DATE,
-          timestamp: data.timestamp || Date.now(),
-          volunteerId: data.volunteer_id,
-          inTime: data.in_time,
-          outTime: data.out_time,
-          sewaPoint: data.sewa_points,
-          workshopLocation: data.workshop_location,
-          isProperUniform: data.is_proper_uniform
-        };
-      });
-      setWorkshopAttendance(records);
+    // 1. Live attendance listener - strictly 30 Aug 2026
+    const qAtt = query(
+      collection(db, 'attendance'),
+      where('date', '>=', startOfDay),
+      where('date', '<=', endOfDay)
+    );
 
-      // 2. Fetch live workshop points from Firestore
-      const qPoints = query(
-        collection(db, 'workshop_points'),
-        where('date', '==', WORKSHOP_DATE)
-      );
-      const snapshotPoints = await getDocs(qPoints);
-      const pointsList: WorkshopPoint[] = snapshotPoints.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          sewadarId: data.sewadarId || data.sewadar_id,
-          sewadarName: data.sewadarName || data.name,
-          gender: data.gender,
-          group: data.group,
-          team: data.team,
-          points: Number(data.points) || 0,
-          reason: data.reason,
-          checkInTime: data.checkInTime || data.in_time,
-          timestamp: data.timestamp || Date.now(),
-          date: data.date || WORKSHOP_DATE,
-          awardedBy: data.awardedBy || data.volunteer_id
-        };
-      });
-      setWorkshopPoints(pointsList);
-    } catch (err) {
-      console.error('Failed to load workshop data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const unsubAtt = onSnapshot(
+      qAtt,
+      (snapshotAtt) => {
+        const records: AttendanceRecord[] = [];
+        snapshotAtt.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          // STRICT DATE CHECK: Only include records from 30 August 2026
+          if (!isWorkshopDate(data.date)) {
+            return;
+          }
 
-  useEffect(() => {
-    fetchWorkshopData(isTestMode);
+          let dStr = data.date;
+          if (dStr && typeof dStr !== 'string' && (dStr as any).toDate) {
+            dStr = (dStr as any).toDate().toISOString().split('T')[0];
+          }
+          
+          const rawGroup = (data.group || '').toString();
+          const isLadies = data.gender === 'Ladies' || rawGroup.toLowerCase().includes('ladies');
+          const gender: Gender = isLadies ? 'Ladies' : 'Gents';
+
+          records.push({
+            id: docSnap.id,
+            sewadarId: data.sewadar_id || data.sewadarId || '',
+            name: data.name || data.sewadarName || '',
+            group: data.group,
+            gender: gender,
+            date: WORKSHOP_DATE,
+            timestamp: data.timestamp || Date.now(),
+            volunteerId: data.volunteer_id || data.volunteerId || '',
+            inTime: data.in_time || data.inTime || '',
+            outTime: data.out_time || data.outTime || '',
+            sewaPoint: data.sewa_points || data.sewaPoint || 'Workshop',
+            workshopLocation: data.workshop_location || data.workshopLocation || 'Workshop',
+            isProperUniform: data.is_proper_uniform ?? data.isProperUniform ?? true
+          });
+        });
+        setWorkshopAttendance(records);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Failed to subscribe to live workshop attendance:', err);
+        setLoading(false);
+      }
+    );
+
+    // 2. Live points listener - strictly 30 Aug 2026
+    const qPoints = query(
+      collection(db, 'workshop_points'),
+      where('date', '==', WORKSHOP_DATE)
+    );
+
+    const unsubPoints = onSnapshot(
+      qPoints,
+      (snapshotPoints) => {
+        const pointsList: WorkshopPoint[] = snapshotPoints.docs.map(docSnap => {
+          const data = docSnap.data();
+          const rawGroup = (data.group || '').toString();
+          const isLadies = data.gender === 'Ladies' || rawGroup.toLowerCase().includes('ladies');
+          const gender: Gender = isLadies ? 'Ladies' : 'Gents';
+
+          return {
+            id: docSnap.id,
+            sewadarId: data.sewadarId || data.sewadar_id || '',
+            sewadarName: data.sewadarName || data.name || '',
+            gender: gender,
+            group: data.group,
+            team: data.team || getWorkshopTeam(gender, data.group || ''),
+            points: Number(data.points) || 0,
+            reason: data.reason || 'Attendance',
+            checkInTime: data.checkInTime || data.in_time || '',
+            timestamp: data.timestamp || Date.now(),
+            date: WORKSHOP_DATE,
+            awardedBy: data.awardedBy || data.volunteer_id || ''
+          };
+        });
+        setWorkshopPoints(pointsList);
+      },
+      (err) => {
+        console.error('Failed to subscribe to live workshop points:', err);
+      }
+    );
+
+    return () => {
+      unsubAtt();
+      unsubPoints();
+    };
   }, [isTestMode]);
 
   const handleToggleTestMode = (newMode: boolean) => {
@@ -212,8 +299,13 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
         map.set(rec.sewadarId, rec);
       }
       if (rec.name) {
-        const normKey = `${rec.gender || ''}_${rec.group || ''}_${normalizeName(rec.name)}`;
-        map.set(normKey, rec);
+        const normName = normalizeName(rec.name);
+        const rawGroup = (rec.group || '').toLowerCase().replace(/^ladies-/i, '').trim();
+        const gender = rec.gender || (rec.group?.toLowerCase().includes('ladies') ? 'Ladies' : 'Gents');
+
+        map.set(`${gender}_${rawGroup}_${normName}`, rec);
+        map.set(`${gender}_${normName}`, rec);
+        map.set(normName, rec);
       }
     }
     return map;
@@ -227,7 +319,12 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
       const keys: string[] = [];
       if (pt.sewadarId) keys.push(pt.sewadarId);
       if (pt.sewadarName) {
-        keys.push(`${pt.gender || ''}_${pt.group || ''}_${normalizeName(pt.sewadarName)}`);
+        const normName = normalizeName(pt.sewadarName);
+        const rawGroup = (pt.group || '').toLowerCase().replace(/^ladies-/i, '').trim();
+        const gender = pt.gender || (pt.group?.toLowerCase().includes('ladies') ? 'Ladies' : 'Gents');
+        keys.push(`${gender}_${rawGroup}_${normName}`);
+        keys.push(`${gender}_${normName}`);
+        keys.push(normName);
       }
 
       for (const key of keys) {
@@ -243,8 +340,56 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
         map.set(key, existing);
       }
     }
+
+    // Also sync attendance points from group logins for 30 Aug 2026 if not already in workshop_points
+    for (const rec of workshopAttendance) {
+      const keys: string[] = [];
+      if (rec.sewadarId) keys.push(rec.sewadarId);
+      if (rec.name) {
+        const normName = normalizeName(rec.name);
+        const rawGroup = (rec.group || '').toLowerCase().replace(/^ladies-/i, '').trim();
+        const gender = rec.gender || (rec.group?.toLowerCase().includes('ladies') ? 'Ladies' : 'Gents');
+        keys.push(`${gender}_${rawGroup}_${normName}`);
+        keys.push(`${gender}_${normName}`);
+        keys.push(normName);
+      }
+
+      const primaryKey = keys[0];
+      const existing = primaryKey ? map.get(primaryKey) : undefined;
+      const hasAttPoint = existing?.records.some(r => r.reason.startsWith('Attendance'));
+
+      if (!hasAttPoint) {
+        const time = rec.inTime || '';
+        const [h, m] = time.split(':').map(Number);
+        const isEarly = !isNaN(h) ? (h < 9 || (h === 9 && m < 30)) : true;
+        const pts = isEarly ? 100 : 50;
+        const fakePt: WorkshopPoint = {
+          id: `synced_${rec.id}`,
+          sewadarId: rec.sewadarId,
+          sewadarName: rec.name,
+          gender: rec.gender,
+          group: rec.group,
+          team: getWorkshopTeam(rec.gender, rec.group),
+          points: pts,
+          reason: isEarly ? 'Attendance – Early' : 'Attendance – Late',
+          checkInTime: rec.inTime,
+          timestamp: rec.timestamp,
+          date: WORKSHOP_DATE,
+          awardedBy: rec.volunteerId
+        };
+
+        for (const key of keys) {
+          const item = map.get(key) || { total: 0, attPoints: 0, quizCount: 0, quizPoints: 0, records: [] };
+          item.total += pts;
+          item.attPoints += pts;
+          item.records.push(fakePt);
+          map.set(key, item);
+        }
+      }
+    }
+
     return map;
-  }, [workshopPoints, normalizeName]);
+  }, [workshopPoints, workshopAttendance, normalizeName]);
 
   // Team totals summary
   const currentTeamName = useMemo(() => {
@@ -252,29 +397,91 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
   }, [selectedGender, selectedGroup]);
 
   const currentTeamPointsTotal = useMemo(() => {
-    return workshopPoints
-      .filter(p => p.team === currentTeamName)
-      .reduce((sum, p) => sum + p.points, 0);
-  }, [workshopPoints, currentTeamName]);
+    let total = 0;
+    for (const s of groupSewadars) {
+      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+      const normName = normalizeName(s.name);
+      const breakdown = sewadarPointsBreakdown.get(s.id) ||
+                        sewadarPointsBreakdown.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                        sewadarPointsBreakdown.get(`${s.gender}_${normName}`) ||
+                        sewadarPointsBreakdown.get(normName);
+      if (breakdown) {
+        total += breakdown.total;
+      }
+    }
+    return total;
+  }, [groupSewadars, sewadarPointsBreakdown, normalizeName]);
 
   // Count how many from current group are marked present
   const markedPresentCount = useMemo(() => {
     let count = 0;
     for (const s of groupSewadars) {
-      const rec = attendanceMap.get(s.id) || attendanceMap.get(`${s.gender}_${s.group}_${normalizeName(s.name)}`);
+      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+      const normName = normalizeName(s.name);
+      const rec = attendanceMap.get(s.id) || 
+                  attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                  attendanceMap.get(`${s.gender}_${normName}`);
       if (rec) count++;
     }
     return count;
   }, [groupSewadars, attendanceMap, normalizeName]);
 
-  // Total marked across all groups for Workshop
-  const totalWorkshopMarked = useMemo(() => {
-    return workshopAttendance.length;
-  }, [workshopAttendance]);
+  // Total unique marked across all groups for Workshop (deduplicated and synced with every group)
+  const { totalWorkshopMarkedGents, totalWorkshopMarkedLadies, totalWorkshopMarked } = useMemo(() => {
+    const markedGentsIds = new Set<string>();
+    const markedLadiesIds = new Set<string>();
+
+    // 1. Iterate over all registered sewadars
+    for (const s of allSewadars) {
+      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+      const normName = normalizeName(s.name);
+      const rec = attendanceMap.get(s.id) || 
+                  attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                  attendanceMap.get(`${s.gender}_${normName}`);
+      
+      if (rec) {
+        if (s.gender === 'Ladies') {
+          markedLadiesIds.add(s.id);
+        } else {
+          markedGentsIds.add(s.id);
+        }
+      }
+    }
+
+    // 2. Include any attendance records that might not be in allSewadars static list
+    for (const rec of workshopAttendance) {
+      const isLadies = rec.gender === 'Ladies' || (rec.group && rec.group.toLowerCase().includes('ladies'));
+      const normName = normalizeName(rec.name || '');
+      const key = rec.sewadarId || `${isLadies ? 'Ladies' : 'Gents'}_${normName || rec.id}`;
+      
+      if (isLadies) {
+        if (!markedLadiesIds.has(rec.sewadarId || '')) {
+          markedLadiesIds.add(key);
+        }
+      } else {
+        if (!markedGentsIds.has(rec.sewadarId || '')) {
+          markedGentsIds.add(key);
+        }
+      }
+    }
+
+    const gents = markedGentsIds.size;
+    const ladies = markedLadiesIds.size;
+    return {
+      totalWorkshopMarkedGents: gents,
+      totalWorkshopMarkedLadies: ladies,
+      totalWorkshopMarked: gents + ladies
+    };
+  }, [allSewadars, attendanceMap, workshopAttendance, normalizeName]);
 
   // Handle Mark Present + Auto Award Attendance Points
   const handleMarkPresent = async (s: Sewadar) => {
-    const existing = attendanceMap.get(s.id) || attendanceMap.get(`${s.gender}_${s.group}_${normalizeName(s.name)}`);
+    const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+    const normName = normalizeName(s.name);
+    const existing = attendanceMap.get(s.id) || 
+                     attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                     attendanceMap.get(`${s.gender}_${normName}`) ||
+                     attendanceMap.get(normName);
     if (existing) {
       return; // Already marked
     }
@@ -435,7 +642,12 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
     if (!window.confirm(`Unmark attendance and attendance points for ${s.name}? (Any quiz points earned will remain).`)) return;
     setActionLoadingId(`unmark_${s.id}`);
 
-    const breakdown = sewadarPointsBreakdown.get(s.id) || sewadarPointsBreakdown.get(`${s.gender}_${s.group}_${normalizeName(s.name)}`);
+    const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+    const normName = normalizeName(s.name);
+    const breakdown = sewadarPointsBreakdown.get(s.id) || 
+                      sewadarPointsBreakdown.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                      sewadarPointsBreakdown.get(`${s.gender}_${normName}`) ||
+                      sewadarPointsBreakdown.get(normName);
     const attPointDoc = breakdown?.records.find(r => r.reason.startsWith('Attendance'));
 
     if (isTestMode) {
@@ -599,6 +811,18 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
               <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-0.5">{totalWorkshopMarked}</p>
             </div>
           </div>
+
+          {/* Gents / Ladies Present Breakdown */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10">
+              <p className="text-[9px] font-black text-sky-300 uppercase tracking-widest">Total Gents Present</p>
+              <p className="text-xl sm:text-2xl font-black text-sky-400 mt-0.5">{totalWorkshopMarkedGents}</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10">
+              <p className="text-[9px] font-black text-pink-300 uppercase tracking-widest">Total Ladies Present</p>
+              <p className="text-xl sm:text-2xl font-black text-pink-400 mt-0.5">{totalWorkshopMarkedLadies}</p>
+            </div>
+          </div>
         </div>
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl"></div>
       </div>
@@ -690,8 +914,16 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
           </div>
         ) : (
           filteredSewadars.map((s, idx) => {
-            const record = attendanceMap.get(s.id) || attendanceMap.get(`${s.gender}_${s.group}_${normalizeName(s.name)}`);
-            const breakdown = sewadarPointsBreakdown.get(s.id) || sewadarPointsBreakdown.get(`${s.gender}_${s.group}_${normalizeName(s.name)}`);
+            const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+            const normName = normalizeName(s.name);
+            const record = attendanceMap.get(s.id) || 
+                           attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                           attendanceMap.get(`${s.gender}_${normName}`) ||
+                           attendanceMap.get(normName);
+            const breakdown = sewadarPointsBreakdown.get(s.id) || 
+                              sewadarPointsBreakdown.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                              sewadarPointsBreakdown.get(`${s.gender}_${normName}`) ||
+                              sewadarPointsBreakdown.get(normName);
             const isMarked = !!record;
             
             const isAttLoading = actionLoadingId === `att_${s.id}` || actionLoadingId === `unmark_${s.id}`;

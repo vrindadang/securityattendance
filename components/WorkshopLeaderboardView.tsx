@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { WorkshopPoint, Gender } from '../types';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { WorkshopPoint, AttendanceRecord, Gender } from '../types';
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { isWorkshopDate, getWorkshopTeam } from './WorkshopAttendanceView';
 import {
   getWorkshopTestMode,
   setWorkshopTestMode,
   isTestModeDisabledByDate,
   checkAndAutoResetTestData,
   getStoredTestPoints,
+  getStoredTestAttendance,
   clearStoredTestData
 } from '../workshopTestUtils';
 
@@ -58,6 +60,7 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
   const [isTestMode, setIsTestMode] = useState<boolean>(() => getWorkshopTestMode());
 
   const [points, setPoints] = useState<WorkshopPoint[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'All' | 'Gents' | 'Ladies'>('All');
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
@@ -71,35 +74,87 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
     if (isTestMode) {
       setLoading(true);
       const testPts = getStoredTestPoints();
+      const testAtt = getStoredTestAttendance();
       setPoints(testPts);
+      setAttendance(testAtt);
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    const [y, m, d] = '2026-08-30'.split('-').map(Number);
+    const startOfDay = Timestamp.fromDate(new Date(y, m - 1, d - 1, 18, 0, 0));
+    const endOfDay = Timestamp.fromDate(new Date(y, m - 1, d + 1, 6, 0, 0));
+
+    // 1. Attendance listener for 30 Aug 2026
+    const qAtt = query(
+      collection(db, 'attendance'),
+      where('date', '>=', startOfDay),
+      where('date', '<=', endOfDay)
+    );
+
+    const unsubAtt = onSnapshot(
+      qAtt,
+      (snapshotAtt) => {
+        const records: AttendanceRecord[] = [];
+        snapshotAtt.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          if (!isWorkshopDate(data.date)) return;
+          const rawGroup = (data.group || '').toString();
+          const isLadies = data.gender === 'Ladies' || rawGroup.toLowerCase().includes('ladies');
+          const gender: Gender = isLadies ? 'Ladies' : 'Gents';
+
+          records.push({
+            id: docSnap.id,
+            sewadarId: data.sewadar_id || data.sewadarId || '',
+            name: data.name || data.sewadarName || '',
+            group: data.group,
+            gender: gender,
+            date: '2026-08-30',
+            timestamp: data.timestamp || Date.now(),
+            volunteerId: data.volunteer_id || data.volunteerId || '',
+            inTime: data.in_time || data.inTime || '',
+            outTime: data.out_time || data.outTime || '',
+            sewaPoint: data.sewa_points || data.sewaPoint || 'Workshop',
+            workshopLocation: data.workshop_location || data.workshopLocation || 'Workshop',
+            isProperUniform: data.is_proper_uniform ?? data.isProperUniform ?? true
+          });
+        });
+        setAttendance(records);
+      },
+      (err) => {
+        console.error('Error in attendance snapshot for leaderboard:', err);
+      }
+    );
+
+    // 2. Points listener for 30 Aug 2026
     const q = query(
       collection(db, 'workshop_points'),
       where('date', '==', '2026-08-30')
     );
 
-    const unsubscribe = onSnapshot(
+    const unsubPoints = onSnapshot(
       q,
       (snapshot) => {
         const records: WorkshopPoint[] = snapshot.docs.map((docSnap) => {
           const data = docSnap.data();
+          const rawGroup = (data.group || '').toString();
+          const isLadies = data.gender === 'Ladies' || rawGroup.toLowerCase().includes('ladies');
+          const gender: Gender = isLadies ? 'Ladies' : 'Gents';
+
           return {
             id: docSnap.id,
-            sewadarId: data.sewadarId || data.sewadar_id,
-            sewadarName: data.sewadarName || data.name,
-            gender: data.gender,
+            sewadarId: data.sewadarId || data.sewadar_id || '',
+            sewadarName: data.sewadarName || data.name || '',
+            gender: gender,
             group: data.group,
-            team: data.team,
+            team: data.team || getWorkshopTeam(gender, data.group || ''),
             points: Number(data.points) || 0,
-            reason: data.reason,
-            checkInTime: data.checkInTime || data.in_time,
+            reason: data.reason || 'Attendance',
+            checkInTime: data.checkInTime || data.in_time || '',
             timestamp: data.timestamp || Date.now(),
-            date: data.date || '2026-08-30',
-            awardedBy: data.awardedBy || data.volunteer_id
+            date: '2026-08-30',
+            awardedBy: data.awardedBy || data.volunteer_id || ''
           };
         });
         setPoints(records);
@@ -111,7 +166,10 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubAtt();
+      unsubPoints();
+    };
   }, [isTestMode]);
 
   const handleToggleTestMode = (newMode: boolean) => {
@@ -124,12 +182,16 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
     if (!window.confirm('Reset all test sandbox data? Real database will not be touched.')) return;
     clearStoredTestData();
     setPoints([]);
+    setAttendance([]);
   };
 
   // Compute team statistics & top contributors
   const teamScores = useMemo(() => {
     const teamMembersMap = new Map<string, Map<string, { points: number; quizCount: number; attPoints: number }>>();
     const teamTotalsMap = new Map<string, { total: number; attPoints: number; quizPoints: number }>();
+
+    // Process explicit points
+    const accountedSewadars = new Set<string>();
 
     for (const p of points) {
       const teamName = p.team || 'Unassigned';
@@ -140,6 +202,8 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
         curTotals.quizPoints += p.points;
       } else {
         curTotals.attPoints += p.points;
+        if (p.sewadarId) accountedSewadars.add(p.sewadarId);
+        if (p.sewadarName) accountedSewadars.add(p.sewadarName.trim().toLowerCase());
       }
       teamTotalsMap.set(teamName, curTotals);
 
@@ -154,6 +218,37 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
       }
       members.set(memberName, curMember);
       teamMembersMap.set(teamName, members);
+    }
+
+    // Also sync attendance check-ins from 30 August 2026 if not already in workshop_points
+    for (const rec of attendance) {
+      const sewadarKey = (rec.sewadarId || '').trim();
+      const nameKey = (rec.name || '').trim().toLowerCase();
+      if (accountedSewadars.has(sewadarKey) || accountedSewadars.has(nameKey)) {
+        continue;
+      }
+
+      const teamName = getWorkshopTeam(rec.gender, rec.group);
+      const time = rec.inTime || '';
+      const [h, m] = time.split(':').map(Number);
+      const isEarly = !isNaN(h) ? (h < 9 || (h === 9 && m < 30)) : true;
+      const attPts = isEarly ? 100 : 50;
+
+      const curTotals = teamTotalsMap.get(teamName) || { total: 0, attPoints: 0, quizPoints: 0 };
+      curTotals.total += attPts;
+      curTotals.attPoints += attPts;
+      teamTotalsMap.set(teamName, curTotals);
+
+      const memberName = (rec.name || 'Unknown').trim();
+      const members = teamMembersMap.get(teamName) || new Map<string, { points: number; quizCount: number; attPoints: number }>();
+      const curMember = members.get(memberName) || { points: 0, quizCount: 0, attPoints: 0 };
+      curMember.points += attPts;
+      curMember.attPoints += attPts;
+      members.set(memberName, curMember);
+      teamMembersMap.set(teamName, members);
+
+      if (sewadarKey) accountedSewadars.add(sewadarKey);
+      if (nameKey) accountedSewadars.add(nameKey);
     }
 
     const result: TeamScore[] = ALL_TEAMS.map((t) => {
@@ -181,7 +276,7 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
     });
 
     return result;
-  }, [points]);
+  }, [points, attendance]);
 
   // Filtered and sorted teams
   const rankedTeams = useMemo(() => {

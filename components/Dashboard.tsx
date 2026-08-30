@@ -7,6 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { generateGroupPerformanceReport, generateGentsRawDataReport, generateMultipleGroupOverlapReport } from './GroupReportPDFGenerator';
+import { generateTillDatePerformanceReport } from './TillDateReportPDFGenerator';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -80,6 +81,24 @@ const Dashboard: React.FC<Props> = ({
   const [gentsRawProgress, setGentsRawProgress] = useState('');
   const [downloadingOverlap, setDownloadingOverlap] = useState(false);
   const [overlapProgress, setOverlapProgress] = useState('');
+  const [downloadingTillDate, setDownloadingTillDate] = useState<'Gents' | 'Ladies' | 'Combined' | null>(null);
+  const [tillDateProgress, setTillDateProgress] = useState('');
+
+  const handleDownloadTillDate = async (gender: 'Gents' | 'Ladies' | 'Combined') => {
+    if (downloadingTillDate) return;
+    try {
+      setDownloadingTillDate(gender);
+      await generateTillDatePerformanceReport(gender, (msg) => {
+        setTillDateProgress(msg);
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`Error generating ${gender} Till-Date Report: ` + (err as any).message);
+    } finally {
+      setDownloadingTillDate(null);
+      setTillDateProgress('');
+    }
+  };
 
   const handleDownloadOverlap = async () => {
     if (downloadingOverlap) return;
@@ -935,6 +954,45 @@ const Dashboard: React.FC<Props> = ({
       {/* Group Performance Report for Super Admin ONLY */}
       {isSuperAdmin && (
         <div className="space-y-4">
+          {/* New Till Date Performance Audit Report Card */}
+          <div className="bg-gradient-to-r from-[#171e3d] via-[#101b33] to-[#0d1527] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-indigo-400/20">
+            <div className="relative z-10 flex-1">
+              <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">All-Time Cumulative Audit</div>
+              <h3 className="text-xl font-black mb-1">Cumulative Performance Reports (Till Date)</h3>
+              <p className="text-indigo-400 text-[11px] font-bold uppercase tracking-widest mb-2">Comprehensive Service Hours, Duty Days & Ratio Audit</p>
+              <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
+                Full-span analytical reports till date covering: (1) Top individuals by service hours & duty days; (2) Group rankings by unique active volunteers with de-duplicated member rosters; (3) Group rankings by total attendance submissions volume; and (4) Group participation ratios calculated on both internal and all-groups totality basis.
+              </p>
+              {tillDateProgress && (
+                <p className="text-indigo-300 text-xs mt-3 animate-pulse font-mono">{tillDateProgress}</p>
+              )}
+            </div>
+            <div className="relative z-10 flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <button 
+                onClick={() => handleDownloadTillDate('Gents')} 
+                disabled={!!downloadingTillDate}
+                className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingTillDate ? 'bg-indigo-900 text-white/50 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
+              >
+                {downloadingTillDate === 'Gents' ? 'Processing Gents...' : 'Gents Report (Till Date)'}
+              </button>
+              <button 
+                onClick={() => handleDownloadTillDate('Ladies')} 
+                disabled={!!downloadingTillDate}
+                className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingTillDate ? 'bg-indigo-900 text-white/50 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-500 text-white'}`}
+              >
+                {downloadingTillDate === 'Ladies' ? 'Processing Ladies...' : 'Ladies Report (Till Date)'}
+              </button>
+              <button 
+                onClick={() => handleDownloadTillDate('Combined')} 
+                disabled={!!downloadingTillDate}
+                className={`px-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingTillDate ? 'bg-indigo-900 text-white/50 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
+              >
+                {downloadingTillDate === 'Combined' ? 'Processing Combined...' : 'Combined Report (Till Date)'}
+              </button>
+            </div>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+          </div>
+
           <div className="bg-gradient-to-r from-teal-950 to-[#0c1f1b] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-emerald-500/15">
             <div className="relative z-10 flex-1">
               <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Super Admin Report</div>
