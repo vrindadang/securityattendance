@@ -222,12 +222,13 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
 
       if (target) {
         target.totalPoints += p.points;
-        if (p.reason === 'Quiz') {
+        const isQuizType = p.reason === 'Quiz' || p.reason.toLowerCase().includes('quiz') || p.reason.toLowerCase().includes('bonus') || (!p.reason.toLowerCase().includes('attendance') && !p.reason.toLowerCase().includes('att'));
+        if (isQuizType) {
           target.quizCount += 1;
           target.quizPoints += p.points;
         } else {
           target.attendancePoints += p.points;
-          target.attendanceLabel = p.points === 100 ? '100 pts (Early)' : `${p.points} pts (Late)`;
+          target.attendanceLabel = p.points === 100 ? '100 pts (Early)' : p.points === 50 ? '50 pts (Late)' : `${p.points} pts`;
         }
       }
     });

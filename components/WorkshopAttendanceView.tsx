@@ -14,6 +14,7 @@ import {
   saveStoredTestPoints,
   clearStoredTestData
 } from '../workshopTestUtils';
+import ManualPointsModal from './ManualPointsModal';
 
 interface WorkshopAttendanceViewProps {
   allSewadars: Sewadar[];
@@ -111,6 +112,10 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
   const [workshopPoints, setWorkshopPoints] = useState<WorkshopPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Manual Points Modal State
+  const [isManualPointsModalOpen, setIsManualPointsModalOpen] = useState(false);
+  const [manualPointsSewadar, setManualPointsSewadar] = useState<Sewadar | null>(null);
 
   // Auto reset test data if 29 August or later
   useEffect(() => {
@@ -770,7 +775,17 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
 
           <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Workshop Attendance & Points</h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  setManualPointsSewadar(null);
+                  setIsManualPointsModalOpen(true);
+                }}
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all active:scale-95"
+              >
+                <span>⚡</span>
+                <span>Manual Points</span>
+              </button>
               {onNavigateToReport && (
                 <button
                   onClick={onNavigateToReport}
@@ -995,8 +1010,21 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
                   </div>
                 </div>
 
-                {/* Right Action Buttons: Mark Present + Award Quiz +50 */}
+                {/* Right Action Buttons: Manual Points + Mark Present + Award Quiz +50 */}
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  {/* Manual Points Button */}
+                  <button
+                    onClick={() => {
+                      setManualPointsSewadar(s);
+                      setIsManualPointsModalOpen(true);
+                    }}
+                    title="Manually add attendance points (50/100) or any quiz points"
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800 rounded-xl font-black text-xs uppercase tracking-wider border border-slate-200/80 transition-all flex items-center gap-1 active:scale-95"
+                  >
+                    <span>⚡</span>
+                    <span className="hidden sm:inline">Points</span>
+                  </button>
+
                   {/* Award Quiz +50 Button (allowed multiple times) */}
                   <button
                     onClick={() => handleAwardQuiz(s)}
@@ -1041,6 +1069,24 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
           })
         )}
       </div>
+
+      {/* Manual Points Modal */}
+      <ManualPointsModal
+        isOpen={isManualPointsModalOpen}
+        onClose={() => {
+          setIsManualPointsModalOpen(false);
+          setManualPointsSewadar(null);
+        }}
+        initialSewadar={manualPointsSewadar}
+        allSewadars={allSewadars}
+        activeVolunteer={activeVolunteer}
+        isTestMode={isTestMode}
+        workshopAttendance={workshopAttendance}
+        workshopPoints={workshopPoints}
+        setWorkshopAttendance={setWorkshopAttendance}
+        setWorkshopPoints={setWorkshopPoints}
+        normalizeName={normalizeName}
+      />
     </div>
   );
 };

@@ -195,10 +195,11 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
 
     for (const p of points) {
       const teamName = p.team || 'Unassigned';
+      const isQuizType = p.reason === 'Quiz' || p.reason.toLowerCase().includes('quiz') || p.reason.toLowerCase().includes('bonus') || (!p.reason.toLowerCase().includes('attendance') && !p.reason.toLowerCase().includes('att'));
       
       const curTotals = teamTotalsMap.get(teamName) || { total: 0, attPoints: 0, quizPoints: 0 };
       curTotals.total += p.points;
-      if (p.reason === 'Quiz') {
+      if (isQuizType) {
         curTotals.quizPoints += p.points;
       } else {
         curTotals.attPoints += p.points;
@@ -211,7 +212,7 @@ export const WorkshopLeaderboardView: React.FC<WorkshopLeaderboardViewProps> = (
       const members = teamMembersMap.get(teamName) || new Map<string, { points: number; quizCount: number; attPoints: number }>();
       const curMember = members.get(memberName) || { points: 0, quizCount: 0, attPoints: 0 };
       curMember.points += p.points;
-      if (p.reason === 'Quiz') {
+      if (isQuizType) {
         curMember.quizCount += 1;
       } else {
         curMember.attPoints += p.points;
