@@ -86,7 +86,21 @@ export const isWorkshopDate = (dateVal: any): boolean => {
 
 // Helper to determine team from gender + group
 export const getWorkshopTeam = (gender: Gender, group: string): string => {
-  const cleanGroup = group.trim().replace(/^ladies-/i, '').trim();
+  if (!group) return gender === 'Ladies' ? 'Ladies' : 'Gents';
+  
+  let cleanGroup = group.trim();
+  // Strip "ladies-" or "ladies:" or "ladies " (case-insensitive)
+  cleanGroup = cleanGroup.replace(/^ladies[-:\s]*/i, '').trim();
+  cleanGroup = cleanGroup.replace(/^gents[-:\s]*/i, '').trim();
+
+  // If group was literally just "Ladies" or "Gents" or became empty, return clean label
+  if (/^ladies$/i.test(cleanGroup) || cleanGroup === '') {
+    return 'Ladies';
+  }
+  if (/^gents$/i.test(cleanGroup)) {
+    return 'Gents';
+  }
+
   if (gender === 'Ladies') {
     return `Ladies ${cleanGroup}`;
   }
@@ -305,12 +319,12 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
       }
       if (rec.name) {
         const normName = normalizeName(rec.name);
-        const rawGroup = (rec.group || '').toLowerCase().replace(/^ladies-/i, '').trim();
+        const rawGroup = (rec.group || '').toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
         const gender = rec.gender || (rec.group?.toLowerCase().includes('ladies') ? 'Ladies' : 'Gents');
 
-        map.set(`${gender}_${rawGroup}_${normName}`, rec);
-        map.set(`${gender}_${normName}`, rec);
-        map.set(normName, rec);
+        if (rawGroup) {
+          map.set(`${gender}_${rawGroup}_${normName}`, rec);
+        }
       }
     }
     return map;
@@ -421,11 +435,10 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
   const markedPresentCount = useMemo(() => {
     let count = 0;
     for (const s of groupSewadars) {
-      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
       const normName = normalizeName(s.name);
-      const rec = attendanceMap.get(s.id) || 
-                  attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
-                  attendanceMap.get(`${s.gender}_${normName}`);
+      const rec = (s.id && attendanceMap.get(s.id)) || 
+                  attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`);
       if (rec) count++;
     }
     return count;
@@ -433,45 +446,58 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
 
   // Total unique marked across all groups for Workshop (deduplicated and synced with every group)
   const { totalWorkshopMarkedGents, totalWorkshopMarkedLadies, totalWorkshopMarked } = useMemo(() => {
-    const markedGentsIds = new Set<string>();
-    const markedLadiesIds = new Set<string>();
+    const markedGentsKeys = new Set<string>();
+    const markedLadiesKeys = new Set<string>();
 
-    // 1. Iterate over all registered sewadars
+    const rosterKeys = new Set<string>();
     for (const s of allSewadars) {
-      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
       const normName = normalizeName(s.name);
-      const rec = attendanceMap.get(s.id) || 
-                  attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
-                  attendanceMap.get(`${s.gender}_${normName}`);
+      if (s.id) rosterKeys.add(s.id);
+      rosterKeys.add(`${s.gender}_${cleanGroup}_${normName}`);
+    }
+
+    // 1. Iterate over all registered sewadars (deduplicated per group)
+    for (const s of allSewadars) {
+      const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
+      const normName = normalizeName(s.name);
+      const rec = (s.id && attendanceMap.get(s.id)) || 
+                  attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`);
       
       if (rec) {
+        const uniqueMemberKey = `${s.gender}_${cleanGroup}_${normName}`;
         if (s.gender === 'Ladies') {
-          markedLadiesIds.add(s.id);
+          markedLadiesKeys.add(uniqueMemberKey);
         } else {
-          markedGentsIds.add(s.id);
+          markedGentsKeys.add(uniqueMemberKey);
         }
       }
     }
 
-    // 2. Include any attendance records that might not be in allSewadars static list
+    // 2. Include only attendance records that do NOT correspond to anyone already
+    // matched against the roster in step 1
     for (const rec of workshopAttendance) {
       const isLadies = rec.gender === 'Ladies' || (rec.group && rec.group.toLowerCase().includes('ladies'));
+      const gender: Gender = isLadies ? 'Ladies' : 'Gents';
+      const cleanGroup = (rec.group || '').toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
       const normName = normalizeName(rec.name || '');
-      const key = rec.sewadarId || `${isLadies ? 'Ladies' : 'Gents'}_${normName || rec.id}`;
-      
+
+      const matchesRoster =
+        (rec.sewadarId && rosterKeys.has(rec.sewadarId)) ||
+        rosterKeys.has(`${gender}_${cleanGroup}_${normName}`);
+
+      if (matchesRoster) continue; // already accounted for via roster in step 1
+
+      const uniqueMemberKey = rec.sewadarId || `${gender}_${cleanGroup}_${normName || rec.id}`;
       if (isLadies) {
-        if (!markedLadiesIds.has(rec.sewadarId || '')) {
-          markedLadiesIds.add(key);
-        }
+        markedLadiesKeys.add(uniqueMemberKey);
       } else {
-        if (!markedGentsIds.has(rec.sewadarId || '')) {
-          markedGentsIds.add(key);
-        }
+        markedGentsKeys.add(uniqueMemberKey);
       }
     }
 
-    const gents = markedGentsIds.size;
-    const ladies = markedLadiesIds.size;
+    const gents = markedGentsKeys.size;
+    const ladies = markedLadiesKeys.size;
     return {
       totalWorkshopMarkedGents: gents,
       totalWorkshopMarkedLadies: ladies,
@@ -481,12 +507,10 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
 
   // Handle Mark Present + Auto Award Attendance Points
   const handleMarkPresent = async (s: Sewadar) => {
-    const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+    const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
     const normName = normalizeName(s.name);
-    const existing = attendanceMap.get(s.id) || 
-                     attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
-                     attendanceMap.get(`${s.gender}_${normName}`) ||
-                     attendanceMap.get(normName);
+    const existing = (s.id && attendanceMap.get(s.id)) || 
+                     attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`);
     if (existing) {
       return; // Already marked
     }
@@ -929,13 +953,11 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
           </div>
         ) : (
           filteredSewadars.map((s, idx) => {
-            const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').trim();
+            const cleanGroup = s.group.toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
             const normName = normalizeName(s.name);
-            const record = attendanceMap.get(s.id) || 
-                           attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
-                           attendanceMap.get(`${s.gender}_${normName}`) ||
-                           attendanceMap.get(normName);
-            const breakdown = sewadarPointsBreakdown.get(s.id) || 
+            const record = (s.id && attendanceMap.get(s.id)) || 
+                           attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`);
+            const breakdown = (s.id && sewadarPointsBreakdown.get(s.id)) || 
                               sewadarPointsBreakdown.get(`${s.gender}_${cleanGroup}_${normName}`) ||
                               sewadarPointsBreakdown.get(`${s.gender}_${normName}`) ||
                               sewadarPointsBreakdown.get(normName);

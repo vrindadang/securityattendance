@@ -170,19 +170,28 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
         collection(db, 'workshop_points'),
         where('date', '==', '30-08-2026')
       );
-      const [snapPts1, snapPts2] = await Promise.all([
+      const qPts3 = query(
+        collection(db, 'workshop_points'),
+        where('date', '>=', startOfDay),
+        where('date', '<=', endOfDay)
+      );
+      const [snapPts1, snapPts2, snapPts3] = await Promise.all([
         getDocs(qPts1).catch(() => ({ docs: [] })),
-        getDocs(qPts2).catch(() => ({ docs: [] }))
+        getDocs(qPts2).catch(() => ({ docs: [] })),
+        getDocs(qPts3).catch(() => ({ docs: [] }))
       ]);
 
       const ptsDocMap = new Map<string, any>();
-      [...snapPts1.docs, ...snapPts2.docs].forEach(d => {
+      [...snapPts1.docs, ...snapPts2.docs, ...snapPts3.docs].forEach(d => {
         ptsDocMap.set(d.id, d);
       });
 
       const ptsList: WorkshopPoint[] = [];
       ptsDocMap.forEach((docSnap) => {
         const data = docSnap.data();
+        if (!isWorkshopDate(data.date) && data.date !== WORKSHOP_DATE && data.date !== '30-08-2026') {
+          return;
+        }
         const rawGroup = (data.group || '').toString();
         const isLadies = data.gender === 'Ladies' || rawGroup.toLowerCase().includes('ladies');
         const gender: Gender = isLadies ? 'Ladies' : 'Gents';
@@ -227,155 +236,125 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
     setWorkshopPoints([]);
   };
 
+  // Helper Levenshtein distance for fuzzy matching
+  const calcLevenshtein = (a: string, b: string): number => {
+    if (a === b) return 0;
+    if (!a) return b ? b.length : 0;
+    if (!b) return a ? a.length : 0;
+    const matrix: number[][] = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
   // Compile detailed sewadar map & group aggregates
   const { gentsGroupSummaries, ladiesGroupSummaries, top3GentsGroups, top3LadiesGroups } = useMemo(() => {
-    // Map of sewadarId -> points and attendance info
-    const sewadarMap = new Map<string, SewadarPointsDetail>();
-
-    // 1. Process all sewadars in allSewadars list
-    allSewadars.forEach(s => {
-      const teamName = getWorkshopTeam(s.gender, s.group);
-      const key = s.id;
-      sewadarMap.set(key, {
-        sewadarId: s.id,
-        name: s.name,
-        gender: s.gender,
-        group: s.group,
-        team: teamName,
-        shift: s.shift,
-        isPresent: false,
-        inTime: '',
-        attendancePoints: 0,
-        attendanceLabel: '0 pts (Absent)',
-        quizCount: 0,
-        quizPoints: 0,
-        totalPoints: 0
-      });
-    });
-
-    // 2. Attach workshop points
-    workshopPoints.forEach(p => {
-      let target: SewadarPointsDetail | undefined;
-      if (p.sewadarId && sewadarMap.has(p.sewadarId)) {
-        target = sewadarMap.get(p.sewadarId);
-      } else {
-        const pNorm = normalizeName(p.sewadarName || '');
-        for (const val of sewadarMap.values()) {
-          if (
-            val.gender === p.gender &&
-            normalizeName(val.name) === pNorm
-          ) {
-            target = val;
-            break;
-          }
-        }
-      }
-
-      // If sewadar not found in initial allSewadars, create dynamic record so NO ONE is lost!
-      if (!target) {
-        const dynId = p.sewadarId || `pt_${p.id}`;
-        target = {
-          sewadarId: dynId,
-          name: p.sewadarName || 'Unknown Sewadar',
-          gender: p.gender,
-          group: p.group || 'Back Office',
-          team: p.team || getWorkshopTeam(p.gender, p.group || 'Back Office'),
-          shift: undefined,
-          isPresent: false,
-          inTime: p.checkInTime || '',
-          attendancePoints: 0,
-          attendanceLabel: '0 pts',
-          quizCount: 0,
-          quizPoints: 0,
-          totalPoints: 0
-        };
-        sewadarMap.set(dynId, target);
-      }
-
-      target.totalPoints += p.points;
-      const isQuizType = p.reason === 'Quiz' || p.reason.toLowerCase().includes('quiz') || p.reason.toLowerCase().includes('bonus') || (!p.reason.toLowerCase().includes('attendance') && !p.reason.toLowerCase().includes('att'));
-      if (isQuizType) {
-        target.quizCount += 1;
-        target.quizPoints += p.points;
-      } else {
-        target.isPresent = true;
-        target.attendancePoints += p.points;
-        target.attendanceLabel = p.points === 100 ? '100 pts (Early)' : p.points === 50 ? '50 pts (Late)' : `${p.points} pts`;
-        if (p.checkInTime && !target.inTime) {
-          target.inTime = p.checkInTime;
-        }
-      }
-    });
-
-    // 3. Attach attendance from group logins on 30 Aug 2026 if not already awarded in workshopPoints
+    // 1. Build rapid attendance lookup map (matching WorkshopAttendanceView)
+    const attendanceMap = new Map<string, AttendanceRecord>();
     workshopAttendance.forEach(rec => {
-      let target: SewadarPointsDetail | undefined;
-      if (rec.sewadarId && sewadarMap.has(rec.sewadarId)) {
-        target = sewadarMap.get(rec.sewadarId);
-      } else {
-        const recNorm = normalizeName(rec.name || '');
-        for (const val of sewadarMap.values()) {
-          if (
-            val.gender === rec.gender &&
-            normalizeName(val.name) === recNorm
-          ) {
-            target = val;
-            break;
-          }
+      if (rec.sewadarId) {
+        attendanceMap.set(rec.sewadarId, rec);
+      }
+      if (rec.name) {
+        const normName = normalizeName(rec.name);
+        const rawGroup = (rec.group || '').toLowerCase().replace(/^ladies[-:\s]*/i, '').replace(/^gents[-:\s]*/i, '').trim();
+        const gender = rec.gender || (rec.group?.toLowerCase().includes('ladies') ? 'Ladies' : 'Gents');
+
+        if (rawGroup) {
+          attendanceMap.set(`${gender}_${rawGroup}_${normName}`, rec);
         }
-      }
-
-      // If sewadar not found in initial allSewadars, create dynamic record so NO ONE is lost!
-      if (!target) {
-        const dynId = rec.sewadarId || `att_${rec.id}`;
-        target = {
-          sewadarId: dynId,
-          name: rec.name || 'Unknown Sewadar',
-          gender: rec.gender,
-          group: rec.group || 'Back Office',
-          team: getWorkshopTeam(rec.gender, rec.group || 'Back Office'),
-          shift: undefined,
-          isPresent: true,
-          inTime: rec.inTime || '',
-          attendancePoints: 0,
-          attendanceLabel: '0 pts',
-          quizCount: 0,
-          quizPoints: 0,
-          totalPoints: 0
-        };
-        sewadarMap.set(dynId, target);
-      }
-
-      target.isPresent = true;
-      if (rec.inTime && !target.inTime) {
-        target.inTime = rec.inTime;
-      }
-      if (target.attendancePoints === 0) {
-        const time = rec.inTime || '';
-        const [h, m] = time.split(':').map(Number);
-        const isEarly = !isNaN(h) ? (h < 9 || (h === 9 && m < 30)) : true;
-        const pts = isEarly ? 100 : 50;
-        target.attendancePoints = pts;
-        target.attendanceLabel = pts === 100 ? '100 pts (Early)' : `${pts} pts (Late)`;
-        target.totalPoints += pts;
       }
     });
 
-    // Helper to build group summaries including all security days and back office teams
+    // 2. Build points breakdown lookup map (matching WorkshopAttendanceView)
+    const pointsMap = new Map<string, { total: number; attPoints: number; quizCount: number; quizPoints: number; records: WorkshopPoint[] }>();
+    workshopPoints.forEach(pt => {
+      const keys: string[] = [];
+      if (pt.sewadarId) keys.push(pt.sewadarId);
+      if (pt.sewadarName) {
+        const normName = normalizeName(pt.sewadarName);
+        const rawGroup = (pt.group || '').toLowerCase().replace(/^ladies[-:\s]*/i, '').replace(/^gents[-:\s]*/i, '').trim();
+        const gender = pt.gender || (pt.group?.toLowerCase().includes('ladies') ? 'Ladies' : 'Gents');
+        if (rawGroup) keys.push(`${gender}_${rawGroup}_${normName}`);
+        keys.push(`${gender}_${normName}`);
+        keys.push(normName);
+      }
+
+      for (const key of keys) {
+        const existing = pointsMap.get(key) || { total: 0, attPoints: 0, quizCount: 0, quizPoints: 0, records: [] };
+        existing.total += pt.points;
+        const isQuizType = pt.reason === 'Quiz' || pt.reason.toLowerCase().includes('quiz') || pt.reason.toLowerCase().includes('bonus') || (!pt.reason.toLowerCase().includes('attendance') && !pt.reason.toLowerCase().includes('att'));
+        if (isQuizType) {
+          existing.quizCount += 1;
+          existing.quizPoints += pt.points;
+        } else {
+          existing.attPoints += pt.points;
+        }
+        existing.records.push(pt);
+        pointsMap.set(key, existing);
+      }
+    });
+
+    const findFuzzyPoints = (s: Sewadar): { total: number; attPoints: number; quizCount: number; quizPoints: number; records: WorkshopPoint[] } | undefined => {
+      const normName = normalizeName(s.name);
+      if (!normName) return undefined;
+      const matchedPts = workshopPoints.filter(pt => {
+        if (pt.gender !== s.gender) return false;
+        const ptNorm = normalizeName(pt.sewadarName || '');
+        if (!ptNorm) return false;
+        if (ptNorm === normName) return true;
+        if (normName.length >= 4 && (ptNorm.startsWith(normName) || normName.startsWith(ptNorm))) return true;
+        return normName.length >= 4 && calcLevenshtein(normName, ptNorm) <= 2;
+      });
+
+      if (matchedPts.length === 0) return undefined;
+
+      const breakdown = { total: 0, attPoints: 0, quizCount: 0, quizPoints: 0, records: matchedPts };
+      matchedPts.forEach(pt => {
+        breakdown.total += pt.points;
+        const isQuizType = pt.reason === 'Quiz' || pt.reason.toLowerCase().includes('quiz') || pt.reason.toLowerCase().includes('bonus') || (!pt.reason.toLowerCase().includes('attendance') && !pt.reason.toLowerCase().includes('att'));
+        if (isQuizType) {
+          breakdown.quizCount += 1;
+          breakdown.quizPoints += pt.points;
+        } else {
+          breakdown.attPoints += pt.points;
+        }
+      });
+      return breakdown;
+    };
+
+    // Track matched record IDs so we can attach dynamic attendees that were not in static roster
+    const accountedAttendanceIds = new Set<string>();
+    const accountedPointIds = new Set<string>();
+
+    // Helper to build group summaries including 7 security days and back office teams
     const buildGroupSummary = (defaultGroupList: DutyGroup[], gender: Gender): GroupSummary[] => {
-      // Find all groups present in sewadarMap for this gender
+      // Find all groups present in allSewadars or attendance for this gender
       const allDiscoveredGroups = new Set<string>();
       defaultGroupList.forEach(g => allDiscoveredGroups.add(g));
-      
-      for (const m of sewadarMap.values()) {
-        if (m.gender === gender && m.group) {
-          const clean = m.group.replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
+
+      allSewadars.forEach(s => {
+        if (s.gender === gender && s.group) {
+          let clean = s.group.trim().replace(/^ladies[-:\s]*/i, '').replace(/^gents[-:\s]*/i, '').trim();
+          if (/^ladies$/i.test(clean) || clean === '') clean = gender === 'Ladies' ? 'Ladies' : 'Gents';
           if (clean) allDiscoveredGroups.add(clean);
         }
-      }
+      });
 
       const orderedGroups: string[] = [];
-      // 1. 7 Security Days in order
       const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       days.forEach(d => {
         if (allDiscoveredGroups.has(d)) {
@@ -383,7 +362,6 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
           allDiscoveredGroups.delete(d);
         }
       });
-      // 2. Back office and department teams in standard order
       const defaultBackOffice = ['HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'];
       defaultBackOffice.forEach(bo => {
         if (allDiscoveredGroups.has(bo)) {
@@ -391,36 +369,162 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
           allDiscoveredGroups.delete(bo);
         }
       });
-      // 3. Any other custom groups
       Array.from(allDiscoveredGroups).sort().forEach(g => orderedGroups.push(g));
 
       const summaries = orderedGroups.map(grpName => {
         const teamName = getWorkshopTeam(gender, grpName);
-        const cleanG = grpName.toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
+        let cleanG = grpName.toLowerCase().replace(/^ladies[-:\s]*/i, '').replace(/^gents[-:\s]*/i, '').trim();
+        if (/^ladies$/i.test(cleanG) || cleanG === '') {
+          cleanG = gender === 'Ladies' ? 'ladies' : 'gents';
+        }
 
-        const members = Array.from(sewadarMap.values())
-          .filter(m => {
-            if (m.gender !== gender) return false;
-            const cleanM = (m.group || '').toLowerCase().replace(/^ladies-/i, '').replace(/^gents-/i, '').trim();
-            return cleanM === cleanG;
-          })
-          .sort((a, b) => {
-            if (a.isPresent !== b.isPresent) return a.isPresent ? -1 : 1;
-            if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-            if (b.attendancePoints !== a.attendancePoints) return b.attendancePoints - a.attendancePoints;
-            return a.name.localeCompare(b.name);
+        // 1. Get roster sewadars belonging to this gender and group (deduplicated by name, matching WorkshopAttendanceView)
+        const rawGroupList = allSewadars.filter(s => {
+          if (s.gender !== gender) return false;
+          let matchGroup = false;
+          if (gender === 'Ladies') {
+            const normGroup = s.group.toLowerCase().replace(/^ladies[-:\s]*/i, '').trim();
+            const normSelected = grpName.toLowerCase().replace(/^ladies[-:\s]*/i, '').trim();
+            matchGroup = normGroup === normSelected;
+          } else {
+            const normGroup = s.group.toLowerCase().replace(/^gents[-:\s]*/i, '').trim();
+            const normSelected = grpName.toLowerCase().replace(/^gents[-:\s]*/i, '').trim();
+            matchGroup = normGroup === normSelected;
+          }
+          return matchGroup;
+        });
+
+        const uniqueMap = new Map<string, Sewadar>();
+        for (const s of rawGroupList) {
+          const key = normalizeName(s.name);
+          const existing = uniqueMap.get(key);
+          if (!existing || (!existing.isRestored && s.isRestored)) {
+            uniqueMap.set(key, s);
+          }
+        }
+        const deduplicatedGroupSewadars = Array.from(uniqueMap.values());
+
+        // 2. Evaluate presence and points for each roster sewadar (matching WorkshopAttendanceView card logic)
+        const groupMembers: SewadarPointsDetail[] = deduplicatedGroupSewadars.map(s => {
+          const cleanGroup = s.group.toLowerCase().replace(/^ladies[-:\s]*/i, '').replace(/^gents[-:\s]*/i, '').trim();
+          const normName = normalizeName(s.name);
+
+          const attRec = (s.id && attendanceMap.get(s.id)) ||
+                         attendanceMap.get(`${s.gender}_${cleanGroup}_${normName}`);
+
+          if (attRec) {
+            accountedAttendanceIds.add(attRec.id);
+            if (attRec.sewadarId) accountedAttendanceIds.add(attRec.sewadarId);
+          }
+
+          const ptsDetail = (s.id && pointsMap.get(s.id)) ||
+                            pointsMap.get(`${s.gender}_${cleanGroup}_${normName}`) ||
+                            pointsMap.get(`${s.gender}_${normName}`) ||
+                            findFuzzyPoints(s);
+
+          if (ptsDetail) {
+            ptsDetail.records.forEach(r => {
+              accountedPointIds.add(r.id);
+              if (r.sewadarId) accountedPointIds.add(r.sewadarId);
+            });
+          }
+
+          // STRICT PRESENCE: Member is present ONLY if they have an actual attendance check-in record
+          const isPresent = !!attRec;
+          const inTime = isPresent ? (attRec?.inTime || '') : '';
+
+          // Compute attendance points strictly if marked present
+          let attPoints = 0;
+          if (isPresent) {
+            if (ptsDetail && ptsDetail.attPoints > 0) {
+              attPoints = ptsDetail.attPoints;
+            } else {
+              const time = inTime || '';
+              const [h, m] = time.split(':').map(Number);
+              const isEarly = !isNaN(h) ? (h < 9 || (h === 9 && m < 30)) : true;
+              attPoints = isEarly ? 100 : 50;
+            }
+          }
+
+          const quizCount = ptsDetail ? ptsDetail.quizCount : 0;
+          const quizPoints = ptsDetail ? ptsDetail.quizPoints : 0;
+          const totalPoints = attPoints + quizPoints;
+
+          let attendanceLabel = '0 pts (Absent)';
+          if (isPresent) {
+            attendanceLabel = attPoints === 100 ? '100 pts (Early)' : attPoints === 50 ? '50 pts (Late)' : `${attPoints} pts`;
+          }
+
+          return {
+            sewadarId: s.id,
+            name: s.name,
+            gender: s.gender,
+            group: s.group,
+            team: teamName,
+            shift: s.shift,
+            isPresent,
+            inTime,
+            attendancePoints: attPoints,
+            attendanceLabel,
+            quizCount,
+            quizPoints,
+            totalPoints
+          };
+        });
+
+        // 3. Attach dynamic attendees belonging to this group who were not in the static roster
+        workshopAttendance.forEach(rec => {
+          if (accountedAttendanceIds.has(rec.id) || (rec.sewadarId && accountedAttendanceIds.has(rec.sewadarId))) return;
+          if (rec.gender !== gender) return;
+          let recCleanG = (rec.group || '').toLowerCase().replace(/^ladies[-:\s]*/i, '').replace(/^gents[-:\s]*/i, '').trim();
+          if (/^ladies$/i.test(recCleanG) || recCleanG === '') recCleanG = gender === 'Ladies' ? 'ladies' : 'gents';
+          if (recCleanG !== cleanG) return;
+
+          // Check if already matched by name in groupMembers
+          const recNorm = normalizeName(rec.name || '');
+          if (groupMembers.some(m => normalizeName(m.name) === recNorm)) return;
+
+          accountedAttendanceIds.add(rec.id);
+          const time = rec.inTime || '';
+          const [h, m] = time.split(':').map(Number);
+          const isEarly = !isNaN(h) ? (h < 9 || (h === 9 && m < 30)) : true;
+          const attPts = isEarly ? 100 : 50;
+
+          groupMembers.push({
+            sewadarId: rec.sewadarId || `att_${rec.id}`,
+            name: rec.name || 'Unknown Sewadar',
+            gender: rec.gender,
+            group: grpName,
+            team: teamName,
+            shift: undefined,
+            isPresent: true,
+            inTime: rec.inTime || '',
+            attendancePoints: attPts,
+            attendanceLabel: isEarly ? '100 pts (Early)' : '50 pts (Late)',
+            quizCount: 0,
+            quizPoints: 0,
+            totalPoints: attPts
           });
+        });
 
-        const totalMembers = members.length;
-        const presentCount = members.filter(m => m.isPresent || m.attendancePoints > 0).length;
+        // Sort members: Present first, then total points descending, then name alphabetically
+        groupMembers.sort((a, b) => {
+          if (a.isPresent !== b.isPresent) return a.isPresent ? -1 : 1;
+          if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+          if (b.attendancePoints !== a.attendancePoints) return b.attendancePoints - a.attendancePoints;
+          return a.name.localeCompare(b.name);
+        });
+
+        const totalMembers = groupMembers.length;
+        const presentCount = groupMembers.filter(m => m.isPresent).length;
         const absentCount = Math.max(0, totalMembers - presentCount);
         const attendancePercent = totalMembers > 0 ? Math.round((presentCount / totalMembers) * 100) : (presentCount > 0 ? 100 : 0);
-        const earlyCount = members.filter(m => m.attendancePoints === 100).length;
-        const lateCount = members.filter(m => m.attendancePoints === 50).length;
-        const activeParticipants = members.filter(m => m.totalPoints > 0).length;
-        const totalPoints = members.reduce((sum, m) => sum + m.totalPoints, 0);
-        const totalAttPoints = members.reduce((sum, m) => sum + m.attendancePoints, 0);
-        const totalQuizPoints = members.reduce((sum, m) => sum + m.quizPoints, 0);
+        const earlyCount = groupMembers.filter(m => m.isPresent && m.attendancePoints === 100).length;
+        const lateCount = groupMembers.filter(m => m.isPresent && m.attendancePoints === 50).length;
+        const activeParticipants = groupMembers.filter(m => m.totalPoints > 0).length;
+        const totalPoints = groupMembers.reduce((sum, m) => sum + m.totalPoints, 0);
+        const totalAttPoints = groupMembers.reduce((sum, m) => sum + (m.isPresent ? m.attendancePoints : 0), 0);
+        const totalQuizPoints = groupMembers.reduce((sum, m) => sum + m.quizPoints, 0);
 
         return {
           groupName: grpName,
@@ -436,12 +540,11 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
           totalParticipants: activeParticipants,
           totalAttPoints,
           totalQuizPoints,
-          members
+          members: groupMembers
         };
       });
 
-      // Filter out back office / department groups only if they have 0 members AND 0 present so UI is not cluttered,
-      // but always keep all groups with members or present attendees.
+      // Keep all 7 security days, plus any back office or custom groups that have members or present attendees
       return summaries.filter(s => {
         if (days.includes(s.groupName)) return true;
         return s.totalMembers > 0 || s.presentCount > 0;
@@ -453,6 +556,15 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
 
     const top3Gents = [...gentsSummaries].sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 3);
     const top3Ladies = [...ladiesSummaries].sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 3);
+
+    // Consolidated End-to-End Audit Log
+    const totalGentsPresent = gentsSummaries.reduce((sum, g) => sum + g.presentCount, 0);
+    const totalLadiesPresent = ladiesSummaries.reduce((sum, g) => sum + g.presentCount, 0);
+    console.group(`[Workshop Audit: 30 Aug 2026 Updated Alignment Summary]`);
+    console.log(`Gents Groups Summary:`, gentsSummaries.map(g => ({ group: g.groupName, total: g.totalMembers, present: g.presentCount, percent: `${g.attendancePercent}%` })));
+    console.log(`Ladies Groups Summary:`, ladiesSummaries.map(g => ({ group: g.groupName, total: g.totalMembers, present: g.presentCount, percent: `${g.attendancePercent}%` })));
+    console.log(`FINAL Present Totals: Gents = ${totalGentsPresent}, Ladies = ${totalLadiesPresent}, Combined = ${totalGentsPresent + totalLadiesPresent}`);
+    console.groupEnd();
 
     return {
       gentsGroupSummaries: gentsSummaries,
@@ -649,7 +761,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
             currentY
           );
 
-          const presentMembers = g.members.filter(m => m.isPresent || m.attendancePoints > 0);
+          const presentMembers = g.members.filter(m => m.isPresent);
 
           if (presentMembers.length === 0) {
             autoTable(doc, {
@@ -1237,7 +1349,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
               {/* Detailed Attendance Roster per Gents Group */}
               <div className="space-y-4">
                 {gentsGroupSummaries.map((g) => {
-                  const presentMembers = g.members.filter(m => m.isPresent || m.attendancePoints > 0);
+                  const presentMembers = g.members.filter(m => m.isPresent);
                   const filteredMembers = presentMembers.filter(m => 
                     !attSearchQuery || 
                     m.name.toLowerCase().includes(attSearchQuery.toLowerCase()) ||
@@ -1427,7 +1539,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
               {/* Detailed Attendance Roster per Ladies Group */}
               <div className="space-y-4">
                 {ladiesGroupSummaries.map((g) => {
-                  const presentMembers = g.members.filter(m => m.isPresent || m.attendancePoints > 0);
+                  const presentMembers = g.members.filter(m => m.isPresent);
                   const filteredMembers = presentMembers.filter(m => 
                     !attSearchQuery || 
                     m.name.toLowerCase().includes(attSearchQuery.toLowerCase()) ||

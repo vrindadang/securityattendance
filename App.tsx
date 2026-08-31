@@ -19,6 +19,35 @@ const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
 const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
 const STORAGE_KEY_LAST_REQ_VIEW = 'skrm_last_req_view';
 
+// Levenshtein distance function for fuzzy matching
+export function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a) return b ? b.length : 0;
+  if (!b) return a ? a.length : 0;
+
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
 const App: React.FC = () => {
   const [activeVolunteer, setActiveVolunteer] = useState<Volunteer | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_VOLUNTEER);
@@ -122,9 +151,14 @@ const App: React.FC = () => {
     if (!name) return "";
     let n = name.toUpperCase().trim();
     
-    // Strip common prefixes/suffixes and spaces
+    // Strip common prefixes/suffixes/honorifics and spaces
     n = n.replace(/^DR\.?\s*/g, '');
     n = n.replace(/^MR\.?\s*/g, '');
+    n = n.replace(/^MRS\.?\s*/g, '');
+    n = n.replace(/^MS\.?\s*/g, '');
+    n = n.replace(/^SMT\.?\s*/g, '');
+    n = n.replace(/^SH\.?\s*/g, '');
+    n = n.replace(/^SHRI\.?\s*/g, '');
     n = n.replace(/\s+JI$/g, '');
     n = n.replace(/\bJI\b/g, '');
     
