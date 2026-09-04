@@ -21,6 +21,23 @@ export interface Sewadar {
   isRemovedSaturday?: boolean;
   isRemovedTuesday?: boolean;
   isRestored?: boolean;
+  routedByHrTable?: boolean;
+  routedByZone?: boolean;
+  originZone?: string;
+  tag?: string;
+  hrTableData?: {
+    phoneNumber?: string;
+    address?: string;
+    qualification?: string;
+    timing?: string;
+    weeklyOff?: string;
+    sewaDays?: string[];
+    selectedOptions?: string[];
+    handoverDayGroup?: string;
+    handoverIncharge?: string;
+    createdAt?: number;
+    updatedAt?: number;
+  };
 }
 
 export interface SewadarDetails {
@@ -28,6 +45,8 @@ export interface SewadarDetails {
   address: string;
   dob: string;
   phone: string;
+  age?: number;
+  district?: string;
   updated_at?: string;
 }
 
@@ -161,4 +180,4 @@ export interface WorkshopPoint {
   awardedBy: string;
 }
 
-export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports' | 'WorkshopAttendance' | 'WorkshopLeaderboard' | 'WorkshopReport';
+export type ViewState = 'Attendance' | 'Dashboard' | 'Login' | 'VolunteerDetails' | 'Requirements' | 'WeeklyReports' | 'WorkshopAttendance' | 'WorkshopLeaderboard' | 'WorkshopReport' | 'ZoneStructure' | 'AddSewadar';

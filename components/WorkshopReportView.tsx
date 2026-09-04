@@ -362,7 +362,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
           allDiscoveredGroups.delete(d);
         }
       });
-      const defaultBackOffice = ['HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'];
+      const defaultBackOffice = ['HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'];
       defaultBackOffice.forEach(bo => {
         if (allDiscoveredGroups.has(bo)) {
           orderedGroups.push(bo);

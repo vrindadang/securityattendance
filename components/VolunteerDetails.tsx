@@ -20,7 +20,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const canManageBothGenders = isSuperAdmin || activeVolunteer.role === 'Back Office Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '', age: '', district: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   const filtered = useMemo(() => {
@@ -40,12 +40,14 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
   }, [sewadars, activeVolunteer, searchTerm]);
 
   const handleEdit = (s: Sewadar) => {
-    const sDetails = details[s.id] || { address: '', dob: '', phone: '' };
+    const sDetails = details[s.id] || { address: '', dob: '', phone: '', age: undefined, district: '' };
     setFormData({
       name: s.name,
       address: sDetails.address,
       dob: sDetails.dob,
-      phone: sDetails.phone
+      phone: sDetails.phone,
+      age: sDetails.age !== undefined && sDetails.age !== null ? String(sDetails.age) : '',
+      district: (sDetails.district || '').replace(/ludhiyana/gi, 'Ludhiana')
     });
     setEditingSewadar(s);
   };
@@ -62,7 +64,9 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         sewadar_id: editingSewadar.id,
         address: formData.address,
         dob: formData.dob,
-        phone: formData.phone
+        phone: formData.phone,
+        age: formData.age ? parseInt(formData.age, 10) : undefined,
+        district: formData.district
       });
       setEditingSewadar(null);
     } catch (err) {
@@ -343,15 +347,30 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         <div className="space-y-3">
           {filtered.map((s, idx) => {
             const sDetails = details[s.id];
-            const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone);
+            const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone || sDetails.age || sDetails.district);
 
             return (
               <div key={s.id} className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-indigo-100 transition-all">
                 <div className="flex items-center gap-5">
                   <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
                   <div className="flex-1">
-                    <h3 className="font-black text-slate-900 text-base">{s.name}</h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.group} • {s.gender}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-black text-slate-900 text-base">{s.name}</h3>
+                      {s.routedByHrTable && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                          Routed by HR table
+                        </span>
+                      )}
+                      {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                          Punjab Zone
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                      {s.group} • {s.gender}
+                      {s.hrTableData?.handoverIncharge ? ` • Handover: ${s.hrTableData.handoverIncharge}` : ''}
+                    </p>
                     
                     {hasDetails && (
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -365,8 +384,18 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                             🎂 {new Date(sDetails.dob).toLocaleDateString('en-GB')}
                           </span>
                         )}
-                        {sDetails.address && (
-                          <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 max-w-[150px] truncate shadow-sm">
+                        {sDetails.age !== undefined && sDetails.age !== null && (
+                          <span className="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
+                            👤 Age: {sDetails.age}
+                          </span>
+                        )}
+                        {sDetails.district && (
+                          <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
+                            📍 {sDetails.district.replace(/ludhiyana/gi, 'Ludhiana')}
+                          </span>
+                        )}
+                        {sDetails.address && sDetails.address !== sDetails.district && (
+                          <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 max-w-[150px] truncate shadow-sm">
                             🏠 {sDetails.address}
                           </span>
                         )}
@@ -446,6 +475,29 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                   value={formData.dob}
                   onChange={e => setFormData(p => ({...p, dob: e.target.value}))}
                 />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Age</label>
+                  <input 
+                    type="number" 
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" 
+                    placeholder="e.g. 45"
+                    value={formData.age}
+                    onChange={e => setFormData(p => ({...p, age: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">District</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" 
+                    placeholder="e.g. Pathankot"
+                    value={formData.district}
+                    onChange={e => setFormData(p => ({...p, district: e.target.value}))}
+                  />
+                </div>
               </div>
               
               <div className="space-y-1.5">

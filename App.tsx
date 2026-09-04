@@ -12,6 +12,8 @@ import WorkshopAttendanceView from './components/WorkshopAttendanceView';
 import WorkshopLeaderboardView from './components/WorkshopLeaderboardView';
 import WorkshopReportView from './components/WorkshopReportView';
 import ImportantInfoBanner from './components/ImportantInfoBanner';
+import { PunjabZoneStructure } from './components/PunjabZoneStructure';
+import { HrTableAddSewadar } from './components/HrTableAddSewadar';
 import { db } from './firebase';
 import { collection, query, where, getDocs, orderBy, setDoc, doc, updateDoc, deleteDoc, limit, addDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
 
@@ -54,7 +56,18 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [activeView, setActiveView] = useState<ViewState>('Attendance');
+  const [activeView, setActiveView] = useState<ViewState>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_VOLUNTEER);
+    if (saved) {
+      try {
+        const v = JSON.parse(saved);
+        if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin') {
+          return 'AddSewadar';
+        }
+      } catch (e) {}
+    }
+    return 'Attendance';
+  });
   const [lastRequirementsViewedAt, setLastRequirementsViewedAt] = useState<number>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_LAST_REQ_VIEW);
     return saved ? parseInt(saved, 10) : 0;
@@ -77,6 +90,14 @@ const App: React.FC = () => {
   const [customSewadars, setCustomSewadars] = useState<Sewadar[]>([]);
   const [deletedSewadarIds, setDeletedSewadarIds] = useState<Set<string>>(new Set());
   const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>(INITIAL_SEWADAR_DETAILS);
+
+  const isHrTable = activeVolunteer?.assignedGroup === 'HR Table' || activeVolunteer?.id === 'admin_hr_table' || activeVolunteer?.name === 'HR Table Admin';
+
+  useEffect(() => {
+    if (isHrTable && activeView === 'Attendance') {
+      setActiveView('AddSewadar');
+    }
+  }, [isHrTable, activeView]);
   const [loading, setLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
@@ -133,6 +154,18 @@ const App: React.FC = () => {
       }
       
       const matchGender = isLadies ? s.gender === 'Ladies' : s.gender === 'Gents';
+
+      const isZone = activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab');
+      if (isZone) {
+        const isPunjabSewadar = s.group === 'Punjab' || 
+          s.group === 'Punjab Zone Ladies' || 
+          s.originZone === 'Punjab Zone' || 
+          s.tag === 'Punjab Zone' || 
+          s.routedByZone || 
+          s.id.startsWith('PZ-');
+        return matchGender && (isPunjabSewadar || isMarked);
+      }
+
       const matchGroup = !assignedGroup || s.group === assignedGroup;
       
       return (matchGender && matchGroup) || isMarked;
@@ -273,6 +306,7 @@ const App: React.FC = () => {
       : (activeVolunteer.assignedGroup || 'Global');
     return [
       'HR Department',
+      'HR Table',
       'PR Department',
       'Lost and Found',
       'Langar Department'
@@ -408,14 +442,32 @@ const App: React.FC = () => {
             localStorage.setItem(STORAGE_KEY_SESSION_ID, deduplicatedSessions[0].id);
           } else {
             setDashboardSelectedSession(null);
-            if (activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
+            const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
+            if (activeVolunteer.role !== 'Super Admin' && !isZone) setShowSettingsModal(true);
           }
         }
       } else {
-        setAllSessions([]);
-        setActiveSession(null);
-        setDashboardSelectedSession(null);
-        if (isInitial && activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
+        const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
+        if (isZone) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const defaultSession: DutySession = {
+            id: `zone-${activeVolunteer.assignedGroup || 'Punjab'}-${todayStr}`,
+            date: todayStr,
+            group: (activeVolunteer.assignedGroup || 'Punjab') as DutyGroup,
+            location: LOCATIONS_LIST.join(', '),
+            start_time: `${todayStr}T06:00:00`,
+            end_time: `${todayStr}T21:00:00`,
+            completed: false
+          };
+          setAllSessions([defaultSession]);
+          setActiveSession(defaultSession);
+          setDashboardSelectedSession(defaultSession);
+        } else {
+          setAllSessions([]);
+          setActiveSession(null);
+          setDashboardSelectedSession(null);
+          if (isInitial && activeVolunteer.role !== 'Super Admin') setShowSettingsModal(true);
+        }
       }
     } catch (err) {
       console.error("Fetch Sessions Error:", err);
@@ -433,7 +485,9 @@ const App: React.FC = () => {
             sewadar_id: d.sewadar_id,
             address: d.address || '',
             dob: d.dob || '',
-            phone: d.phone || ''
+            phone: d.phone || '',
+            age: d.age,
+            district: d.district || ''
           };
         });
       }
@@ -745,7 +799,12 @@ const App: React.FC = () => {
           group: s.group as DutyGroup,
           shift: s.shift || undefined,
           isCustom: true,
-          isRestored: Boolean(s.isRestored)
+          isRestored: Boolean(s.isRestored),
+          routedByHrTable: Boolean(s.routedByHrTable),
+          routedByZone: Boolean(s.routedByZone),
+          originZone: s.originZone || undefined,
+          tag: s.tag || undefined,
+          hrTableData: s.hrTableData || undefined
         })));
       }
 
@@ -790,9 +849,24 @@ const App: React.FC = () => {
   };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
-    if (!activeSession) return;
-    const sessionDate = normalizeDate(activeSession.date);
-    const sessionGroup = activeSession.group;
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+    let session = activeSession;
+    if (!session && isZone) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      session = {
+        id: `zone-${activeVolunteer?.assignedGroup || 'Punjab'}-${todayStr}`,
+        date: todayStr,
+        group: (activeVolunteer?.assignedGroup || 'Punjab') as DutyGroup,
+        location: LOCATIONS_LIST.join(', '),
+        start_time: `${todayStr}T06:00:00`,
+        end_time: `${todayStr}T21:00:00`,
+        completed: false
+      };
+      setActiveSession(session);
+    }
+    if (!session) return;
+    const sessionDate = normalizeDate(session.date);
+    const sessionGroup = session.group;
 
     if (isDelete && recordId) {
       try {
@@ -868,12 +942,12 @@ const App: React.FC = () => {
 
   const handleSaveSewadarDetails = async (details: SewadarDetails, optionalName?: string) => {
     try {
-      const targetSewadar = visibleSewadars.find(s => s.id === details.sewadar_id);
+      const targetSewadar = (allSewadarsList || visibleSewadars).find(s => s.id === details.sewadar_id);
       const targetName = targetSewadar?.name || optionalName || '';
       const targetNorm = normalizeName(targetName);
 
       // We want to find ALL sewadars with the same normalized name
-      const matchingSewadars = visibleSewadars.filter(s => {
+      const matchingSewadars = (allSewadarsList || visibleSewadars).filter(s => {
         return targetNorm && normalizeName(s.name) === targetNorm;
       });
 
@@ -887,7 +961,9 @@ const App: React.FC = () => {
           sewadar_id: id,
           address: details.address,
           dob: details.dob,
-          phone: details.phone
+          phone: details.phone,
+          age: details.age ?? null,
+          district: details.district || details.address || ''
         }, { merge: true });
       }
 
@@ -899,7 +975,9 @@ const App: React.FC = () => {
             sewadar_id: id,
             address: details.address,
             dob: details.dob,
-            phone: details.phone
+            phone: details.phone,
+            age: details.age,
+            district: details.district || details.address || ''
           };
         });
         return next;
@@ -907,6 +985,47 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Save Details Error:", err);
       throw err;
+    }
+  };
+
+  const handleAddSewadar = async (
+    n: string,
+    g: Gender,
+    grp: DutyGroup,
+    shift?: 'DAY' | 'NIGHT',
+    details?: { dob: string; phone: string; address: string },
+    isRestored?: boolean
+  ) => {
+    const newSewadar = {
+      id: generateNumericId(),
+      name: n,
+      gender: g,
+      group: grp,
+      shift,
+      isRestored: Boolean(isRestored)
+    };
+    try {
+      await setDoc(doc(db, 'custom_sewadars', newSewadar.id), {
+        id: newSewadar.id,
+        name: newSewadar.name,
+        gender: newSewadar.gender,
+        group: newSewadar.group,
+        shift: newSewadar.shift || null,
+        isRestored: Boolean(isRestored)
+      });
+      if (details) {
+        await handleSaveSewadarDetails({
+          sewadar_id: newSewadar.id,
+          dob: details.dob,
+          phone: details.phone,
+          address: details.address,
+          district: details.address
+        }, newSewadar.name);
+      }
+      setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
+    } catch (error) {
+      console.error('Failed to add sewadar:', error);
+      throw error;
     }
   };
 
@@ -962,6 +1081,158 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Edit Sewadar Error:", err);
       alert("Failed to update name.");
+    }
+  };
+
+  const handleSaveHrTableSewadar = async (data: {
+    id?: string;
+    name: string;
+    gender: Gender;
+    group: DutyGroup;
+    shift?: 'DAY' | 'NIGHT';
+    hrTableData: {
+      phoneNumber?: string;
+      address?: string;
+      qualification?: string;
+      timing?: string;
+      weeklyOff?: string;
+      sewaDays?: string[];
+      selectedOptions?: string[];
+      handoverDayGroup?: string;
+      handoverIncharge?: string;
+      createdAt?: number;
+      updatedAt?: number;
+    };
+  }) => {
+    const id = data.id || generateNumericId();
+    const existing = customSewadars.find(s => s.id === id);
+    const isPunjabZone = existing?.tag === 'Punjab Zone' || existing?.originZone === 'Punjab Zone' || existing?.routedByZone;
+    const originZone = isPunjabZone ? (existing?.originZone || 'Punjab Zone') : undefined;
+    const tag = isPunjabZone ? 'Punjab Zone' : undefined;
+    const routedByZone = Boolean(isPunjabZone);
+    const routedByHrTable = !isPunjabZone;
+
+    const updatedSewadar: Sewadar = {
+      id,
+      name: data.name.trim(),
+      gender: data.gender,
+      group: data.group,
+      shift: data.shift || undefined,
+      isCustom: true,
+      routedByHrTable,
+      routedByZone,
+      originZone,
+      tag,
+      hrTableData: {
+        ...data.hrTableData,
+        createdAt: data.hrTableData.createdAt || existing?.hrTableData?.createdAt || Date.now(),
+        updatedAt: Date.now()
+      }
+    };
+
+    try {
+      await setDoc(doc(db, 'custom_sewadars', id), {
+        id: updatedSewadar.id,
+        name: updatedSewadar.name,
+        gender: updatedSewadar.gender,
+        group: updatedSewadar.group,
+        shift: updatedSewadar.shift || null,
+        isCustom: true,
+        routedByHrTable: updatedSewadar.routedByHrTable,
+        routedByZone: updatedSewadar.routedByZone || false,
+        originZone: updatedSewadar.originZone || null,
+        tag: updatedSewadar.tag || null,
+        hrTableData: updatedSewadar.hrTableData
+      }, { merge: true });
+
+      if (data.hrTableData.phoneNumber || data.hrTableData.address) {
+        await handleSaveSewadarDetails({
+          sewadar_id: id,
+          dob: '',
+          phone: data.hrTableData.phoneNumber || '',
+          address: data.hrTableData.address || '',
+          district: data.hrTableData.address || ''
+        }, updatedSewadar.name);
+      }
+
+      setCustomSewadars(prev => {
+        const exists = prev.find(s => s.id === id);
+        if (exists) {
+          return prev.map(s => s.id === id ? updatedSewadar : s);
+        } else {
+          return [...prev, updatedSewadar];
+        }
+      });
+
+      return updatedSewadar;
+    } catch (err) {
+      console.error("Save HR Table Sewadar Error:", err);
+      throw err;
+    }
+  };
+
+  const handleDeleteHrTableSewadar = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'custom_sewadars', id));
+      await setDoc(doc(db, 'deleted_sewadars', id), { id, deletedAt: Date.now() });
+      setDeletedSewadarIds(prev => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      setCustomSewadars(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      console.error("Delete HR Table Sewadar Error:", err);
+      throw err;
+    }
+  };
+
+  const handleHandoverZoneSewadar = async (sewadar: Sewadar, targetDay: string, inchargeName: string) => {
+    const updatedSewadar: Sewadar = {
+      ...sewadar,
+      group: targetDay as DutyGroup,
+      isCustom: true,
+      tag: 'Punjab Zone',
+      originZone: 'Punjab Zone',
+      routedByZone: true,
+      routedByHrTable: false,
+      hrTableData: {
+        ...(sewadar.hrTableData || {}),
+        handoverDayGroup: targetDay,
+        handoverIncharge: inchargeName,
+        updatedAt: Date.now(),
+        createdAt: sewadar.hrTableData?.createdAt || Date.now()
+      }
+    };
+
+    try {
+      await setDoc(doc(db, 'custom_sewadars', sewadar.id), {
+        id: updatedSewadar.id,
+        name: updatedSewadar.name,
+        gender: updatedSewadar.gender,
+        group: updatedSewadar.group,
+        shift: updatedSewadar.shift || null,
+        isCustom: true,
+        tag: 'Punjab Zone',
+        originZone: 'Punjab Zone',
+        routedByZone: true,
+        routedByHrTable: false,
+        hrTableData: updatedSewadar.hrTableData
+      }, { merge: true });
+
+      setCustomSewadars(prev => {
+        const exists = prev.find(s => s.id === sewadar.id);
+        if (exists) {
+          return prev.map(s => s.id === sewadar.id ? updatedSewadar : s);
+        } else {
+          return [...prev, updatedSewadar];
+        }
+      });
+
+      return updatedSewadar;
+    } catch (err) {
+      console.error("Handover Zone Sewadar Error:", err);
+      throw err;
     }
   };
 
@@ -1314,13 +1585,25 @@ const App: React.FC = () => {
                 localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
                 if (v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator') {
                   setActiveView('WorkshopAttendance');
+                } else if (v.role === 'Punjab - Zone Structure') {
+                  setActiveView('ZoneStructure');
+                } else if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin') {
+                  setActiveView('AddSewadar');
                 } else {
                   setActiveView('Attendance');
                 }
               } catch (e) {
                 console.error("Storage error:", e);
                 setActiveVolunteer(v);
-                setActiveView(v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator' ? 'WorkshopAttendance' : 'Attendance');
+                if (v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator') {
+                  setActiveView('WorkshopAttendance');
+                } else if (v.role === 'Punjab - Zone Structure') {
+                  setActiveView('ZoneStructure');
+                } else if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin') {
+                  setActiveView('AddSewadar');
+                } else {
+                  setActiveView('Attendance');
+                }
               }
             }} 
             onShowNotice={() => setShowNoticeModal(true)}
@@ -1330,7 +1613,7 @@ const App: React.FC = () => {
         </div>
       ) : (
         <>
-          {showSettingsModal && (
+          {showSettingsModal && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
               <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
                 <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
@@ -1403,7 +1686,41 @@ const App: React.FC = () => {
           )}
 
           <main className={`flex-1 overflow-y-auto px-6 pt-6 no-scrollbar transition-all ${bannerVisible ? 'pb-40' : 'pb-24'}`}>
-        {activeView === 'Attendance' ? (
+        {activeVolunteer?.role === 'Punjab - Zone Structure' || activeView === 'ZoneStructure' ? (
+          <PunjabZoneStructure
+            allSewadars={allSewadarsList}
+            details={enrichedDetailsMap}
+            activeVolunteer={activeVolunteer}
+            onAddSewadar={handleAddSewadar}
+            onBackToPortal={() => {
+              localStorage.removeItem(STORAGE_KEY_VOLUNTEER);
+              localStorage.removeItem(STORAGE_KEY_SESSION_ID);
+              setActiveVolunteer(null);
+              setActiveView('Attendance');
+            }}
+            onNavigateToAttendance={() => {
+              if (activeVolunteer?.role === 'Punjab - Zone Structure') {
+                const gentVolunteer: Volunteer = {
+                  id: 'punjab_zone_att_gents',
+                  name: 'Punjab Zone (Gents)',
+                  role: 'Punjab - Zone Attendance (Gents)',
+                  assignedGroup: 'Punjab',
+                  password: '123'
+                };
+                setActiveVolunteer(gentVolunteer);
+                localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(gentVolunteer));
+              }
+              setActiveView('Attendance');
+            }}
+          />
+        ) : (activeView === 'AddSewadar' || (isHrTable && activeView === 'Attendance')) ? (
+          <HrTableAddSewadar 
+            activeVolunteer={activeVolunteer} 
+            customSewadars={customSewadars}
+            onSaveSewadar={handleSaveHrTableSewadar}
+            onDeleteSewadar={handleDeleteHrTableSewadar}
+          />
+        ) : activeView === 'Attendance' ? (
           <AttendanceManager 
             sewadars={visibleSewadars} 
             attendance={activeAttendance} 
@@ -1411,37 +1728,21 @@ const App: React.FC = () => {
             onSaveVehicle={handleSaveVehicle}
             vehicles={activeVehicles}
             flaggedVehicles={flaggedVehicles}
-            onAddSewadar={async (n, g, grp, shift, details, isRestored) => {
-              const newSewadar = { id: generateNumericId(), name: n, gender: g, group: grp, shift, isRestored: Boolean(isRestored) };
-              try {
-                await setDoc(doc(db, 'custom_sewadars', newSewadar.id), { 
-                  id: newSewadar.id, 
-                  name: newSewadar.name, 
-                  gender: newSewadar.gender, 
-                  group: newSewadar.group,
-                  shift: newSewadar.shift || null,
-                  isRestored: Boolean(isRestored)
-                });
-                if (details) {
-                  await handleSaveSewadarDetails({
-                    sewadar_id: newSewadar.id,
-                    dob: details.dob,
-                    phone: details.phone,
-                    address: details.address
-                  }, newSewadar.name);
-                }
-                setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
-              } catch (error) { console.error('Failed to add sewadar:', error); }
-            }} 
+            onAddSewadar={handleAddSewadar} 
             activeVolunteer={activeVolunteer} 
             workshopLocation={activeSession?.location || null} 
             sessionDate={activeSession?.date || ''} 
             dutyStartTime={activeSession?.start_time || ''} 
             dutyEndTime={activeSession?.end_time || ''} 
             isCompleted={!!activeSession?.completed} 
-            onChangeLocation={() => setShowSettingsModal(true)} 
+            onChangeLocation={() => {
+              if (!activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
+                setShowSettingsModal(true);
+              }
+            }} 
             onDeleteSewadar={handleDeleteSewadar}
             onEditSewadar={handleEditSewadar}
+            onHandoverSewadar={handleHandoverZoneSewadar}
             sessionGroup={activeSession?.group as DutyGroup || null}
           />
         ) : activeView === 'VolunteerDetails' ? (
@@ -1505,7 +1806,11 @@ const App: React.FC = () => {
             isLoading={loading} 
             dutyStartTime={dashboardSelectedSession?.start_time || ''} 
             dutyEndTime={dashboardSelectedSession?.end_time || ''} 
-            onOpenSettings={() => setShowSettingsModal(true)} 
+            onOpenSettings={() => {
+              if (!activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
+                setShowSettingsModal(true);
+              }
+            }} 
             onCompleteSession={handleCompleteSession} 
             onResetAllData={handleResetAllData} 
             notices={notices}
@@ -1517,10 +1822,37 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {activeVolunteer && (
+      {activeVolunteer && activeVolunteer.role !== 'Punjab - Zone Structure' && (
         <nav className={`fixed left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t flex justify-around items-center p-3 pb-6 transition-all ${bannerVisible ? 'bottom-[64px]' : 'bottom-0'}`}>
-          <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg><span className="text-[8px] font-black uppercase">Mark Sewa</span></button>
+          {isHrTable ? (
+            <button
+              onClick={() => setActiveView('AddSewadar')}
+              className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'AddSewadar' ? 'text-indigo-600 font-black' : 'text-slate-400'}`}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              <span className="text-[8px] font-black uppercase">Add Sewadar</span>
+            </button>
+          ) : (
+            <button onClick={() => setActiveView('Attendance')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Attendance' ? 'text-indigo-600' : 'text-slate-400'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
+              </svg>
+              <span className="text-[8px] font-black uppercase">
+                {(activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab')) ? 'Sewadars' : 'Mark Sewa'}
+              </span>
+            </button>
+          )}
           <button onClick={() => setActiveView('VolunteerDetails')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'VolunteerDetails' ? 'text-indigo-600' : 'text-slate-400'}`}><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span className="text-[8px] font-black uppercase">Details</span></button>
+          {(activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role === 'Super Admin') && (
+            <button onClick={() => setActiveView('ZoneStructure')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'ZoneStructure' ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <span className="text-[8px] font-black uppercase">Structure</span>
+            </button>
+          )}
           <button onClick={() => setActiveView('Requirements')} className={`flex-1 flex flex-col items-center gap-1 ${activeView === 'Requirements' ? 'text-indigo-600' : 'text-slate-400'}`}>
             <div className="relative">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>

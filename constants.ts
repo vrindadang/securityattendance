@@ -3,12 +3,34 @@ import { Sewadar, DutyGroup, Volunteer, SewadarDetails } from './types';
 
 export const GENTS_GROUPS: DutyGroup[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-  'HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'
+  'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Punjab'
 ];
+
+export const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+export const GENTS_INCHARGES: Record<string, string> = {
+  'Monday': 'Anil Gulati',
+  'Tuesday': 'SK Gaba',
+  'Wednesday': 'Surjeet',
+  'Thursday': 'Sanjay',
+  'Friday': 'Sushil Ahuja',
+  'Saturday': 'Rajan',
+  'Sunday': 'Manish Munjal'
+};
+
+export const LADIES_INCHARGES: Record<string, string[]> = {
+  'Monday': ['Kanta Rani', 'Kiran Bala', 'Sudesh Rohila'],
+  'Tuesday': ['Kanta Rani', 'Geeta Ohri', 'Anita Sethi'],
+  'Wednesday': ['Kanta Rani', 'Suman Sethi', 'Kamlesh Verma'],
+  'Thursday': ['Kanta Rani', 'Pushpa Taneja', 'Jolly'],
+  'Friday': ['Kanta Rani', 'Rani Gumber', 'Pushpa Singh', 'Jyoti Khera'],
+  'Saturday': ['Kanta Rani', 'Rani Gumber', 'Manju Chauhan', 'Sunita Verma'],
+  'Sunday': ['Kanta Rani', 'Jyoti Khera', 'Mehak Chawla']
+};
 
 export const LADIES_GROUPS: DutyGroup[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-  'HR Department', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'
+  'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance'
 ];
 
 export const LOCATIONS_LIST = [
@@ -458,6 +480,20 @@ const generateVolunteers = (): Volunteer[] => {
 
   vols.push({ id: 'sa', name: 'Super Admin', role: 'Super Admin', password: '000' });
   vols.push({ id: 'admin', name: 'Admin', role: 'Super Admin', password: '123' });
+  vols.push({
+    id: 'admin_hr_table',
+    name: 'HR Table Admin',
+    role: 'Back Office Admin',
+    password: 'hrtable123',
+    assignedGroup: 'HR Table'
+  });
+  vols.push({
+    id: 'punjab_zone_att_gents',
+    name: 'Punjab Zone Incharge',
+    role: 'Punjab - Zone Attendance (Gents)',
+    password: '123',
+    assignedGroup: 'Punjab'
+  });
   return vols;
 };
 
@@ -556,8 +592,78 @@ const generateInitialSewadars = (): Sewadar[] => {
     sewadars.push({ id: `BO-CM-${i}`, name: s.name, gender: s.gender, group: 'CCTV Maintenance' });
   });
 
+  PUNJAB_ZONE_GENTS_RAW.forEach((s, i) => {
+    sewadars.push({ id: `PZ-G-${i + 1}`, name: s.name, gender: 'Gents', group: 'Punjab' });
+  });
+
   return sewadars;
 };
+
+export interface RawPunjabSewadar {
+  name: string;
+  age: number;
+  dob: string;
+  phone: string;
+  district: string;
+}
+
+export const PUNJAB_ZONE_GENTS_RAW: RawPunjabSewadar[] = [
+  { name: "Ashok Kumar", age: 50, dob: "1973-03-17", phone: "9872463144", district: "Pathankot" },
+  { name: "Vijay Kumar", age: 51, dob: "1973-01-01", phone: "7837019809", district: "Pathankot" },
+  { name: "Ramlal", age: 42, dob: "1981-11-06", phone: "9478708531", district: "Pathankot" },
+  { name: "Karnail Chand", age: 63, dob: "1961-01-01", phone: "9781877402", district: "Gurdaspur" },
+  { name: "Sonu", age: 46, dob: "1977-09-19", phone: "9041042069", district: "" },
+  { name: "Surender Kumar", age: 39, dob: "1984-05-19", phone: "9878580854", district: "" },
+  { name: "Mohan Lal", age: 50, dob: "1974-01-01", phone: "9876184325", district: "Pathankot" },
+  { name: "Ram Avtar", age: 49, dob: "1974-08-31", phone: "6006827954", district: "Pathankot" },
+  { name: "Jitender Singh (Prince)", age: 39, dob: "1984-11-18", phone: "9876927135", district: "" },
+  { name: "Rahul", age: 31, dob: "1992-09-16", phone: "7508646551", district: "Pathankot" },
+  { name: "Tilak Raj", age: 59, dob: "1964-05-30", phone: "6239321991", district: "Pathankot" },
+  { name: "Chaman Lal", age: 62, dob: "1961-01-01", phone: "9877811042", district: "Pathankot" },
+  { name: "Sunil Kumar", age: 37, dob: "1986-01-01", phone: "9478818701", district: "Pathankot" },
+  { name: "Vijay Kumar (Sonu)", age: 37, dob: "1986-10-02", phone: "8054970394", district: "Pathankot" },
+  { name: "Joginder Pal", age: 58, dob: "1966-01-01", phone: "7837890674", district: "Gurdaspur" },
+  { name: "Ram Chand", age: 58, dob: "1965-11-10", phone: "8968291181", district: "Pathankot" },
+  { name: "Narinder Kumar", age: 50, dob: "1973-01-01", phone: "9646012637", district: "Pathankot" },
+  { name: "Roshan", age: 67, dob: "1958-01-01", phone: "", district: "Pathankot" },
+  { name: "Joginder Pal", age: 47, dob: "1976-09-03", phone: "9530682173", district: "Pathankot" },
+  { name: "Shammi Kumar", age: 31, dob: "1992-08-15", phone: "6280369347", district: "Pathankot" },
+  { name: "Raman Kumar", age: 44, dob: "1980-04-04", phone: "9463439236", district: "Pathankot" },
+  { name: "Raghubir Singh", age: 68, dob: "1956-01-01", phone: "7355108546", district: "Pathankot" },
+  { name: "Malkit Singh", age: 63, dob: "1961-01-01", phone: "9464911963", district: "Ludhiana" },
+  { name: "Niranjan Singh", age: 66, dob: "1958-01-01", phone: "9417255462", district: "Moga" },
+  { name: "Sukhdev Singh", age: 67, dob: "1957-01-01", phone: "9988604122", district: "Ludhiana" },
+  { name: "Mukand Singh", age: 62, dob: "1962-01-01", phone: "9914723721", district: "Ludhiana" },
+  { name: "Pritam Singh", age: 75, dob: "1949-01-01", phone: "9781170043", district: "Ludhiana" },
+  { name: "Balveer Singh", age: 45, dob: "1979-01-01", phone: "9814693850", district: "Ludhiana" },
+  { name: "Tehla Singh", age: 79, dob: "1945-01-01", phone: "9463914495", district: "Ludhiana" },
+  { name: "Shamsher Singh", age: 65, dob: "1959-01-01", phone: "9855100734", district: "Ludhiana" },
+  { name: "Chand Singh", age: 68, dob: "1956-01-01", phone: "9417096828", district: "Jagraon" },
+  { name: "Shingara Singh", age: 55, dob: "1969-01-01", phone: "9876527634", district: "Ludhiana" },
+  { name: "Santokh Das", age: 62, dob: "1962-01-01", phone: "6280747681", district: "Ludhiana" },
+  { name: "Harpal Singh", age: 57, dob: "1967-01-01", phone: "9217229177", district: "Ludhiana" },
+  { name: "Satur Singh", age: 50, dob: "1974-01-01", phone: "8437202090", district: "Ludhiana" },
+  { name: "Manjit Singh", age: 65, dob: "1959-01-01", phone: "7888818443", district: "Ludhiana" },
+  { name: "Narayan Yadav", age: 63, dob: "1961-01-01", phone: "6205657353", district: "Ludhiana" },
+  { name: "Gurmail Singh", age: 67, dob: "1957-01-01", phone: "7528951042", district: "Ludhiana" },
+  { name: "Surinder Singh", age: 65, dob: "1959-01-01", phone: "8146579507", district: "Ludhiana" },
+  { name: "Gurpreet Singh", age: 29, dob: "1995-01-01", phone: "7528093112", district: "Ludhiana" },
+  { name: "Satpal Singh", age: 58, dob: "1966-01-01", phone: "9464911963", district: "Ludhiana" },
+  { name: "Vishaki Ram", age: 61, dob: "1963-01-01", phone: "8283800370", district: "Jalandhar" },
+  { name: "Jagir Singh", age: 50, dob: "1974-01-01", phone: "9855368145", district: "Ludhiana" },
+  { name: "Hardeep Singh", age: 41, dob: "1983-01-01", phone: "9814951569", district: "Ludhiana" },
+  { name: "Raj Kumar", age: 65, dob: "1959-01-01", phone: "9592764080", district: "Hoshiyar Pur" },
+  { name: "Sucha Singh", age: 65, dob: "1959-01-01", phone: "9501156961", district: "Hoshiyar Pur" },
+  { name: "Hari Om", age: 60, dob: "1964-01-01", phone: "8872130558", district: "Nava Shahar" },
+  { name: "Suresh Kumar", age: 64, dob: "1960-01-01", phone: "8477064554", district: "Udham Singh Nagar" },
+  { name: "Pritam Singh", age: 63, dob: "1961-01-01", phone: "9815824012", district: "Ludhiana" },
+  { name: "Rajinder Kohli", age: 62, dob: "1962-01-01", phone: "7508493473", district: "Ludhiana" },
+  { name: "Sohan Singh", age: 78, dob: "1946-01-01", phone: "6239793518", district: "Ludhiana" },
+  { name: "Lal Singh", age: 88, dob: "1936-01-01", phone: "9463353974", district: "Ludhiana" },
+  { name: "Jaswant Singh", age: 44, dob: "1980-01-01", phone: "9417381457", district: "Mogha" },
+  { name: "Raj Kumar", age: 68, dob: "1956-01-01", phone: "9465803028", district: "Ludhiana" },
+  { name: "Pardeep", age: 65, dob: "1959-01-01", phone: "8872020517", district: "Ludhiana" }
+];
 
 interface RawDetail {
   name: string;
@@ -725,4 +831,15 @@ CCTV_MAINTENANCE_RAW.forEach((r, i) => {
 
 // Rahul Garg (Tuesday Gents) phone details
 INITIAL_SEWADAR_DETAILS['G-Tuesday-68'] = { sewadar_id: 'G-Tuesday-68', address: '', dob: '', phone: '9625102745' };
+
+PUNJAB_ZONE_GENTS_RAW.forEach((s, i) => {
+  INITIAL_SEWADAR_DETAILS[`PZ-G-${i + 1}`] = {
+    sewadar_id: `PZ-G-${i + 1}`,
+    address: s.district || '',
+    dob: s.dob || '',
+    phone: s.phone || '',
+    age: s.age,
+    district: s.district || ''
+  };
+});
 

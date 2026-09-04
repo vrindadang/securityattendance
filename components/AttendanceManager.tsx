@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
-import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday, normalizeName } from '../constants';
+import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday, normalizeName, DAYS_LIST, GENTS_INCHARGES, LADIES_INCHARGES } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -13,6 +13,7 @@ interface Props {
   onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob: string, phone: string, address: string }, isRestored?: boolean) => void;
   onDeleteSewadar?: (id: string) => void;
   onEditSewadar?: (id: string, newName: string) => void;
+  onHandoverSewadar?: (sewadar: Sewadar, targetDay: string, inchargeName: string) => Promise<void> | void;
   activeVolunteer: Volunteer;
   workshopLocation: string | null;
   sessionDate: string;
@@ -33,6 +34,7 @@ const AttendanceManager: React.FC<Props> = ({
   onAddSewadar, 
   onDeleteSewadar,
   onEditSewadar,
+  onHandoverSewadar,
   activeVolunteer, 
   workshopLocation, 
   sessionDate,
@@ -46,6 +48,12 @@ const AttendanceManager: React.FC<Props> = ({
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  // Handover state for Zone Attendance
+  const [handoverDay, setHandoverDay] = useState<string | null>(null);
+  const [isHandoverOpen, setIsHandoverOpen] = useState<boolean>(false);
+  const [isHandingOver, setIsHandingOver] = useState<boolean>(false);
+  const [handoverMessage, setHandoverMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
   // States for marking NEW duty assignment
   const [editInTime, setEditInTime] = useState('');
@@ -97,7 +105,8 @@ const AttendanceManager: React.FC<Props> = ({
     return workshopLocation.split(',').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)).join(', ');
   }, [workshopLocation]);
 
-  const hasConfig = !!workshopLocation;
+  const isZoneLogin = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+  const hasConfig = !!workshopLocation || isZoneLogin;
   const isLocked = !hasConfig;
 
   const normalizeDate = (dateStr: string) => {
@@ -154,7 +163,7 @@ const AttendanceManager: React.FC<Props> = ({
     // Deduplicate in case a restored member exists as both custom and legacy
     const uniqueMap = new Map<string, Sewadar>();
     for (const s of list) {
-      const key = `${s.group}_${normalizeName(s.name)}`;
+      const key = (isGentsSaturday || isGentsTuesday) ? `${s.group}_${normalizeName(s.name)}` : s.id;
       const existing = uniqueMap.get(key);
       if (!existing || (!existing.isRestored && s.isRestored)) {
         uniqueMap.set(key, s);
@@ -213,6 +222,9 @@ const AttendanceManager: React.FC<Props> = ({
     setExpandedId(s.id);
     setIsEditingName(false);
     setTempName(s.name);
+    setHandoverDay(s.hrTableData?.handoverDayGroup || null);
+    setIsHandoverOpen(false);
+    setHandoverMessage(null);
   };
 
   const resetForm = () => {
@@ -524,30 +536,32 @@ const AttendanceManager: React.FC<Props> = ({
       )}
 
       {/* Toggle Bar */}
-      <div className="bg-slate-200/50 p-1.5 rounded-[2.5rem] flex items-center shadow-inner gap-1">
-        <button 
-          onClick={() => setMode('ATTENDANCE')}
-          className={`flex-1 py-4 px-6 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-            mode === 'ATTENDANCE' 
-              ? 'bg-white text-indigo-600 shadow-[0_4px_20px_rgba(0,0,0,0.08)] scale-[1.02]' 
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg>
-          Mark Attendance
-        </button>
-        <button 
-          onClick={() => setMode('VEHICLES')}
-          className={`flex-1 py-4 px-6 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-            mode === 'VEHICLES' 
-              ? 'bg-white text-indigo-600 shadow-[0_4px_20px_rgba(0,0,0,0.08)] scale-[1.02]' 
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          Vehicle Reports
-        </button>
-      </div>
+      {!isZoneLogin && (
+        <div className="bg-slate-200/50 p-1.5 rounded-[2.5rem] flex items-center shadow-inner gap-1">
+          <button 
+            onClick={() => setMode('ATTENDANCE')}
+            className={`flex-1 py-4 px-6 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
+              mode === 'ATTENDANCE' 
+                ? 'bg-white text-indigo-600 shadow-[0_4px_20px_rgba(0,0,0,0.08)] scale-[1.02]' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" /></svg>
+            Mark Attendance
+          </button>
+          <button 
+            onClick={() => setMode('VEHICLES')}
+            className={`flex-1 py-4 px-6 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
+              mode === 'VEHICLES' 
+                ? 'bg-white text-indigo-600 shadow-[0_4px_20px_rgba(0,0,0,0.08)] scale-[1.02]' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Vehicle Reports
+          </button>
+        </div>
+      )}
 
       {mode === 'ATTENDANCE' ? (
         <div className="space-y-4 animate-fade-in">
@@ -555,18 +569,25 @@ const AttendanceManager: React.FC<Props> = ({
           <div className={`p-6 rounded-[2.5rem] shadow-sm border flex items-center justify-between ${hasConfig ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
-                {hasConfig ? (normalizedSessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config'}
+                {isZoneLogin ? 'Zone Attendance' : (hasConfig ? (normalizedSessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config')}
               </p>
               <h2 className="text-base font-black text-slate-800">
-                {cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set')}
+                {isZoneLogin ? 'Punjab Zone Session' : (cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set'))}
               </h2>
               <div className="flex items-center gap-3">
                 <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
                 <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
-                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Marked: {markedCount}</p>
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                  {isZoneLogin 
+                    ? `Handed Over: ${sewadars.filter(s => s.hrTableData?.handoverIncharge && s.group !== 'Punjab').length} / ${sewadars.length}`
+                    : `Marked: ${markedCount}`
+                  }
+                </p>
               </div>
             </div>
-            <button onClick={onChangeLocation} className="px-5 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600">Change</button>
+            {!isZoneLogin && (
+              <button onClick={onChangeLocation} className="px-5 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600">Change</button>
+            )}
           </div>
 
           <div className={`${isLocked ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -616,12 +637,58 @@ const AttendanceManager: React.FC<Props> = ({
                   <div key={s.id} className="flex flex-col gap-1">
                     <button 
                       onClick={() => handleToggle(s)} 
-                      className={isMarked 
-                        ? "w-full bg-emerald-50/40 px-6 py-3.5 rounded-[1.8rem] shadow-sm border border-emerald-100 flex items-center justify-between transition-all hover:bg-emerald-50/60"
-                        : `w-full bg-white px-5 py-5 rounded-[2.5rem] shadow-sm border-2 flex items-center justify-between transition-all border-slate-50`
+                      className={
+                        isZoneLogin 
+                          ? (s.hrTableData?.handoverIncharge && s.group !== 'Punjab'
+                              ? "w-full bg-indigo-50/40 px-5 py-4 rounded-[2.2rem] shadow-sm border-2 border-indigo-200 flex items-center justify-between transition-all hover:bg-indigo-50/70 text-left"
+                              : "w-full bg-white px-5 py-4 rounded-[2.2rem] shadow-sm border-2 border-slate-100 hover:border-indigo-300 flex items-center justify-between transition-all text-left"
+                            )
+                          : (isMarked 
+                              ? "w-full bg-emerald-50/40 px-6 py-3.5 rounded-[1.8rem] shadow-sm border border-emerald-100 flex items-center justify-between transition-all hover:bg-emerald-50/60 text-left"
+                              : "w-full bg-white px-5 py-5 rounded-[2.5rem] shadow-sm border-2 flex items-center justify-between transition-all border-slate-50 text-left"
+                            )
                       }
                     >
-                      {isMarked ? (
+                      {isZoneLogin ? (
+                        <>
+                          <div className="flex items-center gap-4">
+                            <div className={`text-[10px] font-black w-6 text-center ${s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? 'text-indigo-400' : 'text-slate-300'}`}>{idx + 1}</div>
+                            <div className="text-left">
+                              <div className="flex items-center flex-wrap gap-1.5">
+                                <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                                {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                    Punjab Zone
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1">
+                                {s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? (
+                                  <p className="text-[11px] font-bold text-indigo-700 flex items-center gap-1">
+                                    <span>🤝</span>
+                                    <span>Handed over to <strong className="font-black">{s.group} {s.gender}</strong> ({s.hrTableData?.handoverIncharge})</span>
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    Ready for Handover
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            {s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? (
+                              <span className="px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                                <span>Reassign ↗</span>
+                              </span>
+                            ) : (
+                              <span className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md shadow-indigo-100">
+                                <span>Handover To →</span>
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : isMarked ? (
                         <>
                           <div className="flex items-center gap-4">
                             <div className="text-[9px] font-black text-emerald-300 w-5 text-center">{idx + 1}</div>
@@ -630,6 +697,21 @@ const AttendanceManager: React.FC<Props> = ({
                                  <p className="font-black text-sm text-slate-800 leading-tight">
                                    {s.name}
                                  </p>
+                                 {s.routedByHrTable && (
+                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                     Routed by HR table
+                                   </span>
+                                 )}
+                                 {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                     Punjab Zone
+                                   </span>
+                                 )}
+                                 {isZoneLogin && s.hrTableData?.handoverIncharge && s.group !== 'Punjab' && (
+                                   <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-[9px] font-bold">
+                                     🤝 {s.group} ({s.hrTableData.handoverIncharge})
+                                   </span>
+                                 )}
                                  {isWorkshopMarked && (
                                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-[9px] font-black uppercase tracking-wider">
                                      Marked via Workshop
@@ -652,7 +734,24 @@ const AttendanceManager: React.FC<Props> = ({
                           <div className="flex items-center gap-5">
                             <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
                             <div className="text-left">
-                               <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                               <div className="flex items-center flex-wrap gap-1.5">
+                                 <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
+                                 {s.routedByHrTable && (
+                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                     Routed by HR table
+                                   </span>
+                                 )}
+                                 {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                     Punjab Zone
+                                   </span>
+                                 )}
+                                 {isZoneLogin && s.hrTableData?.handoverIncharge && s.group !== 'Punjab' && (
+                                   <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-[9px] font-bold">
+                                     🤝 {s.group} ({s.hrTableData.handoverIncharge})
+                                   </span>
+                                 )}
+                               </div>
                                <div className="flex flex-wrap gap-2 mt-2">
                                   <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest">Available</span>
                                </div>
@@ -715,206 +814,415 @@ const AttendanceManager: React.FC<Props> = ({
                              </div>
                            ) : (
                              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                               <p className="text-base font-black text-slate-900">{s.name}</p>
-                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{s.gender} • {s.group} {s.shift ? `(${s.shift})` : ''}</p>
+                               <div className="flex items-center gap-2 flex-wrap">
+                                 <p className="text-base font-black text-slate-900">{s.name}</p>
+                                 {s.routedByHrTable && (
+                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                     Routed by HR table
+                                   </span>
+                                 )}
+                                 {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                     Punjab Zone
+                                   </span>
+                                 )}
+                               </div>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                 {s.gender} • {s.group} {s.shift ? `(${s.shift})` : ''}
+                                 {s.hrTableData?.handoverIncharge ? ` • Handover: ${s.hrTableData.handoverIncharge}` : ''}
+                               </p>
                              </div>
                            )}
                         </div>
 
-                        {/* List Existing assignments */}
-                        {records.length > 0 && (
-                          <div className="space-y-4">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Assignments</h3>
-                            <div className="space-y-2">
-                              {records.map(rec => (
-                                <div 
-                                  key={rec.id} 
-                                  onClick={() => {
-                                    if (isLocked) return;
-                                    setEditInTime(rec.inTime || '');
-                                    setEditOutTime(rec.outTime || '');
-                                    setEditLocation(rec.workshopLocation || '');
-                                    setEditPoint(rec.sewaPoint || '');
-                                    setEditProperUniform(rec.isProperUniform ?? true);
-                                    setEditShift(rec.shift || null);
-                                    setEditingRecordId(rec.id);
-                                  }}
-                                  className={`p-4 rounded-2xl flex items-center justify-between border cursor-pointer transition-all ${editingRecordId === rec.id ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-slate-50 border-slate-100 hover:bg-white'}`}
-                                >
-                                   <div className="space-y-1">
-                                       <div className="flex items-center gap-2 flex-wrap">
-                                          <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
-                                          {rec.workshopLocation === 'Workshop' && (
-                                            <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase bg-indigo-100 text-indigo-700">
-                                              Marked via Workshop
-                                            </span>
-                                          )}
-                                          {rec.shift && (
-                                            <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${rec.shift === 'DAY' ? 'bg-amber-100 text-amber-700' : 'bg-slate-800 text-white'}`}>
-                                              {rec.shift}
-                                            </span>
-                                          )}
-                                       </div>
-                                      <p className="text-[10px] font-bold text-slate-400">{rec.inTime} to {rec.outTime || 'On Duty'}</p>
-                                   </div>
-                                   <button 
-                                     onClick={(e) => { e.stopPropagation(); onSaveAttendance(s.id, {}, rec.id, true); }} 
-                                     className="p-2 text-red-300 hover:text-red-500 transition-colors"
-                                   >
-                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
-                                   </button>
-                                </div>
-                              ))}
+                                                {/* Handover To Section for Zone Attendance or Super Admin */}
+                        {(isZoneLogin || Boolean(onHandoverSewadar)) && (
+                          <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-3xl p-5 border-2 border-indigo-100 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                  <span>🤝</span> Handover To Group
+                                </h4>
+                                <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                                  {s.hrTableData?.handoverIncharge && s.group !== 'Punjab'
+                                    ? `Assigned to ${s.group} ${s.gender} (${s.hrTableData.handoverIncharge})`
+                                    : `Route and assign this ${s.gender} sewadar to a specific day group & incharge`}
+                                </p>
+                              </div>
+                              {s.hrTableData?.handoverIncharge && s.group !== 'Punjab' && (
+                                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-lg border border-emerald-300 shadow-xs">
+                                  ✓ Assigned to {s.group}
+                                </span>
+                              )}
                             </div>
+
+                            {handoverMessage && (
+                              <div className={`p-3 rounded-xl text-xs font-black border ${
+                                handoverMessage.type === 'success' 
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                  : 'bg-rose-50 text-rose-800 border-rose-200'
+                              }`}>
+                                {handoverMessage.text}
+                              </div>
+                            )}
+
+                            {!isHandoverOpen ? (
+                              <button
+                                type="button"
+                                onClick={() => setIsHandoverOpen(true)}
+                                className="w-full py-3.5 px-5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                                <span>{s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? 'Change Handover / Reassign' : 'Handover To'}</span>
+                              </button>
+                            ) : (
+                              <div className="space-y-4 pt-2 border-t border-indigo-100 animate-in fade-in duration-200">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                    1. Choose Day ({s.gender} Groups)
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsHandoverOpen(false)}
+                                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+
+                                {/* Days Grid */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {DAYS_LIST.map(day => {
+                                    const isSelected = handoverDay === day;
+                                    return (
+                                      <button
+                                        key={day}
+                                        type="button"
+                                        onClick={() => setHandoverDay(day)}
+                                        className={`p-2.5 rounded-xl text-center font-black text-xs border transition-all ${
+                                          isSelected
+                                            ? (s.gender === 'Gents' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-pink-600 text-white border-pink-600 shadow-sm')
+                                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                                        }`}
+                                      >
+                                        <div className="text-[9px] uppercase font-bold opacity-75">{s.gender}</div>
+                                        <div className="text-xs font-black">{day}</div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* 2. Select Incharge */}
+                                {handoverDay && (
+                                  <div className="bg-white rounded-2xl p-4 border border-indigo-100 space-y-3">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                      2. Select Group Incharge for {handoverDay} {s.gender}
+                                    </span>
+                                    {s.gender === 'Gents' ? (
+                                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                        <div>
+                                          <p className="text-sm font-black text-slate-800">
+                                            {GENTS_INCHARGES[handoverDay] || 'Incharge'}
+                                          </p>
+                                          <p className="text-[10px] font-bold text-slate-400">
+                                            {handoverDay} Gents Security Incharge
+                                          </p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          disabled={isHandingOver}
+                                          onClick={async () => {
+                                            const incName = GENTS_INCHARGES[handoverDay] || 'Incharge';
+                                            if (!onHandoverSewadar) return;
+                                            setIsHandingOver(true);
+                                            try {
+                                              await onHandoverSewadar(s, handoverDay, incName);
+                                              setHandoverMessage({
+                                                type: 'success',
+                                                text: `✓ Handed over "${s.name}" to ${incName} in ${handoverDay} Gents group with "Punjab Zone" tag!`
+                                              });
+                                              setIsHandoverOpen(false);
+                                            } catch (e: any) {
+                                              setHandoverMessage({
+                                                type: 'error',
+                                                text: e?.message || 'Failed to handover sewadar. Please try again.'
+                                              });
+                                            } finally {
+                                              setIsHandingOver(false);
+                                            }
+                                          }}
+                                          className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                        >
+                                          <span>{isHandingOver ? 'Assigning...' : `Handover to ${GENTS_INCHARGES[handoverDay]}`}</span>
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {(LADIES_INCHARGES[handoverDay] || []).map((incName, idx) => (
+                                          <div key={idx} className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                            <div>
+                                              <p className="text-sm font-black text-slate-800">{incName}</p>
+                                              <p className="text-[10px] font-bold text-slate-400">{handoverDay} Ladies Incharge</p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              disabled={isHandingOver}
+                                              onClick={async () => {
+                                                if (!onHandoverSewadar) return;
+                                                setIsHandingOver(true);
+                                                try {
+                                                  await onHandoverSewadar(s, handoverDay, incName);
+                                                  setHandoverMessage({
+                                                    type: 'success',
+                                                    text: `✓ Handed over "${s.name}" to ${incName} in ${handoverDay} Ladies group with "Punjab Zone" tag!`
+                                                  });
+                                                  setIsHandoverOpen(false);
+                                                } catch (e: any) {
+                                                  setHandoverMessage({
+                                                    type: 'error',
+                                                    text: e?.message || 'Failed to handover sewadar. Please try again.'
+                                                  });
+                                                } finally {
+                                                  setIsHandingOver(false);
+                                                }
+                                              }}
+                                              className="w-full sm:w-auto px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                            >
+                                              <span>{isHandingOver ? 'Assigning...' : `Handover to ${incName}`}</span>
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        {/* Form for new assignment */}
-                        <div className="space-y-6 pt-4 border-t-2 border-slate-50">
-                           <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1">
-                             {editingRecordId ? 'Update Duty Point' : 'Mark New Duty Point'}
-                           </h3>
-                           <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Ashram</label>
-                                    <select 
-                                      className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none" 
-                                      value={editLocation} 
-                                      onChange={e => {
-                                        setEditLocation(e.target.value);
-                                        // Reset point if location changes
-                                        setEditPoint('');
-                                      }}
-                                    >
-                                       {availableLocs.map(l => <option key={l} value={l}>{l}</option>)}
-                                    </select>
-                                 </div>
-                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Point / Spot</label>
-                                    {editLocation === 'Kirpal Bagh' ? (
-                                      <select 
-                                        className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
-                                        value={editPoint}
-                                        onChange={e => setEditPoint(e.target.value)}
-                                      >
-                                        <option value="">-- Select Point --</option>
-                                        {KIRPAL_BAGH_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        <option value="Other">Other Duty</option>
-                                      </select>
-                                    ) : editLocation === 'Kirpal Ashram' ? (
-                                      <select 
-                                        className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
-                                        value={editPoint}
-                                        onChange={e => setEditPoint(e.target.value)}
-                                      >
-                                        <option value="">-- Select Point --</option>
-                                        {KIRPAL_ASHRAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        <option value="Other">Other Duty</option>
-                                      </select>
-                                    ) : editLocation === 'Sawan Ashram' ? (
-                                      <select 
-                                        className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
-                                        value={editPoint}
-                                        onChange={e => setEditPoint(e.target.value)}
-                                      >
-                                        <option value="">-- Select Point --</option>
-                                        {SAWAN_ASHRAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        <option value="Other">Other Duty</option>
-                                      </select>
-                                    ) : editLocation === 'Sant Darshan Singh Ji Dham' ? (
-                                      <select 
-                                        className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
-                                        value={editPoint}
-                                        onChange={e => setEditPoint(e.target.value)}
-                                      >
-                                        <option value="">-- Select Point --</option>
-                                        {SDS_DHAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        <option value="Other">Other Duty</option>
-                                      </select>
-                                    ) : (
-                                      <input 
-                                        type="text" 
-                                        className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-bold text-sm outline-none" 
-                                        value={editPoint} 
-                                        onChange={e => setEditPoint(e.target.value)} 
-                                        placeholder="e.g. Main Gate..." 
-                                      />
-                                    )}
-                                 </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-4">
-                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">In Time</label>
-                                    <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editInTime} onChange={e => setEditInTime(e.target.value)} />
-                                 </div>
-                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Out Time</label>
-                                    <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editOutTime} onChange={e => setEditOutTime(e.target.value)} />
-                                 </div>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Shift</label>
-                                <div className="flex gap-2">
-                                   <button 
-                                     type="button" 
-                                     onClick={() => setEditShift('DAY')} 
-                                     className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editShift === 'DAY' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
-                                   >
-                                     DAY
-                                   </button>
-                                   <button 
-                                     type="button" 
-                                     onClick={() => setEditShift('NIGHT')} 
-                                     className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editShift === 'NIGHT' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
-                                   >
-                                     NIGHT
-                                   </button>
-                                </div>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Proper Dress Code?</label>
-                                <div className="flex gap-2">
-                                   <button type="button" onClick={() => setEditProperUniform(true)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editProperUniform ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>YES</button>
-                                   <button type="button" onClick={() => setEditProperUniform(false)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${!editProperUniform ? 'bg-red-500 text-white border-red-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>NO</button>
-                                </div>
-                              </div>
-                           </div>
-
-                           <div className="flex flex-col gap-3 pt-4">
-                              {(!editingRecordId || editOutTime) && (
-                                <button 
-                                  disabled={!editInTime || !editOutTime}
-                                  onClick={() => handleSaveAndAnother(s.id)} 
-                                  className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${(!editInTime || !editOutTime) ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-100 text-indigo-600 shadow-sm active:scale-95'}`}
-                                >
-                                   {editingRecordId ? 'Update & Add Another' : '+ Add Another Duty Point'}
-                                </button>
-                              )}
+                        {/* If Zone Login, do NOT show mark attendance or duty assignments - only Handover To & Close button */}
+                        {isZoneLogin ? (
+                          <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                            <button 
+                              type="button"
+                              onClick={() => { setExpandedId(null); setEditingRecordId(null); }} 
+                              className="w-full py-4 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 font-black text-xs uppercase tracking-widest rounded-2xl transition-all"
+                            >
+                              Close
+                            </button>
+                            {isSuperAdmin && onDeleteSewadar && (
                               <button 
-                                disabled={!editInTime}
-                                onClick={() => handleSaveAndClose(s.id)} 
-                                className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${!editInTime ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-600 text-white shadow-xl active:scale-95'}`}
+                                onClick={() => {
+                                  onDeleteSewadar(s.id);
+                                  setExpandedId(null);
+                                }} 
+                                className="w-full py-3 text-red-400 font-black text-[10px] uppercase tracking-widest border-t border-red-50 mt-1"
                               >
-                                 {editingRecordId ? 'Update & Close' : 'Confirm & Done'}
+                                Delete Member Permanently
                               </button>
-                              <button onClick={() => { setExpandedId(null); setEditingRecordId(null); }} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel / Close</button>
-                              {isSuperAdmin && onDeleteSewadar && (
-                                <button 
-                                  onClick={() => {
-                                    onDeleteSewadar(s.id);
-                                    setExpandedId(null);
-                                  }} 
-                                  className="w-full py-4 text-red-400 font-black text-[10px] uppercase tracking-widest border-t border-red-50 mt-4"
-                                >
-                                  Delete Member Permanently
-                                </button>
-                              )}
-                           </div>
-                        </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            {/* List Existing assignments */}
+                            {records.length > 0 && (
+                              <div className="space-y-4">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Assignments</h3>
+                                <div className="space-y-2">
+                                  {records.map(rec => (
+                                    <div 
+                                      key={rec.id} 
+                                      onClick={() => {
+                                        if (isLocked) return;
+                                        setEditInTime(rec.inTime || '');
+                                        setEditOutTime(rec.outTime || '');
+                                        setEditLocation(rec.workshopLocation || '');
+                                        setEditPoint(rec.sewaPoint || '');
+                                        setEditProperUniform(rec.isProperUniform ?? true);
+                                        setEditShift(rec.shift || null);
+                                        setEditingRecordId(rec.id);
+                                      }} 
+                                      className={`p-4 rounded-2xl flex items-center justify-between border cursor-pointer transition-all ${editingRecordId === rec.id ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-slate-50 border-slate-100 hover:bg-white'}`}
+                                    >
+                                       <div className="space-y-1">
+                                           <div className="flex items-center gap-2 flex-wrap">
+                                              <p className="text-xs font-black text-slate-800">{rec.workshopLocation} — {rec.sewaPoint || 'General'}</p>
+                                              {rec.workshopLocation === 'Workshop' && (
+                                                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase bg-indigo-100 text-indigo-700">
+                                                  Marked via Workshop
+                                                </span>
+                                              )}
+                                              {rec.shift && (
+                                                <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase ${rec.shift === 'DAY' ? 'bg-amber-100 text-amber-700' : 'bg-slate-800 text-white'}`}>
+                                                  {rec.shift}
+                                                </span>
+                                              )}
+                                           </div>
+                                          <p className="text-[10px] font-bold text-slate-400">{rec.inTime} to {rec.outTime || 'On Duty'}</p>
+                                       </div>
+                                       <button 
+                                         onClick={(e) => { e.stopPropagation(); onSaveAttendance(s.id, {}, rec.id, true); }} 
+                                         className="p-2 text-red-300 hover:text-red-500 transition-colors"
+                                       >
+                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                                       </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Form for new assignment */}
+                            <div className="space-y-6 pt-4 border-t-2 border-slate-50">
+                               <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1">
+                                 {editingRecordId ? 'Update Duty Point' : 'Mark New Duty Point'}
+                               </h3>
+                               <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Ashram</label>
+                                        <select 
+                                          className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none" 
+                                          value={editLocation} 
+                                          onChange={e => {
+                                            setEditLocation(e.target.value);
+                                            // Reset point if location changes
+                                            setEditPoint('');
+                                          }}
+                                        >
+                                           {availableLocs.map(l => <option key={l} value={l}>{l}</option>)}
+                                        </select>
+                                     </div>
+                                     <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Point / Spot</label>
+                                        {editLocation === 'Kirpal Bagh' ? (
+                                          <select 
+                                            className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                            value={editPoint}
+                                            onChange={e => setEditPoint(e.target.value)}
+                                          >
+                                            <option value="">-- Select Point --</option>
+                                            {KIRPAL_BAGH_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                            <option value="Other">Other Duty</option>
+                                          </select>
+                                        ) : editLocation === 'Kirpal Ashram' ? (
+                                          <select 
+                                            className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                            value={editPoint}
+                                            onChange={e => setEditPoint(e.target.value)}
+                                          >
+                                            <option value="">-- Select Point --</option>
+                                            {KIRPAL_ASHRAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                            <option value="Other">Other Duty</option>
+                                          </select>
+                                        ) : editLocation === 'Sawan Ashram' ? (
+                                          <select 
+                                            className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                            value={editPoint}
+                                            onChange={e => setEditPoint(e.target.value)}
+                                          >
+                                            <option value="">-- Select Point --</option>
+                                            {SAWAN_ASHRAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                            <option value="Other">Other Duty</option>
+                                          </select>
+                                        ) : editLocation === 'Sant Darshan Singh Ji Dham' ? (
+                                          <select 
+                                            className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-sm outline-none appearance-none"
+                                            value={editPoint}
+                                            onChange={e => setEditPoint(e.target.value)}
+                                          >
+                                            <option value="">-- Select Point --</option>
+                                            {SDS_DHAM_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                            <option value="Other">Other Duty</option>
+                                          </select>
+                                        ) : (
+                                          <input 
+                                            type="text" 
+                                            className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-bold text-sm outline-none" 
+                                            value={editPoint} 
+                                            onChange={e => setEditPoint(e.target.value)} 
+                                            placeholder="e.g. Main Gate..." 
+                                          />
+                                        )}
+                                     </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">In Time</label>
+                                        <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editInTime} onChange={e => setEditInTime(e.target.value)} />
+                                     </div>
+                                     <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Out Time</label>
+                                        <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editOutTime} onChange={e => setEditOutTime(e.target.value)} />
+                                     </div>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Shift</label>
+                                    <div className="flex gap-2">
+                                       <button 
+                                         type="button" 
+                                         onClick={() => setEditShift('DAY')} 
+                                         className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editShift === 'DAY' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                                       >
+                                         DAY
+                                       </button>
+                                       <button 
+                                         type="button" 
+                                         onClick={() => setEditShift('NIGHT')} 
+                                         className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editShift === 'NIGHT' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                                       >
+                                         NIGHT
+                                       </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Proper Dress Code?</label>
+                                    <div className="flex gap-2">
+                                       <button type="button" onClick={() => setEditProperUniform(true)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editProperUniform ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>YES</button>
+                                       <button type="button" onClick={() => setEditProperUniform(false)} className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${!editProperUniform ? 'bg-red-500 text-white border-red-500' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>NO</button>
+                                    </div>
+                                  </div>
+                               </div>
+
+                               <div className="flex flex-col gap-3 pt-4">
+                                  {(!editingRecordId || editOutTime) && (
+                                    <button 
+                                      disabled={!editInTime || !editOutTime}
+                                      onClick={() => handleSaveAndAnother(s.id)} 
+                                      className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${(!editInTime || !editOutTime) ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-100 text-indigo-600 shadow-sm active:scale-95'}`}
+                                    >
+                                       {editingRecordId ? 'Update & Add Another' : '+ Add Another Duty Point'}
+                                    </button>
+                                  )}
+                                  <button 
+                                    disabled={!editInTime}
+                                    onClick={() => handleSaveAndClose(s.id)} 
+                                    className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${!editInTime ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-60 shadow-none' : 'bg-indigo-600 text-white shadow-xl active:scale-95'}`}
+                                  >
+                                     {editingRecordId ? 'Update & Close' : 'Confirm & Done'}
+                                  </button>
+                                  <button onClick={() => { setExpandedId(null); setEditingRecordId(null); }} className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel / Close</button>
+                                  {isSuperAdmin && onDeleteSewadar && (
+                                    <button 
+                                      onClick={() => {
+                                        onDeleteSewadar(s.id);
+                                        setExpandedId(null);
+                                      }} 
+                                      className="w-full py-4 text-red-400 font-black text-[10px] uppercase tracking-widest border-t border-red-50 mt-4"
+                                    >
+                                      Delete Member Permanently
+                                    </button>
+                                  )}
+                               </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
