@@ -35,6 +35,7 @@ export interface Sewadar {
     selectedOptions?: string[];
     handoverDayGroup?: string;
     handoverIncharge?: string;
+    handoverDate?: string;
     createdAt?: number;
     updatedAt?: number;
   };

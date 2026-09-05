@@ -368,10 +368,89 @@ const App: React.FC = () => {
     }
   }, [showSettingsModal, activeVolunteer, activeView, dashboardSelectedSession, activeSession, isPermanentKirpalBagh]);
 
-  const fetchSessions = useCallback(async (isInitial = false) => {
+  const fetchSessions = useCallback(async (isInitial = false, customList?: Sewadar[]) => {
     if (!activeVolunteer) return;
     
     try {
+      const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
+      if (isZone) {
+        const isLadiesZone = Boolean(activeVolunteer.role?.includes('Ladies') || activeVolunteer.name?.includes('Ladies'));
+        const zoneGroup = isLadiesZone ? 'Punjab Zone Ladies' : 'Punjab';
+        const zoneGender = isLadiesZone ? 'Ladies' : 'Gents';
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const uniqueSessionsMap: Record<string, DutySession> = {};
+
+        // Always include today's active session
+        uniqueSessionsMap[todayStr] = {
+          id: `zone-${zoneGroup}-${todayStr}`,
+          date: todayStr,
+          group: zoneGroup as DutyGroup,
+          location: 'Handover Report',
+          start_time: `${todayStr}T06:00:00`,
+          end_time: `${todayStr}T21:00:00`,
+          completed: false
+        };
+
+        // Scan only for dates that ACTUALLY have handovers specific to this gender & Punjab zone
+        const pool = customList || (allSewadarsList && allSewadarsList.length > 0 ? allSewadarsList : customSewadars);
+        pool.forEach(s => {
+          if (s.gender !== zoneGender) return;
+
+          const isPunjabSewadar = s.group === zoneGroup || 
+            s.originZone === 'Punjab Zone' || 
+            s.tag === 'Punjab Zone' || 
+            s.routedByZone || 
+            s.id?.startsWith('PZ-');
+          if (!isPunjabSewadar) return;
+
+          const hasHandover = Boolean(s.hrTableData?.handoverIncharge) && 
+            (s.group !== zoneGroup || Boolean(s.hrTableData?.handoverDayGroup));
+          if (!hasHandover) return;
+
+          const hDate = s.hrTableData?.handoverDate || 
+            (s.hrTableData?.updatedAt ? new Date(s.hrTableData.updatedAt).toISOString().split('T')[0] : null) ||
+            (s.hrTableData?.createdAt ? new Date(s.hrTableData.createdAt).toISOString().split('T')[0] : null);
+
+          if (hDate && !uniqueSessionsMap[hDate]) {
+            uniqueSessionsMap[hDate] = {
+              id: `zone-${zoneGroup}-${hDate}`,
+              date: hDate,
+              group: zoneGroup as DutyGroup,
+              location: 'Handover Report',
+              start_time: `${hDate}T06:00:00`,
+              end_time: `${hDate}T21:00:00`,
+              completed: false
+            };
+          }
+        });
+
+        const zoneSessions = Object.values(uniqueSessionsMap).sort((a, b) => 
+          new Date(b.start_time || b.date).getTime() - new Date(a.start_time || a.date).getTime()
+        );
+
+        setAllSessions(zoneSessions);
+        setActiveSession(zoneSessions[0]);
+        if (isInitial) {
+          const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
+          const savedSession = zoneSessions.find(s => s.id === savedSessionId);
+          if (savedSession) {
+            setDashboardSelectedSession(savedSession);
+          } else if (zoneSessions[0]) {
+            setDashboardSelectedSession(zoneSessions[0]);
+            localStorage.setItem(STORAGE_KEY_SESSION_ID, zoneSessions[0].id);
+          }
+        } else {
+          setDashboardSelectedSession(prev => {
+            if (prev && zoneSessions.some(s => s.id === prev.id)) {
+              return prev;
+            }
+            return zoneSessions[0];
+          });
+        }
+        return;
+      }
+
       const q = query(
         collection(db, 'daily_settings'),
         ...(activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup 
@@ -417,7 +496,7 @@ const App: React.FC = () => {
           location: s.location ? s.location.split(',').map((l: string) => l.trim()).filter((l: string) => LOCATIONS_LIST.includes(l)).join(', ') : ''
         }));
         
-        // Deduplicate sessions by date + group.
+        // Deduplicate sessions by date + group
         const uniqueSessionsMap: Record<string, DutySession> = {};
         mappedSessions.forEach((s: any) => {
           const key = `${s.date}-${s.group}`;
@@ -425,8 +504,9 @@ const App: React.FC = () => {
             uniqueSessionsMap[key] = s;
           }
         });
+
         const deduplicatedSessions = Object.values(uniqueSessionsMap).sort((a, b) => 
-          new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+          new Date(b.start_time || b.date).getTime() - new Date(a.start_time || a.date).getTime()
         );
 
         setAllSessions(deduplicatedSessions);
@@ -445,27 +525,11 @@ const App: React.FC = () => {
             localStorage.setItem(STORAGE_KEY_SESSION_ID, deduplicatedSessions[0].id);
           } else {
             setDashboardSelectedSession(null);
-            const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
-            if (activeVolunteer.role !== 'Super Admin' && !isZone && !isHrTable) setShowSettingsModal(true);
+            if (activeVolunteer.role !== 'Super Admin' && !isHrTable) setShowSettingsModal(true);
           }
         }
       } else {
-        const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
-        if (isZone) {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const defaultSession: DutySession = {
-            id: `zone-${activeVolunteer.assignedGroup || 'Punjab'}-${todayStr}`,
-            date: todayStr,
-            group: (activeVolunteer.assignedGroup || 'Punjab') as DutyGroup,
-            location: LOCATIONS_LIST.join(', '),
-            start_time: `${todayStr}T06:00:00`,
-            end_time: `${todayStr}T21:00:00`,
-            completed: false
-          };
-          setAllSessions([defaultSession]);
-          setActiveSession(defaultSession);
-          setDashboardSelectedSession(defaultSession);
-        } else if (isHrTable) {
+        if (isHrTable) {
           const todayStr = new Date().toISOString().split('T')[0];
           const defaultHrSession: DutySession = {
             id: `hrtable-${todayStr}`,
@@ -490,7 +554,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Fetch Sessions Error:", err);
     }
-  }, [activeVolunteer]);
+  }, [activeVolunteer, allSewadarsList, customSewadars]);
 
   const fetchSewadarDetails = useCallback(async () => {
     try {
@@ -810,7 +874,7 @@ const App: React.FC = () => {
       const customSnapshot = await getDocs(collection(db, 'custom_sewadars'));
       const customData = customSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       if (customData) {
-        setCustomSewadars(customData.map((s: any) => ({
+        const mappedCustom = customData.map((s: any) => ({
           id: String(s.id),
           name: s.name,
           gender: s.gender as Gender,
@@ -823,7 +887,11 @@ const App: React.FC = () => {
           originZone: s.originZone || undefined,
           tag: s.tag || undefined,
           hrTableData: s.hrTableData || undefined
-        })));
+        }));
+        setCustomSewadars(mappedCustom);
+        fetchSessions(true, mappedCustom);
+      } else {
+        fetchSessions(true);
       }
 
     } catch (err) {
@@ -831,7 +899,14 @@ const App: React.FC = () => {
     } finally {
       if (target === 'dashboard') setLoading(false);
     }
-  }, [activeVolunteer, calculateFlaggedVehicles]);
+  }, [activeVolunteer, calculateFlaggedVehicles, fetchSessions]);
+
+  useEffect(() => {
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+    if (isZone) {
+      fetchSessions(false);
+    }
+  }, [activeVolunteer, customSewadars, fetchSessions]);
 
   useEffect(() => {
     fetchSecurityPhoto();
@@ -1206,6 +1281,7 @@ const App: React.FC = () => {
   };
 
   const handleHandoverZoneSewadar = async (sewadar: Sewadar, targetDay: string, inchargeName: string) => {
+    const todayStr = activeSession?.date || new Date().toISOString().split('T')[0];
     const updatedSewadar: Sewadar = {
       ...sewadar,
       group: targetDay as DutyGroup,
@@ -1218,6 +1294,7 @@ const App: React.FC = () => {
         ...(sewadar.hrTableData || {}),
         handoverDayGroup: targetDay,
         handoverIncharge: inchargeName,
+        handoverDate: todayStr,
         updatedAt: Date.now(),
         createdAt: sewadar.hrTableData?.createdAt || Date.now()
       }
@@ -1529,7 +1606,10 @@ const App: React.FC = () => {
     } else {
       localStorage.removeItem(STORAGE_KEY_SESSION_ID);
     }
-    setActiveView('Attendance');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+    if (!isZone) {
+      setActiveView('Attendance');
+    }
   };
 
   const handleResetAllData = useCallback(async () => {
@@ -1838,6 +1918,8 @@ const App: React.FC = () => {
             onUpdateNotice={handleUpdateNotice}
             onDeleteNotice={handleDeleteNotice}
             onDeleteSession={handleDeleteSession}
+            sewadars={visibleSewadars}
+            allSewadars={allSewadarsList}
           />
         )}
       </main>

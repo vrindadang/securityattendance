@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession, Notice } from '../types';
+import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession, Notice, Sewadar } from '../types';
 import { VOLUNTEERS, GENTS_GROUPS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -40,6 +40,8 @@ interface Props {
   onUpdateNotice?: (id: string, title: string, content: string, photo?: string, pdf?: string) => void;
   onDeleteNotice?: (id: string) => void;
   onDeleteSession?: (id: string) => void;
+  sewadars?: Sewadar[];
+  allSewadars?: Sewadar[];
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -66,7 +68,9 @@ const Dashboard: React.FC<Props> = ({
   onAddNotice,
   onUpdateNotice,
   onDeleteNotice,
-  onDeleteSession
+  onDeleteSession,
+  sewadars = [],
+  allSewadars = []
 }) => {
   const [issueDesc, setIssueDesc] = useState('');
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
@@ -422,6 +426,55 @@ const Dashboard: React.FC<Props> = ({
   const [sessionFilterGroup, setSessionFilterGroup] = useState<string>('All');
 
   const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
+  const isZoneLogin = Boolean(activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab'));
+  const isLadiesZone = Boolean(activeVolunteer?.role?.includes('Ladies') || activeVolunteer?.name?.includes('Ladies'));
+  const zoneTargetGender = isLadiesZone ? 'Ladies' : 'Gents';
+  const zoneGroup = isLadiesZone ? 'Punjab Zone Ladies' : 'Punjab';
+  
+  const currentSession = allSessions.find(s => s.id === selectedSessionId) || allSessions[0];
+  const sessionDate = currentSession?.date;
+
+  const handedOverSewadarsForSession = useMemo(() => {
+    if (!isZoneLogin) return [];
+    const pool = (allSewadars && allSewadars.length > 0) ? allSewadars : (sewadars || []);
+    const map = new Map<string, Sewadar>();
+
+    pool.forEach(s => {
+      if (s.gender !== zoneTargetGender) return;
+
+      const isPunjab = s.group === zoneGroup || 
+        s.originZone === 'Punjab Zone' || 
+        s.tag === 'Punjab Zone' || 
+        s.routedByZone || 
+        s.id?.startsWith('PZ-');
+      if (!isPunjab) return;
+
+      const hasHandover = Boolean(s.hrTableData?.handoverIncharge) && 
+        (s.group !== zoneGroup || Boolean(s.hrTableData?.handoverDayGroup));
+      if (!hasHandover) return;
+
+      const hDate = s.hrTableData?.handoverDate || 
+        (s.hrTableData?.updatedAt ? new Date(s.hrTableData.updatedAt).toISOString().split('T')[0] : null) ||
+        (s.hrTableData?.createdAt ? new Date(s.hrTableData.createdAt).toISOString().split('T')[0] : null);
+
+      if (sessionDate) {
+        if (hDate === sessionDate) {
+          map.set(s.id, s);
+        } else if (!hDate) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          if (sessionDate === todayStr) {
+            map.set(s.id, s);
+          }
+        }
+      } else {
+        map.set(s.id, s);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [allSewadars, sewadars, isZoneLogin, zoneTargetGender, zoneGroup, sessionDate]);
+
+  const totalHandovers = handedOverSewadarsForSession.length;
   
   const formatDateTime = (iso: string) => {
     if (!iso) return '-';
@@ -443,10 +496,144 @@ const Dashboard: React.FC<Props> = ({
   };
 
   const generateAttendancePDF = () => {
+    const currentSession = allSessions.find(s => s.id === selectedSessionId) || allSessions[0];
+    const dateDisplay = (typeof currentSession?.date === 'string' ? currentSession.date : '').split('-').reverse().join('/') || '-';
+
+    if (isZoneLogin) {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const wingText = isLadiesZone ? 'Ladies Wing' : 'Gents Wing';
+      const groupText = isLadiesZone ? 'Punjab Zone Ladies Security Group' : 'Punjab Zone Gents Security Group';
+      
+      let currentY = 15;
+
+      const ensureSpace = (h: number) => {
+        if (currentY + h > 275) {
+          doc.addPage();
+          currentY = 20;
+          return true;
+        }
+        return false;
+      };
+
+      // Header Intro
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      const introText = `With the blessings of H.H. Sant Rajinder Singh Ji Maharaj, ${groupText}, presents the handover report for ${dateDisplay}`;
+      doc.text(introText, 14, currentY);
+
+      // Title
+      currentY += 12;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(50, 60, 120);
+      doc.text("SKRM Security Sewa report", 14, currentY);
+      
+      // Subtitle
+      currentY += 7;
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Punjab Zone - Sewadar Handover Report (${wingText})`, 14, currentY);
+      
+      // Horizontal Divider
+      currentY += 4;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(14, currentY, 196, currentY);
+
+      // 1. Handover Overview
+      currentY += 10;
+      ensureSpace(40);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("1. Handover Overview", 14, currentY);
+
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['Metric', 'Details']],
+        body: [
+          ['Zone', 'Punjab'],
+          ['Reporting Wing', isLadiesZone ? 'Punjab Zone (Ladies)' : 'Punjab Zone (Gents)'],
+          ['Report Type', 'Sewadar Handover Report'],
+          ['Session Date', dateDisplay],
+          ['Total Sewadars Handed Over', String(handedOverSewadarsForSession.length)]
+        ],
+        headStyles: { fillColor: [50, 60, 120], textColor: 255, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 9 },
+        theme: 'grid'
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+
+      // 2. Handover Details Table
+      ensureSpace(40);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("2. Handover Details", 14, currentY);
+
+      const tableRows = handedOverSewadarsForSession.length > 0
+        ? handedOverSewadarsForSession.map((s, idx) => {
+            const targetDay = s.hrTableData?.handoverDayGroup || s.group;
+            const groupDisplay = targetDay ? `${targetDay} ${s.gender}` : `${s.group}`;
+            const incharge = s.hrTableData?.handoverIncharge || '-';
+            return [
+              String(idx + 1),
+              'Punjab',
+              s.name,
+              groupDisplay,
+              incharge
+            ];
+          })
+        : [['-', 'Punjab', 'No sewadars were handed over for this session date', '-', '-']];
+
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['#', 'Zone', 'Sewadar Name', 'Handover Group', 'Group Incharge']],
+        body: tableRows,
+        headStyles: { fillColor: [50, 60, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 14 },
+          1: { halign: 'center', cellWidth: 26 },
+          2: { fontStyle: 'bold', cellWidth: 50 },
+          3: { halign: 'center', cellWidth: 46 },
+          4: { halign: 'center', cellWidth: 46 }
+        },
+        bodyStyles: { fontSize: 9 },
+        theme: 'grid'
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+
+      // Note
+      const noteText = `Note: This report lists sewadars originating from Punjab Zone handed over to respective security duty groups along with the assigned group incharge name for session date ${dateDisplay}.`;
+      const splitNote = doc.splitTextToSize(noteText, 182);
+      ensureSpace(splitNote.length * 4 + 6);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(100, 100, 100);
+      doc.text(splitNote, 14, currentY);
+
+      // Page numbers footer
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          14,
+          287
+        );
+      }
+
+      doc.save(`SKRM_Punjab_Zone_Handover_Report_${isLadiesZone ? 'Ladies' : 'Gents'}_${dateDisplay.replace(/\//g, '-')}.pdf`);
+      return;
+    }
+
     const doc = new jsPDF('p', 'mm', 'a4');
     const groupName = activeVolunteer?.assignedGroup || 'Security';
-    const currentSession = allSessions.find(s => s.id === selectedSessionId);
-    const dateDisplay = (typeof currentSession?.date === 'string' ? currentSession.date : '').split('-').reverse().join('/') || '-';
     const isLadies = activeVolunteer?.role.includes('Ladies');
     const groupText = isLadies ? `${groupName} Ladies Security Group` : `${groupName} Gents Security Group`;
     
@@ -917,39 +1104,66 @@ const Dashboard: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
-      <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
-        <div className="relative z-10">
-          <h2 className="text-2xl font-black mb-1">Shift Management</h2>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-            Shift Record
-          </p>
+      {isZoneLogin ? (
+        <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
+          <div className="relative z-10">
+            <h2 className="text-2xl font-black mb-1">
+              {isLadiesZone ? 'Punjab Zone (Ladies)' : 'Punjab Zone (Gents)'} Handover Reports
+            </h2>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+              Zone Handover Record • {currentSession?.date ? (typeof currentSession.date === 'string' ? currentSession.date.split('-').reverse().join('/') : currentSession.date) : 'Current Session'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 relative z-10">
+            <button 
+              onClick={generateAttendancePDF} 
+              className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download PDF</span>
+            </button>
+          </div>
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
         </div>
-        <div className="flex flex-wrap gap-2 relative z-10">
-          <button onClick={onOpenSettings} className="bg-slate-800/50 border border-white/10 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95">Change Session</button>
-          <button onClick={generateAttendancePDF} className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95">Download PDF</button>
+      ) : (
+        <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
+          <div className="relative z-10">
+            <h2 className="text-2xl font-black mb-1">Shift Management</h2>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+              Shift Record
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 relative z-10">
+            <button onClick={onOpenSettings} className="bg-slate-800/50 border border-white/10 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95">Change Session</button>
+            <button onClick={generateAttendancePDF} className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95">Download PDF</button>
+          </div>
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
         </div>
-        <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
-      </div>
+      )}
 
       {/* March, April & May Special Report Panel */}
-      <div className="bg-gradient-to-r from-[#1d1f3d] to-[#0f1025] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-indigo-500/15">
-        <div className="relative z-10 flex-1">
-          <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Special Report</div>
-          <h3 className="text-xl font-black mb-1">Targeted Volunteer Attendance</h3>
-          <p className="text-indigo-400 text-[11px] font-bold uppercase tracking-widest mb-2">March, April & May 2026</p>
-          <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
-            Consolidated duty log & service hours log for four key volunteers: <strong className="text-white">Ashwani Narang, Sunil Shadra, Dinesh Salgotra, and Manmohan Khurana</strong>.
-          </p>
+      {!isZoneLogin && (
+        <div className="bg-gradient-to-r from-[#1d1f3d] to-[#0f1025] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-indigo-500/15">
+          <div className="relative z-10 flex-1">
+            <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Special Report</div>
+            <h3 className="text-xl font-black mb-1">Targeted Volunteer Attendance</h3>
+            <p className="text-indigo-400 text-[11px] font-bold uppercase tracking-widest mb-2">March, April & May 2026</p>
+            <p className="text-slate-300 text-xs font-normal max-w-xl leading-relaxed">
+              Consolidated duty log & service hours log for four key volunteers: <strong className="text-white">Ashwani Narang, Sunil Shadra, Dinesh Salgotra, and Manmohan Khurana</strong>.
+            </p>
+          </div>
+          <button 
+            onClick={generateMarchMayReportPDF} 
+            disabled={downloadingMarchMay}
+            className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingMarchMay ? 'bg-indigo-800 text-white/50 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-400 text-white'}`}
+          >
+            {downloadingMarchMay ? 'Generating PDF...' : 'Download March-May Report'}
+          </button>
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
         </div>
-        <button 
-          onClick={generateMarchMayReportPDF} 
-          disabled={downloadingMarchMay}
-          className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 whitespace-nowrap ${downloadingMarchMay ? 'bg-indigo-800 text-white/50 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-400 text-white'}`}
-        >
-          {downloadingMarchMay ? 'Generating PDF...' : 'Download March-May Report'}
-        </button>
-        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
-      </div>
+      )}
 
       {/* Group Performance Report for Super Admin ONLY */}
       {isSuperAdmin && (
@@ -1072,8 +1286,12 @@ const Dashboard: React.FC<Props> = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Total Present</p>
-          <p className="text-4xl font-black text-slate-900">{new Set(attendance.map(a => a.sewadarId)).size}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase mb-2">
+            {isZoneLogin ? 'Total Handovers' : 'Total Present'}
+          </p>
+          <p className="text-4xl font-black text-slate-900">
+            {isZoneLogin ? totalHandovers : new Set(attendance.map(a => a.sewadarId)).size}
+          </p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Open Issues</p>
@@ -1082,7 +1300,22 @@ const Dashboard: React.FC<Props> = ({
       </div>
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select History Session</label>
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+            {isZoneLogin ? 'Select Handover Report Session' : 'Select History Session'}
+          </label>
+          {isZoneLogin && (
+            <button
+              onClick={generateAttendancePDF}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download PDF</span>
+            </button>
+          )}
+        </div>
         <select 
           className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500"
           value={selectedSessionId || ''}
@@ -1092,16 +1325,88 @@ const Dashboard: React.FC<Props> = ({
           {allSessions.map(s => {
             const today = new Date().toISOString().split('T')[0];
             const isToday = s.date === today;
+            const formattedDate = (typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/');
             return (
               <option key={s.id} value={s.id}>
-                {(typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/')} - {s.location} {isToday ? '(Current session)' : ''}
+                {isZoneLogin 
+                  ? `${formattedDate} - Handover Report ${isToday ? '(Today)' : ''}` 
+                  : `${formattedDate} - ${s.location} ${isToday ? '(Current session)' : ''}`}
               </option>
             );
           })}
         </select>
       </div>
 
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+      {isZoneLogin && (
+        <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                Handover Report - {(typeof sessionDate === 'string' ? sessionDate : '').split('-').reverse().join('/') || 'Selected Date'}
+              </h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                Zone: Punjab • {handedOverSewadarsForSession.length} Sewadars Handed Over
+              </p>
+            </div>
+            <button
+              onClick={generateAttendancePDF}
+              className="self-start sm:self-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-md flex items-center gap-2 transition-all active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download PDF</span>
+            </button>
+          </div>
+
+          {handedOverSewadarsForSession.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th className="px-4 py-3 text-center">#</th>
+                    <th className="px-4 py-3 text-center">Zone</th>
+                    <th className="px-4 py-3">Sewadar Name</th>
+                    <th className="px-4 py-3 text-center">Handover Group</th>
+                    <th className="px-4 py-3 text-center">Group Incharge</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {handedOverSewadarsForSession.map((s, idx) => (
+                    <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg font-bold text-[10px] uppercase">
+                          Punjab
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{s.name}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-[10px]">
+                          {s.hrTableData?.handoverDayGroup || s.group} {s.gender}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-slate-800">
+                        {s.hrTableData?.handoverIncharge || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <p className="text-slate-500 font-bold text-xs">
+                No sewadars were handed over on this date ({(typeof sessionDate === 'string' ? sessionDate : '').split('-').reverse().join('/') || '-'}).
+              </p>
+              <p className="text-slate-400 text-[10px] mt-1">Handovers made on this date will appear here and can be exported as a PDF.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isZoneLogin && (
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase mb-4">Report an Issue</h3>
           <textarea 
             className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-medium text-slate-800 outline-none focus:border-indigo-500 transition-all"
@@ -1120,64 +1425,69 @@ const Dashboard: React.FC<Props> = ({
             Submit Incident Report
           </button>
         </div>
+      )}
 
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xs font-black text-slate-400 uppercase">Photos of Group</h3>
-            <p className="text-[10px] font-bold text-slate-300 mt-1 uppercase tracking-widest">Share moments from your shift</p>
+      {!isZoneLogin && (
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-black text-slate-400 uppercase">Photos of Group</h3>
+              <p className="text-[10px] font-bold text-slate-300 mt-1 uppercase tracking-widest">Share moments from your shift</p>
+            </div>
+            <label className="cursor-pointer bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all">
+              Add Photo
+              <input type="file" accept="image/*" onChange={handleGroupPhotoChange} className="hidden" />
+            </label>
           </div>
-          <label className="cursor-pointer bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all">
-            Add Photo
-            <input type="file" accept="image/*" onChange={handleGroupPhotoChange} className="hidden" />
-          </label>
-        </div>
 
-        {groupPhotos.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {groupPhotos.map((gp) => (
-              <div key={gp.id} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm group">
-                <img src={gp.photo} alt="Group Moment" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                  <p className="text-[7px] font-black text-white uppercase tracking-widest truncate">{gp.volunteerName}</p>
+          {groupPhotos.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {groupPhotos.map((gp) => (
+                <div key={gp.id} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm group">
+                  <img src={gp.photo} alt="Group Moment" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                    <p className="text-[7px] font-black text-white uppercase tracking-widest truncate">{gp.volunteerName}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100">
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No group photos captured yet.</p>
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100">
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No group photos captured yet.</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="space-y-3">
-        <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Incident Logs</h3>
-        {issues.length > 0 ? issues.map(issue => (
-          <div key={issue.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div className="space-y-1">
-                <p className="font-bold text-slate-800">{issue.description}</p>
-                <p className="text-[10px] font-bold text-slate-400">
-                  {new Date(issue.timestamp).toLocaleTimeString()} • Reported by {issue.volunteerName}
-                </p>
+      {!isZoneLogin && (
+        <div className="space-y-3">
+          <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Incident Logs</h3>
+          {issues.length > 0 ? issues.map(issue => (
+            <div key={issue.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-800">{issue.description}</p>
+                  <p className="text-[10px] font-bold text-slate-400">
+                    {new Date(issue.timestamp).toLocaleTimeString()} • Reported by {issue.volunteerName}
+                  </p>
+                </div>
+                {onDeleteIssue && (
+                  <button onClick={() => onDeleteIssue(issue.id)} className="text-red-400 hover:text-red-600 p-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
+                  </button>
+                )}
               </div>
-              {onDeleteIssue && (
-                <button onClick={() => onDeleteIssue(issue.id)} className="text-red-400 hover:text-red-600 p-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1v3M4 7h16" /></svg>
-                </button>
+              {issue.photo && (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
+                  <img src={issue.photo} alt="Issue evidence" className="w-full h-auto object-cover" style={{ maxHeight: '200px' }} />
+                </div>
               )}
             </div>
-            {issue.photo && (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-                <img src={issue.photo} alt="Issue evidence" className="w-full h-auto object-cover" style={{ maxHeight: '200px' }} />
-              </div>
-            )}
-          </div>
-        )) : (
-          <p className="text-center py-10 text-slate-300 italic text-sm">No incidents reported for this session.</p>
-        )}
-      </div>
+          )) : (
+            <p className="text-center py-10 text-slate-300 italic text-sm">No incidents reported for this session.</p>
+          )}
+        </div>
+      )}
 
       {isSuperAdmin && (
         <div className="mt-12 space-y-6">

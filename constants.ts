@@ -11,10 +11,10 @@ export const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'
 export const GENTS_INCHARGES: Record<string, string> = {
   'Monday': 'Anil Gulati',
   'Tuesday': 'SK Gaba',
-  'Wednesday': 'Surjeet',
-  'Thursday': 'Sanjay',
+  'Wednesday': 'Surjit Singh',
+  'Thursday': 'Sanjay Grover',
   'Friday': 'Sushil Ahuja',
-  'Saturday': 'Rajan',
+  'Saturday': 'Rajan Nagpal',
   'Sunday': 'Manish Munjal'
 };
 
