@@ -26,16 +26,16 @@ export interface Sewadar {
   originZone?: string;
   tag?: string;
   hrTableData?: {
-    phoneNumber?: string;
-    address?: string;
-    qualification?: string;
-    timing?: string;
-    weeklyOff?: string;
+    phoneNumber?: string | null;
+    address?: string | null;
+    qualification?: string | null;
+    timing?: string | null;
+    weeklyOff?: string | null;
     sewaDays?: string[];
     selectedOptions?: string[];
-    handoverDayGroup?: string;
-    handoverIncharge?: string;
-    handoverDate?: string;
+    handoverDayGroup?: string | null;
+    handoverIncharge?: string | null;
+    handoverDate?: string | null;
     createdAt?: number;
     updatedAt?: number;
   };

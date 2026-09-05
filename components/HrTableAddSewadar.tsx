@@ -12,15 +12,15 @@ interface HrTableAddSewadarProps {
     group: DutyGroup;
     shift?: 'DAY' | 'NIGHT';
     hrTableData: {
-      phoneNumber?: string;
-      address?: string;
-      qualification?: string;
-      timing?: string;
-      weeklyOff?: string;
+      phoneNumber?: string | null;
+      address?: string | null;
+      qualification?: string | null;
+      timing?: string | null;
+      weeklyOff?: string | null;
       sewaDays?: string[];
       selectedOptions?: string[];
-      handoverDayGroup?: string;
-      handoverIncharge?: string;
+      handoverDayGroup?: string | null;
+      handoverIncharge?: string | null;
       createdAt?: number;
       updatedAt?: number;
     };
@@ -46,8 +46,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   onSaveSewadar,
   onDeleteSewadar
 }) => {
-  // Tabs: 'add' or 'list'
-  const [activeTab, setActiveTab] = useState<'form' | 'list'>('form');
+  // Tabs: 'form' (Add Sewadar), 'sewadars' (All Sewadars), 'routed' (Routed Sewadars)
+  const [activeTab, setActiveTab] = useState<'form' | 'sewadars' | 'routed'>('form');
 
   // Form states
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,42 +61,76 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   const [sewaDays, setSewaDays] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
 
-  // Handover state
-  const [showHandover, setShowHandover] = useState(false);
-  const [selectedDayGroup, setSelectedDayGroup] = useState<string | null>(null);
+  // Action states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Search & Filter for Routed List
+  // List Handover state (Zone Attendance pattern)
+  const [activeHandoverId, setActiveHandoverId] = useState<string | null>(null);
+  const [handoverDay, setHandoverDay] = useState<string | null>(null);
+  const [isHandingOver, setIsHandingOver] = useState(false);
+
+  // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'Gents' | 'Ladies'>('ALL');
   const [dayFilter, setDayFilter] = useState<string>('ALL');
 
-  // Sewadars routed by HR Table or Zone Attendance
-  const routedSewadars = useMemo(() => {
+  // All Sewadars created/managed by HR Table
+  const allSewadars = useMemo(() => {
     return customSewadars.filter(s => 
+      s.group === 'HR Table' || 
       s.routedByHrTable || 
       s.routedByZone || 
       s.tag === 'Punjab Zone' || 
       s.originZone === 'Punjab Zone' || 
-      Boolean(s.hrTableData?.handoverDayGroup)
+      Boolean(s.hrTableData)
     );
   }, [customSewadars]);
 
+  // Routed Sewadars: ONLY those who have been handed over to a group and incharge
+  const routedSewadars = useMemo(() => {
+    return allSewadars.filter(s => 
+      Boolean(s.hrTableData?.handoverIncharge && (s.hrTableData?.handoverDayGroup || (s.group && s.group !== 'HR Table')))
+    );
+  }, [allSewadars]);
+
+  // Filtered list for "Sewadars" tab (All sewadars)
+  const filteredAllSewadars = useMemo(() => {
+    return allSewadars.filter(s => {
+      const matchesSearch = 
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.hrTableData?.phoneNumber && s.hrTableData.phoneNumber.includes(searchTerm)) ||
+        (s.hrTableData?.handoverIncharge && s.hrTableData.handoverIncharge.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        s.group.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesGender = genderFilter === 'ALL' || s.gender === genderFilter;
+      const matchesDay = 
+        dayFilter === 'ALL' || 
+        s.group === dayFilter || 
+        s.hrTableData?.handoverDayGroup === dayFilter ||
+        (dayFilter === 'HR Table' && (!s.hrTableData?.handoverIncharge || s.group === 'HR Table'));
+
+      return matchesSearch && matchesGender && matchesDay;
+    });
+  }, [allSewadars, searchTerm, genderFilter, dayFilter]);
+
+  // Filtered list for "Routed Sewadars" tab (Only handed over)
   const filteredRoutedSewadars = useMemo(() => {
     return routedSewadars.filter(s => {
       const matchesSearch = 
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.hrTableData?.phoneNumber && s.hrTableData.phoneNumber.includes(searchTerm)) ||
         (s.hrTableData?.handoverIncharge && s.hrTableData.handoverIncharge.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        s.group.toLowerCase().includes(searchTerm.toLowerCase());
+        s.group.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesGender = genderFilter === 'ALL' || s.gender === genderFilter;
       const matchesDay = 
         dayFilter === 'ALL' || 
         s.group === dayFilter || 
-        (dayFilter === 'HR Table' && (s.group === 'HR Table' || !s.hrTableData?.handoverIncharge));
+        s.hrTableData?.handoverDayGroup === dayFilter;
 
       return matchesSearch && matchesGender && matchesDay;
     });
@@ -125,8 +159,6 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setWeeklyOff('');
     setSewaDays([]);
     setSelectedOptions([]);
-    setSelectedDayGroup(null);
-    setShowHandover(false);
   };
 
   const handleStartEdit = (s: Sewadar) => {
@@ -140,13 +172,11 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setWeeklyOff(s.hrTableData?.weeklyOff || '');
     setSewaDays(s.hrTableData?.sewaDays || []);
     setSelectedOptions(s.hrTableData?.selectedOptions || []);
-    setSelectedDayGroup(s.group !== 'HR Table' ? (s.group || s.hrTableData?.handoverDayGroup || null) : null);
-    setShowHandover(Boolean(!s.hrTableData?.handoverIncharge));
     setActiveTab('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Option to save sewadar only (handover at a later stage or preserve existing group)
+  // Save sewadar directly from form (preserves existing group & handover data if editing)
   const handleSaveOnly = async () => {
     if (!name.trim()) {
       setFeedback({ type: 'error', message: 'Please enter Sewadar Name before saving.' });
@@ -159,10 +189,10 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
 
     try {
       const existing = editingId ? routedSewadars.find(item => item.id === editingId) : null;
-      const targetDay = selectedDayGroup || existing?.group || 'HR Table';
-      const keepIncharge = (existing && (!selectedDayGroup || selectedDayGroup === existing.group))
-        ? existing.hrTableData?.handoverIncharge
-        : undefined;
+      const targetDay = existing?.group || 'HR Table';
+      const keepIncharge = existing?.hrTableData?.handoverIncharge || null;
+      const keepHandoverGroup = existing?.hrTableData?.handoverDayGroup || (targetDay !== 'HR Table' ? targetDay : null);
+      const keepHandoverDate = existing?.hrTableData?.handoverDate || null;
 
       await onSaveSewadar({
         id: editingId || undefined,
@@ -170,30 +200,29 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
         gender,
         group: targetDay,
         hrTableData: {
-          phoneNumber: phoneNumber.trim() || undefined,
-          address: address.trim() || undefined,
-          qualification: qualification.trim() || undefined,
-          timing: timing.trim() || undefined,
-          weeklyOff: weeklyOff || undefined,
-          sewaDays: sewaDays.length > 0 ? sewaDays : undefined,
-          selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
-          handoverDayGroup: selectedDayGroup || existing?.hrTableData?.handoverDayGroup || (targetDay !== 'HR Table' ? targetDay : undefined),
+          phoneNumber: phoneNumber.trim() || null,
+          address: address.trim() || null,
+          qualification: qualification.trim() || null,
+          timing: timing.trim() || null,
+          weeklyOff: weeklyOff || null,
+          sewaDays: sewaDays.length > 0 ? sewaDays : [],
+          selectedOptions: selectedOptions.length > 0 ? selectedOptions : [],
+          handoverDayGroup: keepHandoverGroup,
           handoverIncharge: keepIncharge,
+          handoverDate: keepHandoverDate,
+          createdAt: existing?.hrTableData?.createdAt || Date.now(),
+          updatedAt: Date.now()
         }
       });
 
       const actionText = editingId ? 'updated' : 'saved';
       setFeedback({
         type: 'success',
-        message: keepIncharge
-          ? `Sewadar "${name.trim()}" successfully ${actionText}!`
-          : targetDay !== 'HR Table'
-          ? `Sewadar "${name.trim()}" saved for ${targetDay} ${gender}! You can handover to an incharge whenever ready.`
-          : `Sewadar "${name.trim()}" saved successfully! You can handover to a group & incharge at a later stage.`
+        message: `Sewadar "${name.trim()}" successfully ${actionText}!`
       });
 
       resetForm();
-      setActiveTab('list');
+      setActiveTab('sewadars');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Save Error:', err);
@@ -203,49 +232,46 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     }
   };
 
-  const handleHandoverAndSave = async (targetDay: string, inchargeName: string) => {
-    if (!name.trim()) {
-      setFeedback({ type: 'error', message: 'Please enter Sewadar Name before handover.' });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setIsSubmitting(true);
+  // Handover directly from list view (Zone Attendance pattern)
+  const handleListHandover = async (sewadar: Sewadar, targetDay: string, inchargeName: string) => {
+    setIsHandingOver(true);
     setFeedback(null);
 
     try {
+      const todayStr = new Date().toISOString().split('T')[0];
       await onSaveSewadar({
-        id: editingId || undefined,
-        name: name.trim(),
-        gender,
-        group: targetDay,
+        id: sewadar.id,
+        name: sewadar.name,
+        gender: sewadar.gender,
+        group: targetDay as DutyGroup,
         hrTableData: {
-          phoneNumber: phoneNumber.trim() || undefined,
-          address: address.trim() || undefined,
-          qualification: qualification.trim() || undefined,
-          timing: timing.trim() || undefined,
-          weeklyOff: weeklyOff || undefined,
-          sewaDays: sewaDays.length > 0 ? sewaDays : undefined,
-          selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
+          phoneNumber: sewadar.hrTableData?.phoneNumber || null,
+          address: sewadar.hrTableData?.address || null,
+          qualification: sewadar.hrTableData?.qualification || null,
+          timing: sewadar.hrTableData?.timing || null,
+          weeklyOff: sewadar.hrTableData?.weeklyOff || null,
+          sewaDays: sewadar.hrTableData?.sewaDays || [],
+          selectedOptions: sewadar.hrTableData?.selectedOptions || [],
           handoverDayGroup: targetDay,
           handoverIncharge: inchargeName,
+          handoverDate: todayStr,
+          createdAt: sewadar.hrTableData?.createdAt || Date.now(),
+          updatedAt: Date.now()
         }
       });
 
-      const actionText = editingId ? 'updated and re-assigned' : 'added and handed over';
       setFeedback({
         type: 'success',
-        message: `Sewadar "${name.trim()}" successfully ${actionText} to ${inchargeName} in ${targetDay} ${gender} group!`
+        message: `✓ Handed over "${sewadar.name}" to ${inchargeName} in ${targetDay} ${sewadar.gender} group!`
       });
 
-      resetForm();
-      setActiveTab('list');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setActiveHandoverId(null);
+      setHandoverDay(null);
     } catch (err: any) {
       console.error('Handover Error:', err);
-      setFeedback({ type: 'error', message: err?.message || 'Failed to save sewadar. Please try again.' });
+      setFeedback({ type: 'error', message: err?.message || 'Failed to handover sewadar. Please try again.' });
     } finally {
-      setIsSubmitting(false);
+      setIsHandingOver(false);
     }
   };
 
@@ -295,11 +321,11 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
           </span>
         </div>
 
-        {/* View Switcher Tabs */}
-        <div className="max-w-2xl mx-auto mt-4 flex gap-2">
+        {/* View Switcher Tabs: ADD SEWADAR | SEWADARS | ROUTED SEWADARS */}
+        <div className="max-w-2xl mx-auto mt-4 flex bg-slate-100 p-1 rounded-2xl gap-1">
           <button
             onClick={() => setActiveTab('form')}
-            className={`flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'form'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -308,12 +334,27 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
-            <span>{editingId ? 'Edit Sewadar' : 'Add Sewadar'}</span>
+            <span className="truncate">{editingId ? 'Edit Sewadar' : 'Add Sewadar'}</span>
           </button>
+
           <button
-            onClick={() => setActiveTab('list')}
-            className={`flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'list'
+            onClick={() => setActiveTab('sewadars')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'sewadars'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <span className="truncate">Sewadars ({allSewadars.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('routed')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'routed'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
@@ -321,7 +362,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <span>Routed Sewadars ({routedSewadars.length})</span>
+            <span className="truncate">Routed Sewadars ({routedSewadars.length})</span>
           </button>
         </div>
       </div>
@@ -405,10 +446,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setGender('Gents');
-                      setSelectedDayGroup(null);
-                    }}
+                    onClick={() => setGender('Gents')}
                     className={`py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all border-2 ${
                       gender === 'Gents'
                         ? 'bg-blue-50 border-blue-600 text-blue-800 shadow-sm'
@@ -419,10 +457,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setGender('Ladies');
-                      setSelectedDayGroup(null);
-                    }}
+                    onClick={() => setGender('Ladies')}
                     className={`py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all border-2 ${
                       gender === 'Ladies'
                         ? 'bg-pink-50 border-pink-600 text-pink-800 shadow-sm'
@@ -603,241 +638,32 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                     );
                   })}
                 </div>
-              </div>
-            </div>
 
-            {/* Bottom Actions: Save Sewadar (Handover at later stage) vs Handover To Group */}
-            <div className="space-y-4 pt-1">
-              {/* Option A: Save Sewadar (Handover Later) */}
-              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      {editingId ? 'Save Sewadar Changes' : 'Save Sewadar'}
-                    </h3>
-                    <p className="text-xs text-slate-400 font-medium">
-                      {editingId 
-                        ? 'Save updated sewadar details while preserving current group assignment'
-                        : 'Save sewadar details now — you can handover to a group & incharge at a later stage'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2.5">
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleSaveOnly}
-                    className="flex-1 py-4 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-md shadow-emerald-200 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                        </svg>
-                        Saving Sewadar...
-                      </span>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                        </svg>
-                        <span>{editingId ? 'Save Changes (Keep Group)' : 'Save Sewadar (Handover Later)'}</span>
-                      </>
-                    )}
-                  </button>
-
-                  {editingId && (
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="py-4 px-6 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs uppercase tracking-wider rounded-2xl transition-all"
-                    >
-                      Cancel Edit
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Option B: Handover To Group & Incharge Accordion Trigger */}
-              <div>
                 <button
                   type="button"
-                  onClick={() => setShowHandover(prev => !prev)}
-                  className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-between gap-3 text-base active:scale-[0.99] transition-all"
+                  disabled={isSubmitting || !name.trim()}
+                  onClick={handleSaveOnly}
+                  className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-md shadow-emerald-200 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
                 >
-                  <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                    <span>{editingId ? 'Handover / Re-assign Group & Incharge' : 'Handover Directly To Incharge'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
-                      {effectiveGender}
-                    </span>
-                    <svg
-                      className={`w-5 h-5 transition-transform ${showHandover ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
+                  Save sewadar
                 </button>
-              </div>
-            </div>
 
-            {/* Handover Section */}
-            {showHandover && (
-              <div className="bg-white rounded-3xl p-6 shadow-md border-2 border-indigo-200 space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-200">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
-                      Select Group & Incharge: {effectiveGender === 'Gents' ? 'Gents Groups' : 'Ladies Groups'}
-                    </h3>
-                    <p className="text-xs text-slate-400 font-medium">
-                      Select a day and click on an Incharge to add & handover this sewadar
-                    </p>
-                  </div>
-                </div>
-
-                {/* Day Groups Buttons */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {DAYS_LIST.map(day => {
-                    const isSelected = selectedDayGroup === day;
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => setSelectedDayGroup(day)}
-                        className={`p-3 rounded-2xl text-center font-black text-xs border-2 transition-all active:scale-95 ${
-                          isSelected
-                            ? effectiveGender === 'Gents'
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200'
-                              : 'bg-pink-600 text-white border-pink-600 shadow-md shadow-pink-200'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        <div className="text-[10px] uppercase font-bold opacity-80 mb-0.5">
-                          {effectiveGender}
-                        </div>
-                        <div className="text-sm font-black">{day}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Incharge Name Display and Handover Action */}
-                {selectedDayGroup ? (
-                  <div className="bg-gradient-to-br from-slate-50 to-indigo-50/40 rounded-2xl p-5 border border-indigo-100 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider rounded-lg">
-                          {selectedDayGroup} {effectiveGender}
-                        </span>
-                        <span className="text-xs font-black text-slate-500 uppercase">
-                          Tap Incharge to Complete Handover
-                        </span>
-                      </div>
-                    </div>
-
-                    {effectiveGender === 'Gents' ? (
-                      (() => {
-                        const incharge = GENTS_INCHARGES[selectedDayGroup] || 'Incharge';
-                        return (
-                          <div className="bg-white rounded-2xl p-4 border-2 border-indigo-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xl shadow-inner">
-                                👨
-                              </div>
-                              <div>
-                                <div className="text-base font-black text-slate-900">
-                                  {incharge}
-                                </div>
-                                <div className="text-xs font-semibold text-slate-400">
-                                  {selectedDayGroup} Gents Security Incharge
-                                </div>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={isSubmitting}
-                              onClick={() => handleHandoverAndSave(selectedDayGroup, incharge)}
-                              className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                              {isSubmitting ? (
-                                <span>Saving...</span>
-                              ) : (
-                                <>
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  <span>Handover to {incharge}</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="space-y-2.5">
-                        {(LADIES_INCHARGES[selectedDayGroup] || []).map((inchargeName, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-white rounded-2xl p-4 border border-pink-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3"
-                          >
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                              <div className="w-10 h-10 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-black text-lg">
-                                👩
-                              </div>
-                              <div>
-                                <div className="text-sm font-black text-slate-800">{inchargeName}</div>
-                                <div className="text-[11px] font-semibold text-slate-400">
-                                  {selectedDayGroup} Ladies Security Incharge
-                                </div>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={isSubmitting}
-                              onClick={() => handleHandoverAndSave(selectedDayGroup, inchargeName)}
-                              className="w-full sm:w-auto px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-pink-200 active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-                            >
-                              {isSubmitting ? (
-                                <span>Saving...</span>
-                              ) : (
-                                <>
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  <span>Handover to {inchargeName}</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
-                    <p className="text-xs font-bold">Please select a day group above to view the incharge</p>
-                  </div>
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                  >
+                    Cancel Edit
+                  </button>
                 )}
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* ===================== TAB 2: ROUTED SEWADARS LIST ===================== */}
-        {activeTab === 'list' && (
+        {/* ===================== TAB 2: ALL SEWADARS ("SEWADARS") ===================== */}
+        {activeTab === 'sewadars' && (
           <div className="space-y-4">
             {/* Search & Filter Bar */}
             <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
@@ -902,7 +728,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
             {/* List Header */}
             <div className="flex items-center justify-between px-2">
               <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
-                {filteredRoutedSewadars.length} {filteredRoutedSewadars.length === 1 ? 'Sewadar' : 'Sewadars'} Routed by HR Table
+                {filteredAllSewadars.length} {filteredAllSewadars.length === 1 ? 'Sewadar' : 'Sewadars'}
               </span>
               <button
                 onClick={() => {
@@ -916,20 +742,20 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
             </div>
 
             {/* Empty State */}
-            {filteredRoutedSewadars.length === 0 ? (
+            {filteredAllSewadars.length === 0 ? (
               <div className="bg-white rounded-3xl p-10 text-center border border-slate-200/80 shadow-sm space-y-4">
                 <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-500 mx-auto flex items-center justify-center text-2xl">
                   📋
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-800">No Routed Sewadars Found</h3>
+                  <h3 className="text-base font-black text-slate-800">No Sewadars Found</h3>
                   <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                    {routedSewadars.length === 0
-                      ? 'No sewadars have been routed by the HR Table yet. Fill the registration form to handover sewadars to respective groups.'
+                    {allSewadars.length === 0
+                      ? 'No sewadars have been registered yet. Fill the registration form to add sewadars.'
                       : 'No sewadars match your search or filter criteria.'}
                   </p>
                 </div>
-                {routedSewadars.length === 0 && (
+                {allSewadars.length === 0 && (
                   <button
                     onClick={() => {
                       resetForm();
@@ -942,16 +768,17 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                 )}
               </div>
             ) : (
-              /* Sewadars Cards */
+              /* All Sewadars Cards */
               <div className="space-y-3">
-                {filteredRoutedSewadars.map((s, idx) => {
+                {filteredAllSewadars.map((s, idx) => {
                   const data = s.hrTableData || {};
+                  const isHandedOver = Boolean(data.handoverIncharge && (data.handoverDayGroup || s.group !== 'HR Table'));
                   return (
                     <div
                       key={s.id}
                       className="bg-white rounded-3xl p-5 border-2 border-slate-100 shadow-sm hover:border-indigo-200 transition-all space-y-4"
                     >
-                      {/* Top Row: Name, Tags & Actions */}
+                      {/* Top Row: Name, Status & Actions */}
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -959,16 +786,6 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                             <h3 className="text-base font-black text-slate-900 leading-tight">
                               {s.name}
                             </h3>
-                            {s.routedByHrTable && (
-                              <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                                Routed by HR table
-                              </span>
-                            )}
-                            {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
-                              <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                                Punjab Zone
-                              </span>
-                            )}
                           </div>
 
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -979,105 +796,417 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                                   : 'bg-pink-50 text-pink-700 border border-pink-100'
                               }`}
                             >
-                              {s.group === 'HR Table' ? 'HR Table' : `${s.group} ${s.gender}`}
+                              {s.gender}
                             </span>
-                            {data.handoverIncharge ? (
+                            {isHandedOver && (
                               <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[10px] font-black flex items-center gap-1">
-                                <span>🤝 Handover:</span>
-                                <span>{data.handoverIncharge}</span>
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-black flex items-center gap-1">
-                                <span>⏳ Handover Pending</span>
+                                <span>🤝 Handed over:</span>
+                                <span>{data.handoverDayGroup || s.group} ({data.handoverIncharge})</span>
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Edit and Delete Buttons */}
-                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(s)}
-                            className="px-3.5 py-2 bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 shadow-xs"
-                            title="Edit details or change group"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            <span>{data.handoverIncharge ? 'Edit / Group' : 'Edit / Handover'}</span>
-                          </button>
+                        {/* Handover Button */}
+                        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                          {isHandedOver ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (activeHandoverId === s.id) {
+                                  setActiveHandoverId(null);
+                                  setHandoverDay(null);
+                                } else {
+                                  setActiveHandoverId(s.id);
+                                  setHandoverDay(data.handoverDayGroup || (s.group !== 'HR Table' ? s.group : null));
+                                }
+                              }}
+                              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs active:scale-95 transition-all"
+                            >
+                              <span>{activeHandoverId === s.id ? 'Close' : 'Reassign ↗'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (activeHandoverId === s.id) {
+                                  setActiveHandoverId(null);
+                                  setHandoverDay(null);
+                                } else {
+                                  setActiveHandoverId(s.id);
+                                  setHandoverDay(null);
+                                }
+                              }}
+                              className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md shadow-indigo-100 active:scale-95 transition-all"
+                            >
+                              <span>{activeHandoverId === s.id ? 'Close' : 'Handover To →'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
 
+                      {/* Handover To Section - Exactly like Zone Attendance */}
+                      {activeHandoverId === s.id && (
+                        <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-3xl p-5 border-2 border-indigo-100 space-y-4 animate-in fade-in duration-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🤝</span> Handover To Group
+                              </h4>
+                              <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                                {isHandedOver
+                                  ? `Assigned to ${data.handoverDayGroup || s.group} ${s.gender} (${data.handoverIncharge})`
+                                  : `Route and assign this ${s.gender} sewadar to a specific day group & incharge`}
+                              </p>
+                            </div>
+                            {isHandedOver && (
+                              <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-lg border border-emerald-300 shadow-xs">
+                                ✓ Assigned to {data.handoverDayGroup || s.group}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 1. Choose Day ({s.gender} Groups) */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                              1. Choose Day ({s.gender} Groups)
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {DAYS_LIST.map(day => {
+                                const isSelected = handoverDay === day;
+                                return (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => setHandoverDay(day)}
+                                    className={`p-2.5 rounded-xl text-center font-black text-xs border transition-all active:scale-95 ${
+                                      isSelected
+                                        ? s.gender === 'Gents'
+                                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                          : 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                                    }`}
+                                  >
+                                    <div className="text-[9px] uppercase font-bold opacity-75">{s.gender}</div>
+                                    <div className="text-xs font-black">{day}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 2. Select Incharge */}
+                          {handoverDay && (
+                            <div className="bg-white rounded-2xl p-4 border border-indigo-100 space-y-3">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                2. Select Group Incharge for {handoverDay} {s.gender}
+                              </span>
+                              {s.gender === 'Gents' ? (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                  <div>
+                                    <p className="text-sm font-black text-slate-800">
+                                      {GENTS_INCHARGES[handoverDay] || 'Incharge'}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                      {handoverDay} Gents Security Incharge
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={isHandingOver}
+                                    onClick={() => handleListHandover(s, handoverDay, GENTS_INCHARGES[handoverDay] || 'Incharge')}
+                                    className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <span>{isHandingOver ? 'Assigning...' : `Handover to ${GENTS_INCHARGES[handoverDay]}`}</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {(LADIES_INCHARGES[handoverDay] || []).map((incName, iIdx) => (
+                                    <div key={iIdx} className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                      <div>
+                                        <p className="text-sm font-black text-slate-800">{incName}</p>
+                                        <p className="text-[10px] font-bold text-slate-400">{handoverDay} Ladies Incharge</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={isHandingOver}
+                                        onClick={() => handleListHandover(s, handoverDay, incName)}
+                                        className="w-full sm:w-auto px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                      >
+                                        <span>{isHandingOver ? 'Assigning...' : `Handover to ${incName}`}</span>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===================== TAB 3: ROUTED SEWADARS (HANDED OVER ONLY) ===================== */}
+        {activeTab === 'routed' && (
+          <div className="space-y-4">
+            {/* Search & Filter Bar */}
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+              <div className="relative">
+                <span className="absolute left-4 top-3.5 text-slate-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Search routed sewadar by name, incharge, or group..."
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 outline-none text-sm"
+                />
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-2 items-center justify-between">
+                <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setGenderFilter('ALL')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      genderFilter === 'ALL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setGenderFilter('Gents')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      genderFilter === 'Gents' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    👨 Gents
+                  </button>
+                  <button
+                    onClick={() => setGenderFilter('Ladies')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      genderFilter === 'Ladies' ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    👩 Ladies
+                  </button>
+                </div>
+
+                <select
+                  value={dayFilter}
+                  onChange={e => setDayFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none"
+                >
+                  <option value="ALL">All Groups</option>
+                  {DAYS_LIST.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* List Header */}
+            <div className="flex items-center justify-between px-2">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                {filteredRoutedSewadars.length} {filteredRoutedSewadars.length === 1 ? 'Sewadar' : 'Sewadars'} Handed Over
+              </span>
+            </div>
+
+            {/* Empty State */}
+            {filteredRoutedSewadars.length === 0 ? (
+              <div className="bg-white rounded-3xl p-10 text-center border border-slate-200/80 shadow-sm space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-500 mx-auto flex items-center justify-center text-2xl">
+                  🤝
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">No Handed Over Sewadars Found</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    {routedSewadars.length === 0
+                      ? 'No sewadars have been handed over to a group and incharge yet. Switch to the "Sewadars" tab to handover sewadars.'
+                      : 'No routed sewadars match your search or filter criteria.'}
+                  </p>
+                </div>
+                {routedSewadars.length === 0 && (
+                  <button
+                    onClick={() => setActiveTab('sewadars')}
+                    className="px-6 py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md shadow-indigo-200 active:scale-95 transition-all"
+                  >
+                    Go to Sewadars Tab
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* Routed Sewadars Cards - STRICTLY clean without edit/delete, without ready for handover, without chips */
+              <div className="space-y-3">
+                {filteredRoutedSewadars.map((s, idx) => {
+                  const data = s.hrTableData || {};
+                  return (
+                    <div
+                      key={s.id}
+                      className="bg-white rounded-3xl p-5 border-2 border-slate-100 shadow-sm hover:border-indigo-200 transition-all space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <span className="text-[10px] font-black text-slate-300 w-5 pt-0.5 sm:pt-0">#{idx + 1}</span>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base font-black text-slate-900 leading-tight">
+                                {s.name}
+                              </h3>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                                  s.gender === 'Gents'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                    : 'bg-pink-50 text-pink-700 border border-pink-100'
+                                }`}
+                              >
+                                {s.gender}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-black flex items-center gap-1.5 shadow-xs">
+                                <span className="text-emerald-600">✓</span>
+                                <span>Handed over to:</span>
+                                <span className="font-extrabold">{data.handoverDayGroup || s.group} {s.gender}</span>
+                              </span>
+
+                              <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-black flex items-center gap-1.5 shadow-xs">
+                                <span>👤</span>
+                                <span>Incharge:</span>
+                                <span className="font-extrabold">{data.handoverIncharge}</span>
+                              </span>
+
+                              {data.handoverDate && (
+                                <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-[10px] font-bold">
+                                  🗓️ {data.handoverDate}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reassign action if they need to change group/incharge */}
+                        <div className="self-end sm:self-center">
                           <button
                             type="button"
-                            disabled={deletingId === s.id}
-                            onClick={() => handleDelete(s.id, s.name)}
-                            className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50 shadow-xs"
-                            title="Delete this sewadar"
+                            onClick={() => {
+                              if (activeHandoverId === s.id) {
+                                setActiveHandoverId(null);
+                                setHandoverDay(null);
+                              } else {
+                                setActiveHandoverId(s.id);
+                                setHandoverDay(data.handoverDayGroup || (s.group !== 'HR Table' ? s.group : null));
+                              }
+                            }}
+                            className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs active:scale-95 transition-all"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            <span>{deletingId === s.id ? '...' : 'Delete'}</span>
+                            <span>{activeHandoverId === s.id ? 'Close' : 'Reassign ↗'}</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Detail Chips */}
-                      <div className="flex flex-wrap gap-2 text-xs pt-1 border-t border-slate-100">
-                        {data.phoneNumber && (
-                          <span className="px-2.5 py-1 bg-slate-50 text-slate-700 rounded-lg font-bold border border-slate-200 flex items-center gap-1">
-                            📞 {data.phoneNumber}
-                          </span>
-                        )}
-                        {data.address && (
-                          <span className="px-2.5 py-1 bg-slate-50 text-slate-700 rounded-lg font-bold border border-slate-200 flex items-center gap-1 max-w-[200px] truncate">
-                            📍 {data.address}
-                          </span>
-                        )}
-                        {data.qualification && (
-                          <span className="px-2.5 py-1 bg-slate-50 text-slate-700 rounded-lg font-bold border border-slate-200 flex items-center gap-1">
-                            🎓 {data.qualification}
-                          </span>
-                        )}
-                        {data.timing && (
-                          <span className="px-2.5 py-1 bg-slate-50 text-slate-700 rounded-lg font-bold border border-slate-200 flex items-center gap-1">
-                            ⏰ {data.timing}
-                          </span>
-                        )}
-                        {data.weeklyOff && (
-                          <span className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-lg font-bold border border-amber-200 flex items-center gap-1">
-                            🗓️ Off: {data.weeklyOff}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Sewa Days & Chosen Departments */}
-                      {(data.sewaDays?.length || data.selectedOptions?.length) ? (
-                        <div className="space-y-1.5 pt-1">
-                          {data.sewaDays && data.sewaDays.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-black uppercase text-slate-400">Sewa Days:</span>
-                              {data.sewaDays.map(d => (
-                                <span key={d} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-md">
-                                  {d.slice(0, 3)}
-                                </span>
-                              ))}
+                      {/* Reassign Handover Drawer */}
+                      {activeHandoverId === s.id && (
+                        <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-3xl p-5 border-2 border-indigo-100 space-y-4 animate-in fade-in duration-200 mt-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🤝</span> Reassign Handover
+                              </h4>
+                              <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                                Reassign {s.name} to another group and incharge
+                              </p>
                             </div>
-                          )}
+                          </div>
 
-                          {data.selectedOptions && data.selectedOptions.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-black uppercase text-slate-400">Categories:</span>
-                              {data.selectedOptions.map(opt => (
-                                <span key={opt} className="px-2 py-0.5 bg-emerald-50 text-emerald-800 text-[10px] font-black rounded-md border border-emerald-100">
-                                  {opt}
-                                </span>
-                              ))}
+                          {/* 1. Choose Day */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                              1. Choose Day ({s.gender} Groups)
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {DAYS_LIST.map(day => {
+                                const isSelected = handoverDay === day;
+                                return (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => setHandoverDay(day)}
+                                    className={`p-2.5 rounded-xl text-center font-black text-xs border transition-all active:scale-95 ${
+                                      isSelected
+                                        ? s.gender === 'Gents'
+                                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                          : 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                                    }`}
+                                  >
+                                    <div className="text-[9px] uppercase font-bold opacity-75">{s.gender}</div>
+                                    <div className="text-xs font-black">{day}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 2. Select Incharge */}
+                          {handoverDay && (
+                            <div className="bg-white rounded-2xl p-4 border border-indigo-100 space-y-3">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                2. Select Group Incharge for {handoverDay} {s.gender}
+                              </span>
+                              {s.gender === 'Gents' ? (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                  <div>
+                                    <p className="text-sm font-black text-slate-800">
+                                      {GENTS_INCHARGES[handoverDay] || 'Incharge'}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                      {handoverDay} Gents Security Incharge
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={isHandingOver}
+                                    onClick={() => handleListHandover(s, handoverDay, GENTS_INCHARGES[handoverDay] || 'Incharge')}
+                                    className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <span>{isHandingOver ? 'Assigning...' : `Handover to ${GENTS_INCHARGES[handoverDay]}`}</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {(LADIES_INCHARGES[handoverDay] || []).map((incName, iIdx) => (
+                                    <div key={iIdx} className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                      <div>
+                                        <p className="text-sm font-black text-slate-800">{incName}</p>
+                                        <p className="text-[10px] font-bold text-slate-400">{handoverDay} Ladies Incharge</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={isHandingOver}
+                                        onClick={() => handleListHandover(s, handoverDay, incName)}
+                                        className="w-full sm:w-auto px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                      >
+                                        <span>{isHandingOver ? 'Assigning...' : `Handover to ${incName}`}</span>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      ) : null}
+                      )}
                     </div>
                   );
                 })}

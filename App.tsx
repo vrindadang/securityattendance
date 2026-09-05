@@ -21,6 +21,30 @@ const STORAGE_KEY_VOLUNTEER = 'skrm_active_volunteer';
 const STORAGE_KEY_SESSION_ID = 'skrm_selected_session_id';
 const STORAGE_KEY_LAST_REQ_VIEW = 'skrm_last_req_view';
 
+// Helper to recursively strip/convert undefined to null for Firestore compatibility
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === undefined) {
+    return null as any;
+  }
+  if (data === null || typeof data !== 'object') {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirestore(item)) as any;
+  }
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      sanitized[key] = null;
+    } else if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+      sanitized[key] = sanitizeForFirestore(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized as T;
+}
+
 // Levenshtein distance function for fuzzy matching
 export function levenshteinDistance(a: string, b: string): number {
   if (a === b) return 0;
@@ -1187,15 +1211,19 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSewadar = async (id: string) => {
-    if (!activeVolunteer || activeVolunteer.role !== 'Super Admin') return;
+    if (!activeVolunteer || (activeVolunteer.role !== 'Super Admin' && !isHrTable)) return;
     if (!window.confirm("Are you sure you want to delete this member?")) return;
     try {
-      await setDoc(doc(db, 'deleted_sewadars', id), { id, deletedAt: Date.now() });
-      setDeletedSewadarIds(prev => {
-        const next = new Set(prev);
-        next.add(id);
-        return next;
-      });
+      if (isHrTable) {
+        await handleDeleteHrTableSewadar(id);
+      } else {
+        await setDoc(doc(db, 'deleted_sewadars', id), { id, deletedAt: Date.now() });
+        setDeletedSewadarIds(prev => {
+          const next = new Set(prev);
+          next.add(id);
+          return next;
+        });
+      }
     } catch (err) {
       console.error("Delete Sewadar Error:", err);
     }
@@ -1248,15 +1276,16 @@ const App: React.FC = () => {
     group: DutyGroup;
     shift?: 'DAY' | 'NIGHT';
     hrTableData: {
-      phoneNumber?: string;
-      address?: string;
-      qualification?: string;
-      timing?: string;
-      weeklyOff?: string;
+      phoneNumber?: string | null;
+      address?: string | null;
+      qualification?: string | null;
+      timing?: string | null;
+      weeklyOff?: string | null;
       sewaDays?: string[];
       selectedOptions?: string[];
-      handoverDayGroup?: string;
-      handoverIncharge?: string;
+      handoverDayGroup?: string | null;
+      handoverIncharge?: string | null;
+      handoverDate?: string | null;
       createdAt?: number;
       updatedAt?: number;
     };
@@ -1269,6 +1298,22 @@ const App: React.FC = () => {
     const routedByZone = Boolean(isPunjabZone);
     const routedByHrTable = !isPunjabZone;
 
+    const rawHrData = data.hrTableData || {};
+    const sanitizedHrData = {
+      phoneNumber: rawHrData.phoneNumber || null,
+      address: rawHrData.address || null,
+      qualification: rawHrData.qualification || null,
+      timing: rawHrData.timing || null,
+      weeklyOff: rawHrData.weeklyOff || null,
+      sewaDays: Array.isArray(rawHrData.sewaDays) ? rawHrData.sewaDays : [],
+      selectedOptions: Array.isArray(rawHrData.selectedOptions) ? rawHrData.selectedOptions : [],
+      handoverDayGroup: rawHrData.handoverDayGroup || null,
+      handoverIncharge: rawHrData.handoverIncharge || null,
+      handoverDate: rawHrData.handoverDate || null,
+      createdAt: rawHrData.createdAt || existing?.hrTableData?.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+
     const updatedSewadar: Sewadar = {
       id,
       name: data.name.trim(),
@@ -1280,15 +1325,11 @@ const App: React.FC = () => {
       routedByZone,
       originZone,
       tag,
-      hrTableData: {
-        ...data.hrTableData,
-        createdAt: data.hrTableData.createdAt || existing?.hrTableData?.createdAt || Date.now(),
-        updatedAt: Date.now()
-      }
+      hrTableData: sanitizedHrData
     };
 
     try {
-      await setDoc(doc(db, 'custom_sewadars', id), {
+      const firestorePayload = sanitizeForFirestore({
         id: updatedSewadar.id,
         name: updatedSewadar.name,
         gender: updatedSewadar.gender,
@@ -1299,8 +1340,10 @@ const App: React.FC = () => {
         routedByZone: updatedSewadar.routedByZone || false,
         originZone: updatedSewadar.originZone || null,
         tag: updatedSewadar.tag || null,
-        hrTableData: updatedSewadar.hrTableData
-      }, { merge: true });
+        hrTableData: sanitizedHrData
+      });
+
+      await setDoc(doc(db, 'custom_sewadars', id), firestorePayload, { merge: true });
 
       if (data.hrTableData.phoneNumber || data.hrTableData.address) {
         await handleSaveSewadarDetails({
@@ -1346,6 +1389,15 @@ const App: React.FC = () => {
 
   const handleHandoverZoneSewadar = async (sewadar: Sewadar, targetDay: string, inchargeName: string) => {
     const todayStr = activeSession?.date || new Date().toISOString().split('T')[0];
+    const sanitizedHrData = {
+      ...(sewadar.hrTableData || {}),
+      handoverDayGroup: targetDay,
+      handoverIncharge: inchargeName,
+      handoverDate: todayStr,
+      updatedAt: Date.now(),
+      createdAt: sewadar.hrTableData?.createdAt || Date.now()
+    };
+
     const updatedSewadar: Sewadar = {
       ...sewadar,
       group: targetDay as DutyGroup,
@@ -1354,18 +1406,11 @@ const App: React.FC = () => {
       originZone: 'Punjab Zone',
       routedByZone: true,
       routedByHrTable: false,
-      hrTableData: {
-        ...(sewadar.hrTableData || {}),
-        handoverDayGroup: targetDay,
-        handoverIncharge: inchargeName,
-        handoverDate: todayStr,
-        updatedAt: Date.now(),
-        createdAt: sewadar.hrTableData?.createdAt || Date.now()
-      }
+      hrTableData: sanitizedHrData
     };
 
     try {
-      await setDoc(doc(db, 'custom_sewadars', sewadar.id), {
+      const firestorePayload = sanitizeForFirestore({
         id: updatedSewadar.id,
         name: updatedSewadar.name,
         gender: updatedSewadar.gender,
@@ -1376,8 +1421,10 @@ const App: React.FC = () => {
         originZone: 'Punjab Zone',
         routedByZone: true,
         routedByHrTable: false,
-        hrTableData: updatedSewadar.hrTableData
-      }, { merge: true });
+        hrTableData: sanitizedHrData
+      });
+
+      await setDoc(doc(db, 'custom_sewadars', sewadar.id), firestorePayload, { merge: true });
 
       setCustomSewadars(prev => {
         const exists = prev.find(s => s.id === sewadar.id);
@@ -1918,6 +1965,7 @@ const App: React.FC = () => {
             onSaveDetails={handleSaveSewadarDetails}
             onDeleteSewadar={handleDeleteSewadar}
             onEditSewadar={handleEditSewadar}
+            onSaveHrTableSewadar={handleSaveHrTableSewadar}
           />
         ) : activeView === 'Requirements' ? (
           <RequirementsView

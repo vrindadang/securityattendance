@@ -13,15 +13,47 @@ interface Props {
   onSaveDetails: (details: SewadarDetails) => Promise<void>;
   onDeleteSewadar?: (id: string) => void;
   onEditSewadar?: (id: string, newName: string) => void;
+  onSaveHrTableSewadar?: (data: any) => Promise<void>;
 }
 
-const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar, onEditSewadar }) => {
+const SEWA_OPTIONS = [
+  'Cctv vision',
+  'Cctv maintenance',
+  'PR',
+  'Langar sewa',
+  'Security gents',
+  'Security ladies',
+  'Another department sewa',
+  'It related sewa',
+  'Setup sewa'
+];
+
+const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, activeVolunteer, onSaveDetails, onDeleteSewadar, onEditSewadar, onSaveHrTableSewadar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isSuperAdmin = activeVolunteer.role === 'Super Admin';
+  const isHrTable = activeVolunteer.role === 'HR Table' || activeVolunteer.assignedGroup === 'HR Table';
   const canManageBothGenders = isSuperAdmin || activeVolunteer.role === 'Back Office Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
   const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '', age: '', district: '' });
   const [isSaving, setIsSaving] = useState(false);
+
+  // HR Table specific edit modal and expanded card state
+  const [expandedSewadarId, setExpandedSewadarId] = useState<string | null>(null);
+  const [editingHrSewadar, setEditingHrSewadar] = useState<Sewadar | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    gender: 'Gents' as 'Gents' | 'Ladies',
+    phoneNumber: '',
+    address: '',
+    qualification: '',
+    timing: '',
+    weeklyOff: '',
+    sewaDays: [] as string[],
+    selectedOptions: [] as string[]
+  });
+  const [isSavingHr, setIsSavingHr] = useState(false);
 
   const filtered = useMemo(() => {
     return sewadars.filter(s => {
@@ -40,6 +72,22 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
   }, [sewadars, activeVolunteer, searchTerm]);
 
   const handleEdit = (s: Sewadar) => {
+    if (isHrTable || s.hrTableData || s.routedByHrTable) {
+      setEditFormData({
+        name: s.name,
+        gender: (s.gender as 'Gents' | 'Ladies') || 'Gents',
+        phoneNumber: s.hrTableData?.phoneNumber || details[s.id]?.phone || '',
+        address: s.hrTableData?.address || details[s.id]?.address || details[s.id]?.district || '',
+        qualification: s.hrTableData?.qualification || '',
+        timing: s.hrTableData?.timing || '',
+        weeklyOff: s.hrTableData?.weeklyOff || '',
+        sewaDays: s.hrTableData?.sewaDays || [],
+        selectedOptions: s.hrTableData?.selectedOptions || []
+      });
+      setEditingHrSewadar(s);
+      return;
+    }
+
     const sDetails = details[s.id] || { address: '', dob: '', phone: '', age: undefined, district: '' };
     setFormData({
       name: s.name,
@@ -50,6 +98,57 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
       district: (sDetails.district || '').replace(/ludhiyana/gi, 'Ludhiana')
     });
     setEditingSewadar(s);
+  };
+
+  const handleDelete = (s: Sewadar) => {
+    if (!onDeleteSewadar) return;
+    if (window.confirm(`Are you sure you want to delete sewadar "${s.name}"?`)) {
+      onDeleteSewadar(s.id);
+    }
+  };
+
+  const handleSaveHrSewadar = async () => {
+    if (!editingHrSewadar || !editFormData.name.trim()) return;
+    setIsSavingHr(true);
+    try {
+      if (onSaveHrTableSewadar) {
+        await onSaveHrTableSewadar({
+          id: editingHrSewadar.id,
+          name: editFormData.name.trim(),
+          gender: editFormData.gender,
+          group: editingHrSewadar.group || 'HR Table',
+          hrTableData: {
+            phoneNumber: editFormData.phoneNumber.trim() || null,
+            address: editFormData.address.trim() || null,
+            qualification: editFormData.qualification.trim() || null,
+            timing: editFormData.timing.trim() || null,
+            weeklyOff: editFormData.weeklyOff || null,
+            sewaDays: editFormData.sewaDays,
+            selectedOptions: editFormData.selectedOptions,
+            handoverDayGroup: editingHrSewadar.hrTableData?.handoverDayGroup || null,
+            handoverIncharge: editingHrSewadar.hrTableData?.handoverIncharge || null,
+            handoverDate: editingHrSewadar.hrTableData?.handoverDate || null,
+            createdAt: editingHrSewadar.hrTableData?.createdAt || Date.now(),
+            updatedAt: Date.now()
+          }
+        });
+      }
+      if (isSuperAdmin && onEditSewadar && editFormData.name.trim() !== editingHrSewadar.name) {
+        await onEditSewadar(editingHrSewadar.id, editFormData.name.trim());
+      }
+      await onSaveDetails({
+        sewadar_id: editingHrSewadar.id,
+        phone: editFormData.phoneNumber.trim(),
+        address: editFormData.address.trim(),
+        district: editFormData.address.trim()
+      });
+      setEditingHrSewadar(null);
+    } catch (err) {
+      console.error("Save HR sewadar error:", err);
+      alert("Error saving sewadar details. Please try again.");
+    } finally {
+      setIsSavingHr(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -348,77 +447,163 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
           {filtered.map((s, idx) => {
             const sDetails = details[s.id];
             const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone || sDetails.age || sDetails.district);
+            const isExpanded = expandedSewadarId === s.id;
+            const mobileNumber = s.hrTableData?.phoneNumber || sDetails?.phone;
+            const locationAddress = s.hrTableData?.address || sDetails?.address || sDetails?.district;
 
             return (
-              <div key={s.id} className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-indigo-100 transition-all">
-                <div className="flex items-center gap-5">
-                  <div className="text-[10px] font-black text-slate-200 w-6 text-center">{idx + 1}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-black text-slate-900 text-base">{s.name}</h3>
-                      {s.routedByHrTable && (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                          Routed by HR table
-                        </span>
-                      )}
-                      {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                          Punjab Zone
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                      {s.group} • {s.gender}
-                      {s.hrTableData?.handoverIncharge ? ` • Handover: ${s.hrTableData.handoverIncharge}` : ''}
-                    </p>
-                    
-                    {hasDetails && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {sDetails.phone && (
-                          <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
-                            📞 {sDetails.phone}
+              <div 
+                key={s.id} 
+                onClick={() => setExpandedSewadarId(prev => prev === s.id ? null : s.id)}
+                className={`bg-white p-5 sm:p-6 rounded-[2rem] border-2 shadow-sm flex flex-col transition-all cursor-pointer ${
+                  isExpanded ? 'border-indigo-300 ring-2 ring-indigo-50 shadow-md' : 'border-slate-100 hover:border-indigo-100'
+                }`}
+              >
+                {/* Main Card Header / Row */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-4 flex-1">
+                    <div className="text-[10px] font-black text-slate-300 w-6 text-center pt-1 sm:pt-0">{idx + 1}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                          {s.name}
+                          <svg 
+                            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-600' : ''}`} 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </h3>
+                        {/* Only show "Routed by HR table" in other groups to differentiate, never inside HR Table tab */}
+                        {s.routedByHrTable && !isHrTable && (
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                            Routed by HR table
                           </span>
                         )}
-                        {sDetails.dob && (
-                          <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
-                            🎂 {new Date(sDetails.dob).toLocaleDateString('en-GB')}
-                          </span>
-                        )}
-                        {sDetails.age !== undefined && sDetails.age !== null && (
-                          <span className="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
-                            👤 Age: {sDetails.age}
-                          </span>
-                        )}
-                        {sDetails.district && (
-                          <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 shadow-sm">
-                            📍 {sDetails.district.replace(/ludhiyana/gi, 'Ludhiana')}
-                          </span>
-                        )}
-                        {sDetails.address && sDetails.address !== sDetails.district && (
-                          <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 max-w-[150px] truncate shadow-sm">
-                            🏠 {sDetails.address}
+                        {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
+                            Punjab Zone
                           </span>
                         )}
                       </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                        {isHrTable || s.group === 'HR Table'
+                          ? (s.hrTableData?.handoverDayGroup ? `${s.hrTableData.handoverDayGroup} • ${s.gender}` : s.gender)
+                          : `${s.group} • ${s.gender}`
+                        }
+                        {s.hrTableData?.handoverIncharge ? ` • Handover: ${s.hrTableData.handoverIncharge}` : ''}
+                      </p>
+                      
+                      {/* Compact Badges */}
+                      <div className="mt-2.5 flex flex-wrap gap-2">
+                        {mobileNumber && (
+                          <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-[9px] font-black flex items-center gap-1 shadow-2xs">
+                            📞 {mobileNumber}
+                          </span>
+                        )}
+                        {locationAddress && (
+                          <span className="bg-amber-50 text-amber-800 px-3 py-1 rounded-lg text-[9px] font-black flex items-center gap-1 max-w-[190px] truncate shadow-2xs">
+                            📍 {locationAddress.replace(/ludhiyana/gi, 'Ludhiana')}
+                          </span>
+                        )}
+                        {sDetails?.dob && (
+                          <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-[9px] font-black flex items-center gap-1 shadow-2xs">
+                            🎂 {new Date(sDetails.dob).toLocaleDateString('en-GB')}
+                          </span>
+                        )}
+                        {sDetails?.age !== undefined && sDetails?.age !== null && (
+                          <span className="bg-purple-50 text-purple-700 px-3 py-1 rounded-lg text-[9px] font-black flex items-center gap-1 shadow-2xs">
+                            👤 Age: {sDetails.age}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions (Edit Info & Delete side-by-side) */}
+                  <div className="flex items-center gap-2 self-end md:self-auto flex-wrap pt-2 md:pt-0" onClick={e => e.stopPropagation()}>
+                    <button 
+                      type="button"
+                      onClick={() => handleEdit(s)}
+                      className="px-4 py-2.5 bg-slate-50 hover:bg-indigo-600 hover:text-white border border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-700 transition-all whitespace-nowrap shadow-xs active:scale-95 flex items-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      <span>{hasDetails || s.hrTableData ? 'Edit Info' : '+ Add Info'}</span>
+                    </button>
+                    {(isSuperAdmin || isHrTable) && onDeleteSewadar && (
+                      <button 
+                        type="button"
+                        onClick={() => handleDelete(s)}
+                        className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-600 hover:text-white border border-rose-200 rounded-xl text-[10px] font-black uppercase text-rose-600 transition-all whitespace-nowrap shadow-xs active:scale-95 flex items-center gap-1"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Delete</span>
+                      </button>
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <button 
-                    onClick={() => handleEdit(s)}
-                    className="px-6 py-3 bg-slate-50 border rounded-xl text-[9px] font-black uppercase text-slate-600 hover:bg-indigo-600 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
-                  >
-                    {hasDetails ? 'Edit Info' : '+ Add Info'}
-                  </button>
-                  {isSuperAdmin && onDeleteSewadar && (
-                    <button 
-                      onClick={() => onDeleteSewadar(s.id)}
-                      className="px-6 py-3 bg-red-50 border border-red-100 rounded-xl text-[9px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-all whitespace-nowrap shadow-sm active:scale-95"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
+
+                {/* Expanded Details Section */}
+                {isExpanded && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 space-y-3 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                      <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">📞 Mobile Number</span>
+                        <span className="text-xs font-bold text-slate-800">{mobileNumber || 'Not specified'}</span>
+                      </div>
+                      <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">📍 Location / Address</span>
+                        <span className="text-xs font-bold text-slate-800">{locationAddress || 'Not specified'}</span>
+                      </div>
+                      <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">🎓 Qualification</span>
+                        <span className="text-xs font-bold text-slate-800">{s.hrTableData?.qualification || 'Not specified'}</span>
+                      </div>
+                      <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">⏰ Duty Timing</span>
+                        <span className="text-xs font-bold text-slate-800">{s.hrTableData?.timing || 'Not specified'}</span>
+                      </div>
+                      <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">🗓️ Weekly Off</span>
+                        <span className="text-xs font-bold text-slate-800">{s.hrTableData?.weeklyOff || 'None / Flexible'}</span>
+                      </div>
+                      <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">📅 Sewa Days</span>
+                        <span className="text-xs font-bold text-slate-800">
+                          {s.hrTableData?.sewaDays && s.hrTableData.sewaDays.length > 0 
+                            ? s.hrTableData.sewaDays.join(', ') 
+                            : 'All Days / Flexible'}
+                        </span>
+                      </div>
+                      {s.hrTableData?.handoverIncharge && (
+                        <div className="bg-indigo-50/60 p-3 rounded-2xl border border-indigo-100 sm:col-span-2">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-indigo-500 block mb-0.5">🤝 Handover Assignment</span>
+                          <span className="text-xs font-black text-indigo-900">
+                            Handed over to {s.hrTableData.handoverDayGroup || s.group} {s.gender} ({s.hrTableData.handoverIncharge})
+                          </span>
+                        </div>
+                      )}
+                      {s.hrTableData?.selectedOptions && s.hrTableData.selectedOptions.length > 0 && (
+                        <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100 sm:col-span-2 md:col-span-3">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">🏷️ Options to Choose From</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {s.hrTableData.selectedOptions.map(opt => (
+                              <span key={opt} className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-[10px] font-bold rounded-lg shadow-2xs">
+                                {opt}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -429,6 +614,282 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
           )}
         </div>
       </div>
+
+      {/* HR Table Sewadar Edit Modal (Matching Add Sewadar Edit Flow exactly) */}
+      {editingHrSewadar && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Editing Header Banner - Exactly like SS */}
+            <div className="bg-amber-50 border-2 border-amber-300 p-4 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+              <div>
+                <div className="text-xs font-black text-amber-900 uppercase tracking-wide">
+                  Editing Sewadar Mode
+                </div>
+                <div className="text-sm font-bold text-amber-800">
+                  Modifying selections & group for <span className="font-black text-black">"{editFormData.name}"</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingHrSewadar(null)}
+                className="px-3.5 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-2xs"
+              >
+                Cancel Edit
+              </button>
+            </div>
+
+            {/* Sewadar Information Form */}
+            <div className="bg-white rounded-2xl space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                  Sewadar Information
+                </h2>
+                <span className="text-[11px] font-bold text-slate-400">All fields</span>
+              </div>
+
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={e => setEditFormData(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Enter full name of sewadar"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
+                />
+              </div>
+
+              {/* Gender */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData(p => ({ ...p, gender: 'Gents' }))}
+                    className={`py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all border-2 ${
+                      editFormData.gender === 'Gents'
+                        ? 'bg-blue-50 border-blue-600 text-blue-800 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>👨</span> Gents
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData(p => ({ ...p, gender: 'Ladies' }))}
+                    className={`py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all border-2 ${
+                      editFormData.gender === 'Ladies'
+                        ? 'bg-pink-50 border-pink-600 text-pink-800 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>👩</span> Ladies
+                  </button>
+                </div>
+              </div>
+
+              {/* Phone Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-sm">+91</span>
+                  <input
+                    type="tel"
+                    value={editFormData.phoneNumber}
+                    onChange={e => setEditFormData(p => ({ ...p, phoneNumber: e.target.value.replace(/[^0-9]/g, '') }))}
+                    placeholder="10-digit mobile number"
+                    maxLength={10}
+                    className="w-full pl-14 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Address
+                </label>
+                <textarea
+                  value={editFormData.address}
+                  onChange={e => setEditFormData(p => ({ ...p, address: e.target.value }))}
+                  placeholder="Residential address / Colony / City"
+                  rows={2}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none resize-none"
+                />
+              </div>
+
+              {/* Qualification */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Qualification
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.qualification}
+                  onChange={e => setEditFormData(p => ({ ...p, qualification: e.target.value }))}
+                  placeholder="e.g. 10th, 12th, Graduate, B.Tech, Diploma"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
+                />
+              </div>
+
+              {/* Timing */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Timing
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.timing}
+                  onChange={e => setEditFormData(p => ({ ...p, timing: e.target.value }))}
+                  placeholder="e.g. Morning, Evening, 8 AM - 2 PM, Full Day"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
+                />
+              </div>
+
+              {/* Weekly Off */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Weekly Off
+                </label>
+                <select
+                  value={editFormData.weeklyOff}
+                  onChange={e => setEditFormData(p => ({ ...p, weeklyOff: e.target.value }))}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
+                >
+                  <option value="">Select Weekly Off Day</option>
+                  {DAYS_OF_WEEK.map(day => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                  <option value="None / Flexible">None / Flexible</option>
+                </select>
+              </div>
+
+              {/* Sewa Days */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    Sewa Days
+                  </label>
+                  <span className="text-[11px] font-bold text-indigo-600">
+                    {editFormData.sewaDays.length > 0 ? `${editFormData.sewaDays.length} selected` : 'Select available days'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map(day => {
+                    const isSelected = editFormData.sewaDays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          setEditFormData(p => ({
+                            ...p,
+                            sewaDays: isSelected ? p.sewaDays.filter(d => d !== day) : [...p.sewaDays, day]
+                          }));
+                        }}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all border ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editFormData.sewaDays.length === DAYS_OF_WEEK.length) {
+                        setEditFormData(p => ({ ...p, sewaDays: [] }));
+                      } else {
+                        setEditFormData(p => ({ ...p, sewaDays: [...DAYS_OF_WEEK] }));
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-black border border-dashed border-slate-300 text-slate-500 hover:text-slate-800 hover:border-slate-400 transition-all"
+                  >
+                    {editFormData.sewaDays.length === DAYS_OF_WEEK.length ? 'Clear All' : 'All Days'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Options to choose from */}
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      Options to choose from
+                    </label>
+                    <p className="text-[11px] text-slate-400 font-medium">Select departments or sewa categories</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">
+                    {editFormData.selectedOptions.length} chosen
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {SEWA_OPTIONS.map(option => {
+                    const isChecked = editFormData.selectedOptions.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setEditFormData(p => ({
+                            ...p,
+                            selectedOptions: isChecked
+                              ? p.selectedOptions.filter(o => o !== option)
+                              : [...p.selectedOptions, option]
+                          }));
+                        }}
+                        className={`p-3.5 rounded-2xl text-left font-bold text-xs flex items-center justify-between border-2 transition-all active:scale-[0.98] ${
+                          isChecked
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{option}</span>
+                        <div
+                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
+                            isChecked
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isChecked && (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Save Sewadar Button */}
+                <button
+                  type="button"
+                  disabled={isSavingHr || !editFormData.name.trim()}
+                  onClick={handleSaveHrSewadar}
+                  className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-md shadow-emerald-200 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+                >
+                  {isSavingHr ? 'Saving...' : 'Save sewadar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingSewadar && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
