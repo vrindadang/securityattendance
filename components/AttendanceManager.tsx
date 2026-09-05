@@ -186,6 +186,15 @@ const AttendanceManager: React.FC<Props> = ({
   }, [attendance, normalizedSessionDate]);
 
   const formatConfigHeader = () => {
+    if (isZoneLogin) {
+      if (normalizedSessionDate) {
+        const parts = normalizedSessionDate.split('-');
+        if (parts.length === 3) {
+          return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+      }
+      return new Date().toLocaleDateString('en-GB');
+    }
     if (!dutyStartTime || !dutyEndTime || !normalizedSessionDate) return '-';
     const d = new Date(normalizedSessionDate);
     const dateStr = d.toLocaleDateString('en-GB');
