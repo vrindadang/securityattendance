@@ -93,7 +93,10 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
         s.group.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesGender = genderFilter === 'ALL' || s.gender === genderFilter;
-      const matchesDay = dayFilter === 'ALL' || s.group === dayFilter;
+      const matchesDay = 
+        dayFilter === 'ALL' || 
+        s.group === dayFilter || 
+        (dayFilter === 'HR Table' && (s.group === 'HR Table' || !s.hrTableData?.handoverIncharge));
 
       return matchesSearch && matchesGender && matchesDay;
     });
@@ -137,10 +140,67 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setWeeklyOff(s.hrTableData?.weeklyOff || '');
     setSewaDays(s.hrTableData?.sewaDays || []);
     setSelectedOptions(s.hrTableData?.selectedOptions || []);
-    setSelectedDayGroup(s.group || s.hrTableData?.handoverDayGroup || null);
-    setShowHandover(true);
+    setSelectedDayGroup(s.group !== 'HR Table' ? (s.group || s.hrTableData?.handoverDayGroup || null) : null);
+    setShowHandover(Boolean(!s.hrTableData?.handoverIncharge));
     setActiveTab('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Option to save sewadar only (handover at a later stage or preserve existing group)
+  const handleSaveOnly = async () => {
+    if (!name.trim()) {
+      setFeedback({ type: 'error', message: 'Please enter Sewadar Name before saving.' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFeedback(null);
+
+    try {
+      const existing = editingId ? routedSewadars.find(item => item.id === editingId) : null;
+      const targetDay = selectedDayGroup || existing?.group || 'HR Table';
+      const keepIncharge = (existing && (!selectedDayGroup || selectedDayGroup === existing.group))
+        ? existing.hrTableData?.handoverIncharge
+        : undefined;
+
+      await onSaveSewadar({
+        id: editingId || undefined,
+        name: name.trim(),
+        gender,
+        group: targetDay,
+        hrTableData: {
+          phoneNumber: phoneNumber.trim() || undefined,
+          address: address.trim() || undefined,
+          qualification: qualification.trim() || undefined,
+          timing: timing.trim() || undefined,
+          weeklyOff: weeklyOff || undefined,
+          sewaDays: sewaDays.length > 0 ? sewaDays : undefined,
+          selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
+          handoverDayGroup: selectedDayGroup || existing?.hrTableData?.handoverDayGroup || (targetDay !== 'HR Table' ? targetDay : undefined),
+          handoverIncharge: keepIncharge,
+        }
+      });
+
+      const actionText = editingId ? 'updated' : 'saved';
+      setFeedback({
+        type: 'success',
+        message: keepIncharge
+          ? `Sewadar "${name.trim()}" successfully ${actionText}!`
+          : targetDay !== 'HR Table'
+          ? `Sewadar "${name.trim()}" saved for ${targetDay} ${gender}! You can handover to an incharge whenever ready.`
+          : `Sewadar "${name.trim()}" saved successfully! You can handover to a group & incharge at a later stage.`
+      });
+
+      resetForm();
+      setActiveTab('list');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      console.error('Save Error:', err);
+      setFeedback({ type: 'error', message: err?.message || 'Failed to save sewadar. Please try again.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleHandoverAndSave = async (targetDay: string, inchargeName: string) => {
@@ -495,116 +555,140 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* Options to Choose From */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div>
-                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    Options to choose from
-                  </h2>
-                  <p className="text-xs text-slate-400 font-medium">Select departments or sewa categories</p>
+              {/* Options to Choose From (Integrated inside Sewadar Information) */}
+              <div className="pt-5 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      Options to choose from
+                    </label>
+                    <p className="text-[11px] text-slate-400 font-medium">Select departments or sewa categories</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">
+                    {selectedOptions.length} chosen
+                  </span>
                 </div>
-                <span className="text-xs font-bold text-slate-400">
-                  {selectedOptions.length} chosen
-                </span>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {SEWA_OPTIONS.map(option => {
-                  const isChecked = selectedOptions.includes(option);
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => toggleOption(option)}
-                      className={`p-3.5 rounded-2xl text-left font-bold text-xs flex items-center justify-between border-2 transition-all active:scale-[0.98] ${
-                        isChecked
-                          ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{option}</span>
-                      <div
-                        className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {SEWA_OPTIONS.map(option => {
+                    const isChecked = selectedOptions.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleOption(option)}
+                        className={`p-3.5 rounded-2xl text-left font-bold text-xs flex items-center justify-between border-2 transition-all active:scale-[0.98] ${
                           isChecked
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'border-slate-300 bg-white'
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
                         }`}
                       >
-                        {isChecked && (
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                        <span className="truncate pr-2">{option}</span>
+                        <div
+                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
+                            isChecked
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isChecked && (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Quick Save Changes when in Edit Mode */}
-            {editingId && (
-              <div className="pt-2 flex flex-col sm:flex-row gap-2">
+            {/* Bottom Actions: Save Sewadar (Handover at later stage) vs Handover To Group */}
+            <div className="space-y-4 pt-1">
+              {/* Option A: Save Sewadar (Handover Later) */}
+              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      {editingId ? 'Save Sewadar Changes' : 'Save Sewadar'}
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium">
+                      {editingId 
+                        ? 'Save updated sewadar details while preserving current group assignment'
+                        : 'Save sewadar details now — you can handover to a group & incharge at a later stage'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleSaveOnly}
+                    className="flex-1 py-4 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-md shadow-emerald-200 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        Saving Sewadar...
+                      </span>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        <span>{editingId ? 'Save Changes (Keep Group)' : 'Save Sewadar (Handover Later)'}</span>
+                      </>
+                    )}
+                  </button>
+
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="py-4 px-6 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs uppercase tracking-wider rounded-2xl transition-all"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Option B: Handover To Group & Incharge Accordion Trigger */}
+              <div>
                 <button
                   type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    const s = routedSewadars.find(item => item.id === editingId);
-                    const currentDay = selectedDayGroup || s?.group || 'Monday';
-                    const currentIncharge = s?.hrTableData?.handoverIncharge || 
-                      (effectiveGender === 'Gents' ? (GENTS_INCHARGES[currentDay] || 'Incharge') : ((LADIES_INCHARGES[currentDay] || [])[0] || 'Incharge'));
-                    handleHandoverAndSave(currentDay, currentIncharge);
-                  }}
-                  className="flex-1 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  onClick={() => setShowHandover(prev => !prev)}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-between gap-3 text-base active:scale-[0.99] transition-all"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Save Changes (Keep {selectedDayGroup || 'Current'} Group)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs uppercase tracking-wider rounded-2xl transition-all"
-                >
-                  Cancel
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span>{editingId ? 'Handover / Re-assign Group & Incharge' : 'Handover Directly To Incharge'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
+                      {effectiveGender}
+                    </span>
+                    <svg
+                      className={`w-5 h-5 transition-transform ${showHandover ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </button>
               </div>
-            )}
-
-            {/* Handover To Trigger Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowHandover(prev => !prev);
-                }}
-                className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-between gap-3 text-base active:scale-[0.99] transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                  <span>{editingId ? 'Update Handover & Group' : 'Handover To'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
-                    {effectiveGender}
-                  </span>
-                  <svg
-                    className={`w-5 h-5 transition-transform ${showHandover ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
             </div>
 
             {/* Handover Section */}
@@ -806,7 +890,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                   onChange={e => setDayFilter(e.target.value)}
                   className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none"
                 >
-                  <option value="ALL">All Days</option>
+                  <option value="ALL">All Groups</option>
+                  <option value="HR Table">⏳ Pending Handover</option>
                   {DAYS_LIST.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
@@ -894,12 +979,16 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                                   : 'bg-pink-50 text-pink-700 border border-pink-100'
                               }`}
                             >
-                              {s.group} {s.gender}
+                              {s.group === 'HR Table' ? 'HR Table' : `${s.group} ${s.gender}`}
                             </span>
-                            {data.handoverIncharge && (
+                            {data.handoverIncharge ? (
                               <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[10px] font-black flex items-center gap-1">
                                 <span>🤝 Handover:</span>
                                 <span>{data.handoverIncharge}</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-black flex items-center gap-1">
+                                <span>⏳ Handover Pending</span>
                               </span>
                             )}
                           </div>
@@ -916,7 +1005,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
-                            <span>Edit / Group</span>
+                            <span>{data.handoverIncharge ? 'Edit / Group' : 'Edit / Handover'}</span>
                           </button>
 
                           <button

@@ -451,6 +451,70 @@ const App: React.FC = () => {
         return;
       }
 
+      if (isHrTable) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const uniqueSessionsMap: Record<string, DutySession> = {};
+
+        // Always include today's active session
+        uniqueSessionsMap[todayStr] = {
+          id: `hrtable-${todayStr}`,
+          date: todayStr,
+          group: 'HR Table' as DutyGroup,
+          location: 'HR Table',
+          start_time: `${todayStr}T06:00:00`,
+          end_time: `${todayStr}T21:00:00`,
+          completed: false
+        };
+
+        // Scan for all dates where sewadars were registered or handed over by HR Table
+        const pool = customList || (allSewadarsList && allSewadarsList.length > 0 ? allSewadarsList : customSewadars);
+        pool.forEach(s => {
+          const isHrSewadar = s.routedByHrTable || s.group === 'HR Table' || Boolean(s.hrTableData) || s.tag === 'HR Table';
+          if (!isHrSewadar) return;
+
+          const hDate = s.hrTableData?.handoverDate || 
+            (s.hrTableData?.createdAt ? new Date(s.hrTableData.createdAt).toISOString().split('T')[0] : null) ||
+            (s.hrTableData?.updatedAt ? new Date(s.hrTableData.updatedAt).toISOString().split('T')[0] : null);
+
+          if (hDate && !uniqueSessionsMap[hDate]) {
+            uniqueSessionsMap[hDate] = {
+              id: `hrtable-${hDate}`,
+              date: hDate,
+              group: 'HR Table' as DutyGroup,
+              location: 'HR Table',
+              start_time: `${hDate}T06:00:00`,
+              end_time: `${hDate}T21:00:00`,
+              completed: false
+            };
+          }
+        });
+
+        const hrSessions = Object.values(uniqueSessionsMap).sort((a, b) => 
+          new Date(b.start_time || b.date).getTime() - new Date(a.start_time || a.date).getTime()
+        );
+
+        setAllSessions(hrSessions);
+        setActiveSession(hrSessions[0]);
+        if (isInitial) {
+          const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
+          const savedSession = hrSessions.find(s => s.id === savedSessionId);
+          if (savedSession) {
+            setDashboardSelectedSession(savedSession);
+          } else if (hrSessions[0]) {
+            setDashboardSelectedSession(hrSessions[0]);
+            localStorage.setItem(STORAGE_KEY_SESSION_ID, hrSessions[0].id);
+          }
+        } else {
+          setDashboardSelectedSession(prev => {
+            if (prev && hrSessions.some(s => s.id === prev.id)) {
+              return prev;
+            }
+            return hrSessions[0];
+          });
+        }
+        return;
+      }
+
       const q = query(
         collection(db, 'daily_settings'),
         ...(activeVolunteer.role !== 'Super Admin' && activeVolunteer.assignedGroup 
@@ -1250,11 +1314,11 @@ const App: React.FC = () => {
 
       setCustomSewadars(prev => {
         const exists = prev.find(s => s.id === id);
-        if (exists) {
-          return prev.map(s => s.id === id ? updatedSewadar : s);
-        } else {
-          return [...prev, updatedSewadar];
+        const nextList = exists ? prev.map(s => s.id === id ? updatedSewadar : s) : [...prev, updatedSewadar];
+        if (isHrTable) {
+          setTimeout(() => fetchSessions(false, nextList), 50);
         }
+        return nextList;
       });
 
       return updatedSewadar;

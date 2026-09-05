@@ -430,9 +430,93 @@ const Dashboard: React.FC<Props> = ({
   const isLadiesZone = Boolean(activeVolunteer?.role?.includes('Ladies') || activeVolunteer?.name?.includes('Ladies'));
   const zoneTargetGender = isLadiesZone ? 'Ladies' : 'Gents';
   const zoneGroup = isLadiesZone ? 'Punjab Zone Ladies' : 'Punjab';
+  const isHrTable = Boolean(
+    activeVolunteer?.assignedGroup === 'HR Table' || 
+    activeVolunteer?.id === 'admin_hr_table' || 
+    activeVolunteer?.name === 'HR Table Admin' || 
+    activeVolunteer?.name?.includes('HR Table')
+  );
   
   const currentSession = allSessions.find(s => s.id === selectedSessionId) || allSessions[0];
   const sessionDate = currentSession?.date;
+
+  const getSewadarDate = (s: Sewadar): string => {
+    if (s.hrTableData?.createdAt) {
+      return new Date(s.hrTableData.createdAt).toISOString().split('T')[0];
+    }
+    if (s.hrTableData?.handoverDate) {
+      return s.hrTableData.handoverDate;
+    }
+    if (s.hrTableData?.updatedAt) {
+      return new Date(s.hrTableData.updatedAt).toISOString().split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const hrTableSewadars = useMemo(() => {
+    if (!isHrTable) return [];
+    const pool = (allSewadars && allSewadars.length > 0) ? allSewadars : (sewadars || []);
+    const map = new Map<string, Sewadar>();
+
+    pool.forEach(s => {
+      const isHr = s.routedByHrTable || 
+        s.group === 'HR Table' || 
+        Boolean(s.hrTableData) || 
+        s.tag === 'HR Table';
+      if (isHr) {
+        map.set(s.id, s);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [allSewadars, sewadars, isHrTable]);
+
+  const hrDailySummary = useMemo(() => {
+    if (!isHrTable) return [];
+    const summaryMap: Record<string, { date: string; added: number; handedOver: number; pending: number }> = {};
+
+    hrTableSewadars.forEach(s => {
+      const d = getSewadarDate(s);
+      if (!summaryMap[d]) {
+        summaryMap[d] = { date: d, added: 0, handedOver: 0, pending: 0 };
+      }
+      summaryMap[d].added += 1;
+      if (s.hrTableData?.handoverIncharge) {
+        summaryMap[d].handedOver += 1;
+      } else {
+        summaryMap[d].pending += 1;
+      }
+    });
+
+    // Ensure sessionDate or today exists in the summary
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (!summaryMap[todayStr]) {
+      summaryMap[todayStr] = { date: todayStr, added: 0, handedOver: 0, pending: 0 };
+    }
+    if (sessionDate && !summaryMap[sessionDate]) {
+      summaryMap[sessionDate] = { date: sessionDate, added: 0, handedOver: 0, pending: 0 };
+    }
+
+    return Object.values(summaryMap).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [hrTableSewadars, isHrTable, sessionDate]);
+
+  const hrSewadarsForSession = useMemo(() => {
+    if (!isHrTable) return [];
+    const targetDate = sessionDate || new Date().toISOString().split('T')[0];
+
+    return hrTableSewadars.filter(s => {
+      const d = getSewadarDate(s);
+      return d === targetDate;
+    });
+  }, [hrTableSewadars, isHrTable, sessionDate]);
+
+  const hrHandedOverForSession = useMemo(() => {
+    return hrSewadarsForSession.filter(s => Boolean(s.hrTableData?.handoverIncharge));
+  }, [hrSewadarsForSession]);
+
+  const hrPendingForSession = useMemo(() => {
+    return hrSewadarsForSession.filter(s => !s.hrTableData?.handoverIncharge);
+  }, [hrSewadarsForSession]);
 
   const handedOverSewadarsForSession = useMemo(() => {
     if (!isZoneLogin) return [];
@@ -629,6 +713,140 @@ const Dashboard: React.FC<Props> = ({
       }
 
       doc.save(`SKRM_Punjab_Zone_Handover_Report_${isLadiesZone ? 'Ladies' : 'Gents'}_${dateDisplay.replace(/\//g, '-')}.pdf`);
+      return;
+    }
+
+    if (isHrTable) {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      let currentY = 15;
+
+      const ensureSpace = (h: number) => {
+        if (currentY + h > 275) {
+          doc.addPage();
+          currentY = 20;
+          return true;
+        }
+        return false;
+      };
+
+      // Header Intro
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      const introText = `With the blessings of H.H. Sant Rajinder Singh Ji Maharaj, HR Table, presents the sewadar registration & handover report for ${dateDisplay}`;
+      doc.text(introText, 14, currentY);
+
+      // Title
+      currentY += 12;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(50, 60, 120);
+      doc.text("SKRM Security Sewa report", 14, currentY);
+      
+      // Subtitle
+      currentY += 7;
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont("helvetica", "normal");
+      doc.text("HR Table - Sewadar Addition & Handover Report", 14, currentY);
+      
+      // Horizontal Divider
+      currentY += 4;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(14, currentY, 196, currentY);
+
+      // 1. Overview
+      currentY += 10;
+      ensureSpace(40);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("1. Daily Registration & Handover Overview", 14, currentY);
+
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['Metric', 'Details']],
+        body: [
+          ['Department', 'HR Table'],
+          ['Report Type', 'Sewadar Daily Addition & Handover Report'],
+          ['Report Date', dateDisplay],
+          ['Total Sewadars Added', String(hrSewadarsForSession.length)],
+          ['Handed Over to Groups', String(hrHandedOverForSession.length)],
+          ['Pending Handover in HR Table', String(hrPendingForSession.length)]
+        ],
+        headStyles: { fillColor: [50, 60, 120], textColor: 255, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 9 },
+        theme: 'grid'
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 12;
+
+      // 2. Handover Details Table
+      ensureSpace(40);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("2. Sewadar Details & Handover Log", 14, currentY);
+
+      const tableRows = hrSewadarsForSession.length > 0
+        ? hrSewadarsForSession.map((s, idx) => {
+            const targetDay = s.hrTableData?.handoverDayGroup || (s.group !== 'HR Table' ? s.group : '');
+            const groupDisplay = targetDay ? `${targetDay} ${s.gender}` : 'Pending Handover';
+            const incharge = s.hrTableData?.handoverIncharge || 'Pending Handover';
+            const options = (s.hrTableData?.selectedOptions || []).join(', ') || '-';
+            return [
+              String(idx + 1),
+              s.name,
+              s.gender,
+              groupDisplay,
+              incharge,
+              options
+            ];
+          })
+        : [['-', 'No sewadars were registered on this date', '-', '-', '-', '-']];
+
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['#', 'Sewadar Name', 'Gender', 'Handover Group', 'Group Incharge', 'Chosen Options']],
+        body: tableRows,
+        headStyles: { fillColor: [50, 60, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { fontStyle: 'bold', cellWidth: 42 },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 38 },
+          4: { cellWidth: 44 },
+          5: { cellWidth: 36 }
+        },
+        bodyStyles: { fontSize: 8.5 },
+        theme: 'grid'
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+
+      // Note
+      const noteText = `Note: This report lists all sewadars registered by the HR Table along with the respective security duty group and incharge handover details for session date ${dateDisplay}.`;
+      const splitNote = doc.splitTextToSize(noteText, 182);
+      ensureSpace(splitNote.length * 4 + 6);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(100, 100, 100);
+      doc.text(splitNote, 14, currentY);
+
+      // Page numbers footer
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          14,
+          287
+        );
+      }
+
+      doc.save(`SKRM_HR_Table_Report_${dateDisplay.replace(/\//g, '-')}.pdf`);
       return;
     }
 
@@ -1127,6 +1345,27 @@ const Dashboard: React.FC<Props> = ({
           </div>
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
         </div>
+      ) : isHrTable ? (
+        <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
+          <div className="relative z-10">
+            <h2 className="text-2xl font-black mb-1">HR Table Reports</h2>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+              HR Table Record • {currentSession?.date ? (typeof currentSession.date === 'string' ? currentSession.date.split('-').reverse().join('/') : currentSession.date) : 'Current Session'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 relative z-10">
+            <button 
+              onClick={generateAttendancePDF} 
+              className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download PDF</span>
+            </button>
+          </div>
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
+        </div>
       ) : (
         <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
           <div className="relative z-10">
@@ -1144,7 +1383,7 @@ const Dashboard: React.FC<Props> = ({
       )}
 
       {/* March, April & May Special Report Panel */}
-      {!isZoneLogin && (
+      {!isZoneLogin && !isHrTable && (
         <div className="bg-gradient-to-r from-[#1d1f3d] to-[#0f1025] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-indigo-500/15">
           <div className="relative z-10 flex-1">
             <div className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-block mb-3">Special Report</div>
@@ -1284,27 +1523,94 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase mb-2">
-            {isZoneLogin ? 'Total Handovers' : 'Total Present'}
-          </p>
-          <p className="text-4xl font-black text-slate-900">
-            {isZoneLogin ? totalHandovers : new Set(attendance.map(a => a.sewadarId)).size}
-          </p>
+      {isHrTable ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Sewadars Added (This Date)</p>
+            <p className="text-4xl font-black text-slate-900">{hrSewadarsForSession.length}</p>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
+            <p className="text-[10px] font-black text-emerald-500 uppercase mb-2">Handed Over to Groups</p>
+            <p className="text-4xl font-black text-emerald-600">{hrHandedOverForSession.length}</p>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
+            <p className="text-[10px] font-black text-amber-500 uppercase mb-2">Pending Handover</p>
+            <p className="text-4xl font-black text-amber-600">{hrPendingForSession.length}</p>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Open Issues</p>
-          <p className="text-4xl font-black text-amber-600">{issues.length}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase mb-2">
+              {isZoneLogin ? 'Total Handovers' : 'Total Present'}
+            </p>
+            <p className="text-4xl font-black text-slate-900">
+              {isZoneLogin ? totalHandovers : new Set(attendance.map(a => a.sewadarId)).size}
+            </p>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Open Issues</p>
+            <p className="text-4xl font-black text-amber-600">{issues.length}</p>
+          </div>
         </div>
-      </div>
+      )}
+
+      {isHrTable && (
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-wider">
+              Sewadars Added Per Day Summary
+            </h4>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Total {hrTableSewadars.length} Registered
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {hrDailySummary.slice(0, 8).map((day) => {
+              const formatted = day.date.split('-').reverse().join('/');
+              const isSelected = sessionDate === day.date;
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  onClick={() => {
+                    const matchedSession = allSessions.find(s => s.date === day.date);
+                    if (matchedSession) {
+                      onSessionChange(matchedSession.id);
+                    }
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    isSelected 
+                      ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' 
+                      : 'border-slate-100 bg-slate-50 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <p className="text-[10px] font-black text-slate-500 uppercase">{formatted}</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-xl font-black text-slate-900">{day.added}</span>
+                    <span className="text-[10px] font-bold text-slate-400">added</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 text-[9px] font-bold">
+                    <span className="text-emerald-600">{day.handedOver} handed over</span>
+                    {day.pending > 0 && <span className="text-amber-600">• {day.pending} pending</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-            {isZoneLogin ? 'Select Handover Report Session' : 'Select History Session'}
+            {isZoneLogin 
+              ? 'Select Handover Report Session' 
+              : isHrTable 
+                ? 'Select HR Table Report Session' 
+                : 'Select History Session'}
           </label>
-          {isZoneLogin && (
+          {(isZoneLogin || isHrTable) && (
             <button
               onClick={generateAttendancePDF}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
@@ -1326,6 +1632,17 @@ const Dashboard: React.FC<Props> = ({
             const today = new Date().toISOString().split('T')[0];
             const isToday = s.date === today;
             const formattedDate = (typeof s.date === 'string' ? s.date : '').split('-').reverse().join('/');
+            
+            if (isHrTable) {
+              const dayCount = hrDailySummary.find(d => d.date === s.date)?.added || 0;
+              const handedCount = hrDailySummary.find(d => d.date === s.date)?.handedOver || 0;
+              return (
+                <option key={s.id} value={s.id}>
+                  {formattedDate} - HR Table Report ({dayCount} Added, {handedCount} Handed Over) {isToday ? '(Today)' : ''}
+                </option>
+              );
+            }
+
             return (
               <option key={s.id} value={s.id}>
                 {isZoneLogin 
@@ -1405,7 +1722,120 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {!isZoneLogin && (
+      {isHrTable && (
+        <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                HR Table Handover Report - {(typeof sessionDate === 'string' ? sessionDate : '').split('-').reverse().join('/') || 'Selected Date'}
+              </h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                {hrSewadarsForSession.length} Added • {hrHandedOverForSession.length} Handed Over • {hrPendingForSession.length} Handover Pending
+              </p>
+            </div>
+            <button
+              onClick={generateAttendancePDF}
+              className="self-start sm:self-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-md flex items-center gap-2 transition-all active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download PDF</span>
+            </button>
+          </div>
+
+          {hrSewadarsForSession.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th className="px-4 py-3 text-center">#</th>
+                    <th className="px-4 py-3">Sewadar Name</th>
+                    <th className="px-4 py-3 text-center">Gender</th>
+                    <th className="px-4 py-3 text-center">Handover Group</th>
+                    <th className="px-4 py-3 text-center">Group Incharge</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3">Chosen Options</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {hrSewadarsForSession.map((s, idx) => {
+                    const isHandedOver = Boolean(s.hrTableData?.handoverIncharge);
+                    const targetGroup = s.hrTableData?.handoverDayGroup || (s.group !== 'HR Table' ? s.group : '');
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-900">{s.name}</p>
+                          {s.phone && <p className="text-[10px] text-slate-400 font-medium">{s.phone}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2.5 py-1 rounded-lg font-bold text-[10px] ${
+                            s.gender === 'Ladies' ? 'bg-pink-50 text-pink-700' : 'bg-blue-50 text-blue-700'
+                          }`}>
+                            {s.gender}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {targetGroup ? (
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-[10px]">
+                              {targetGroup} {s.gender}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-slate-800">
+                          {s.hrTableData?.handoverIncharge ? (
+                            <span>{s.hrTableData.handoverIncharge}</span>
+                          ) : (
+                            <span className="text-amber-600 italic text-[11px]">Pending Incharge</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {isHandedOver ? (
+                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-[10px] uppercase">
+                              Handed Over
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg font-bold text-[10px] uppercase">
+                              Pending Handover
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {s.hrTableData?.selectedOptions && s.hrTableData.selectedOptions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {s.hrTableData.selectedOptions.map((opt, oIdx) => (
+                                <span key={oIdx} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[9px] font-semibold">
+                                  {opt}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-[10px]">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <p className="text-slate-500 font-bold text-xs">
+                No sewadars were registered by HR Table on this date ({(typeof sessionDate === 'string' ? sessionDate : '').split('-').reverse().join('/') || '-'}).
+              </p>
+              <p className="text-slate-400 text-[10px] mt-1">
+                Sewadars added on this date will appear here along with their handover group, incharge, and options.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isZoneLogin && !isHrTable && (
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
           <h3 className="text-xs font-black text-slate-400 uppercase mb-4">Report an Issue</h3>
           <textarea 
@@ -1427,7 +1857,7 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {!isZoneLogin && (
+      {!isZoneLogin && !isHrTable && (
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <div>
@@ -1459,7 +1889,7 @@ const Dashboard: React.FC<Props> = ({
         </div>
       )}
 
-      {!isZoneLogin && (
+      {!isZoneLogin && !isHrTable && (
         <div className="space-y-3">
           <h3 className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Incident Logs</h3>
           {issues.length > 0 ? issues.map(issue => (
