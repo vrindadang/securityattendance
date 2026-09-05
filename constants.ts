@@ -378,7 +378,7 @@ const LADIES_THURSDAY_NIGHT_LIST = [
   "PUSHPA TANEJA", "ANITA MAKKAR", "ANITA SETHI", "GEETA OHRI", "SUDESH BATHRA",
   "SATYA MANOCHA", "SUMAN SETHI", "SANTOSH MEHRA", "SAMITRA YADAV", "CHANDRA NAILWAL",
   "PUSHPA SINGH", "MANJU CHAUHAN", "SUNITA VERMA", "RASHMA YADAV", "SANTOSH DUHAN",
-  "JYOTI MALHOTRA", "BHUMIKA", "KAMLESH VERMA", "MEENAKSHI", "JOLLY",
+  "JYOTI MALHOTRA", "BHUMIKA", "KAMLESH VERMA", "MEENAKSHI",
   "YOGITA CHAWLA"
 ];
 
@@ -491,7 +491,7 @@ const generateVolunteers = (): Volunteer[] => {
     id: 'punjab_zone_att_gents',
     name: 'Punjab Zone Incharge',
     role: 'Punjab - Zone Attendance (Gents)',
-    password: '123',
+    password: 'pun123',
     assignedGroup: 'Punjab'
   });
   return vols;

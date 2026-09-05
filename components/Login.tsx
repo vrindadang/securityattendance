@@ -224,7 +224,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
   const handlePunjabPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPass = password.trim();
-    if (cleanPass === '123' || cleanPass.toLowerCase() === 'punjab' || cleanPass.toLowerCase() === 'punjab123') {
+    if (cleanPass.toLowerCase() === 'pun123') {
       setIsZoneAuthorized(true);
       setPassword('');
       setError('');
@@ -377,7 +377,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                     name: 'Punjab Zone Structure',
                     role: 'Punjab - Zone Structure',
                     assignedGroup: 'Punjab Zone Structure',
-                    password: password || '123'
+                    password: password || 'pun123'
                   });
                 }}
                 className="group bg-white p-6 rounded-[2rem] border-2 border-slate-100 hover:border-amber-500 transition-all flex items-center gap-6 active:scale-95 text-left"
@@ -428,7 +428,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                     name: 'Punjab Zone (Gents)',
                     role: 'Punjab - Zone Attendance (Gents)',
                     assignedGroup: 'Punjab',
-                    password: password || '123'
+                    password: password || 'pun123'
                   });
                 }}
                 className="group bg-white p-6 rounded-[2rem] border-2 border-indigo-100 hover:border-indigo-500 transition-all flex items-center gap-6 active:scale-95 text-left"
@@ -447,7 +447,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                     name: 'Punjab Zone (Ladies)',
                     role: 'Punjab - Zone Attendance (Ladies)',
                     assignedGroup: 'Punjab Zone Ladies',
-                    password: password || '123'
+                    password: password || 'pun123'
                   });
                 }}
                 className="group bg-white p-6 rounded-[2rem] border-2 border-pink-100 hover:border-pink-500 transition-all flex items-center gap-6 active:scale-95 text-left"

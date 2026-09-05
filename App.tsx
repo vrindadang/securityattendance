@@ -91,11 +91,14 @@ const App: React.FC = () => {
   const [deletedSewadarIds, setDeletedSewadarIds] = useState<Set<string>>(new Set());
   const [sewadarDetailsMap, setSewadarDetailsMap] = useState<Record<string, SewadarDetails>>(INITIAL_SEWADAR_DETAILS);
 
-  const isHrTable = activeVolunteer?.assignedGroup === 'HR Table' || activeVolunteer?.id === 'admin_hr_table' || activeVolunteer?.name === 'HR Table Admin';
+  const isHrTable = activeVolunteer?.assignedGroup === 'HR Table' || activeVolunteer?.id === 'admin_hr_table' || activeVolunteer?.name === 'HR Table Admin' || activeVolunteer?.name?.includes('HR Table');
 
   useEffect(() => {
-    if (isHrTable && activeView === 'Attendance') {
-      setActiveView('AddSewadar');
+    if (isHrTable) {
+      setShowSettingsModal(false);
+      if (activeView === 'Attendance') {
+        setActiveView('AddSewadar');
+      }
     }
   }, [isHrTable, activeView]);
   const [loading, setLoading] = useState(false);
@@ -443,7 +446,7 @@ const App: React.FC = () => {
           } else {
             setDashboardSelectedSession(null);
             const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
-            if (activeVolunteer.role !== 'Super Admin' && !isZone) setShowSettingsModal(true);
+            if (activeVolunteer.role !== 'Super Admin' && !isZone && !isHrTable) setShowSettingsModal(true);
           }
         }
       } else {
@@ -462,6 +465,21 @@ const App: React.FC = () => {
           setAllSessions([defaultSession]);
           setActiveSession(defaultSession);
           setDashboardSelectedSession(defaultSession);
+        } else if (isHrTable) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const defaultHrSession: DutySession = {
+            id: `hrtable-${todayStr}`,
+            date: todayStr,
+            group: 'HR Table' as DutyGroup,
+            location: 'Kirpal Bagh',
+            start_time: `${todayStr}T06:00:00`,
+            end_time: `${todayStr}T21:00:00`,
+            completed: false
+          };
+          setAllSessions([defaultHrSession]);
+          setActiveSession(defaultHrSession);
+          setDashboardSelectedSession(defaultHrSession);
+          setShowSettingsModal(false);
         } else {
           setAllSessions([]);
           setActiveSession(null);
@@ -1557,7 +1575,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const bannerVisible = !activeVolunteer || showSettingsModal || activeView === 'Dashboard';
+  const bannerVisible = !activeVolunteer || (showSettingsModal && !isHrTable) || activeView === 'Dashboard';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -1581,25 +1599,27 @@ const App: React.FC = () => {
           <Login 
             onLogin={v => { 
               try {
+                setShowSettingsModal(false);
                 setActiveVolunteer(v); 
                 localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(v)); 
                 if (v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator') {
                   setActiveView('WorkshopAttendance');
                 } else if (v.role === 'Punjab - Zone Structure') {
                   setActiveView('ZoneStructure');
-                } else if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin') {
+                } else if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin' || v.name?.includes('HR Table')) {
                   setActiveView('AddSewadar');
                 } else {
                   setActiveView('Attendance');
                 }
               } catch (e) {
                 console.error("Storage error:", e);
+                setShowSettingsModal(false);
                 setActiveVolunteer(v);
                 if (v.id === 'workshop_coordinator' || v.name === 'Workshop Coordinator') {
                   setActiveView('WorkshopAttendance');
                 } else if (v.role === 'Punjab - Zone Structure') {
                   setActiveView('ZoneStructure');
-                } else if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin') {
+                } else if (v.assignedGroup === 'HR Table' || v.id === 'admin_hr_table' || v.name === 'HR Table Admin' || v.name?.includes('HR Table')) {
                   setActiveView('AddSewadar');
                 } else {
                   setActiveView('Attendance');
@@ -1613,7 +1633,7 @@ const App: React.FC = () => {
         </div>
       ) : (
         <>
-          {showSettingsModal && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && (
+          {showSettingsModal && !isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
               <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
                 <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
@@ -1705,7 +1725,7 @@ const App: React.FC = () => {
                   name: 'Punjab Zone (Gents)',
                   role: 'Punjab - Zone Attendance (Gents)',
                   assignedGroup: 'Punjab',
-                  password: '123'
+                  password: 'pun123'
                 };
                 setActiveVolunteer(gentVolunteer);
                 localStorage.setItem(STORAGE_KEY_VOLUNTEER, JSON.stringify(gentVolunteer));
@@ -1736,7 +1756,7 @@ const App: React.FC = () => {
             dutyEndTime={activeSession?.end_time || ''} 
             isCompleted={!!activeSession?.completed} 
             onChangeLocation={() => {
-              if (!activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
+              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
                 setShowSettingsModal(true);
               }
             }} 
@@ -1807,7 +1827,7 @@ const App: React.FC = () => {
             dutyStartTime={dashboardSelectedSession?.start_time || ''} 
             dutyEndTime={dashboardSelectedSession?.end_time || ''} 
             onOpenSettings={() => {
-              if (!activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
+              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
                 setShowSettingsModal(true);
               }
             }} 
