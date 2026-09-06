@@ -44,6 +44,52 @@ const SEWA_OPTIONS = [
   'Setup sewa'
 ];
 
+const getOptionBadges = (s: Sewadar): string[] => {
+  const data = s.hrTableData || {};
+  const selected = Array.isArray(data.selectedOptions) ? data.selectedOptions : [];
+
+  const gentsGroups = (Array.isArray(data.securityGentsGroups) && data.securityGentsGroups.length > 0)
+    ? data.securityGentsGroups
+    : (s.gender === 'Gents' && Array.isArray(data.interestedGroups) ? data.interestedGroups : []);
+
+  const ladiesGroups = (Array.isArray(data.securityLadiesGroups) && data.securityLadiesGroups.length > 0)
+    ? data.securityLadiesGroups
+    : (s.gender === 'Ladies' && Array.isArray(data.interestedGroups) ? data.interestedGroups : []);
+
+  const badges: string[] = [];
+
+  selected.forEach(opt => {
+    const lower = opt.toLowerCase();
+    if (lower.includes('security gents') || opt === 'Security gents') {
+      if (gentsGroups.length > 0) {
+        badges.push(`Security Gents (${gentsGroups.join(', ')})`);
+      } else {
+        badges.push('Security Gents');
+      }
+    } else if (lower.includes('security ladies') || opt === 'Security ladies') {
+      if (ladiesGroups.length > 0) {
+        badges.push(`Security Ladies (${ladiesGroups.join(', ')})`);
+      } else {
+        badges.push('Security Ladies');
+      }
+    } else {
+      badges.push(opt);
+    }
+  });
+
+  // Fallback if security day groups were specified but 'Security gents' / 'Security ladies' was not in selectedOptions
+  const hasSecurityBadge = badges.some(b => b.startsWith('Security'));
+  if (!hasSecurityBadge) {
+    if (gentsGroups.length > 0) {
+      badges.push(`Security Gents (${gentsGroups.join(', ')})`);
+    } else if (ladiesGroups.length > 0) {
+      badges.push(`Security Ladies (${ladiesGroups.join(', ')})`);
+    }
+  }
+
+  return badges;
+};
+
 export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   activeVolunteer,
   customSewadars,
@@ -105,12 +151,19 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   // Filtered list for "Sewadars" tab (All sewadars)
   const filteredAllSewadars = useMemo(() => {
     return allSewadars.filter(s => {
+      const optionsMatch = 
+        (s.hrTableData?.selectedOptions || []).some(o => o.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.hrTableData?.interestedGroups || []).some(g => g.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.hrTableData?.securityGentsGroups || []).some(g => g.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.hrTableData?.securityLadiesGroups || []).some(g => g.toLowerCase().includes(searchTerm.toLowerCase()));
+
       const matchesSearch = 
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.hrTableData?.phoneNumber && s.hrTableData.phoneNumber.includes(searchTerm)) ||
         (s.hrTableData?.handoverIncharge && s.hrTableData.handoverIncharge.toLowerCase().includes(searchTerm.toLowerCase())) ||
         s.group.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase().includes(searchTerm.toLowerCase()));
+        (s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        optionsMatch;
       
       const matchesGender = genderFilter === 'ALL' || s.gender === genderFilter;
       const matchesDay = 
@@ -126,12 +179,19 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   // Filtered list for "Routed Sewadars" tab (Only handed over)
   const filteredRoutedSewadars = useMemo(() => {
     return routedSewadars.filter(s => {
+      const optionsMatch = 
+        (s.hrTableData?.selectedOptions || []).some(o => o.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.hrTableData?.interestedGroups || []).some(g => g.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.hrTableData?.securityGentsGroups || []).some(g => g.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.hrTableData?.securityLadiesGroups || []).some(g => g.toLowerCase().includes(searchTerm.toLowerCase()));
+
       const matchesSearch = 
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.hrTableData?.phoneNumber && s.hrTableData.phoneNumber.includes(searchTerm)) ||
         (s.hrTableData?.handoverIncharge && s.hrTableData.handoverIncharge.toLowerCase().includes(searchTerm.toLowerCase())) ||
         s.group.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase().includes(searchTerm.toLowerCase()));
+        (s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        optionsMatch;
       
       const matchesGender = genderFilter === 'ALL' || s.gender === genderFilter;
       const matchesDay = 
@@ -916,7 +976,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
 
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                             <span
-                              className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                              className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0 ${
                                 s.gender === 'Gents'
                                   ? 'bg-blue-50 text-blue-700 border border-blue-100'
                                   : 'bg-pink-50 text-pink-700 border border-pink-100'
@@ -924,8 +984,19 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                             >
                               {s.gender}
                             </span>
+
+                            {getOptionBadges(s).map((badge, bIdx) => (
+                              <span
+                                key={bIdx}
+                                className="px-2.5 py-0.5 bg-emerald-50 text-emerald-900 border border-emerald-200/90 rounded-lg text-[10px] font-black flex items-center gap-1 shadow-2xs"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span>{badge}</span>
+                              </span>
+                            ))}
+
                             {isHandedOver && (
-                              <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[10px] font-black flex items-center gap-1">
+                              <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[10px] font-black flex items-center gap-1 shrink-0">
                                 <span>🤝 Handed over:</span>
                                 <span>{data.handoverDayGroup || s.group} ({data.handoverIncharge})</span>
                               </span>
@@ -1189,7 +1260,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                                 {s.name}
                               </h3>
                               <span
-                                className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                                className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0 ${
                                   s.gender === 'Gents'
                                     ? 'bg-blue-50 text-blue-700 border border-blue-100'
                                     : 'bg-pink-50 text-pink-700 border border-pink-100'
@@ -1197,6 +1268,16 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                               >
                                 {s.gender}
                               </span>
+
+                              {getOptionBadges(s).map((badge, bIdx) => (
+                                <span
+                                  key={bIdx}
+                                  className="px-2.5 py-0.5 bg-emerald-50 text-emerald-900 border border-emerald-200/90 rounded-lg text-[10px] font-black flex items-center gap-1 shadow-2xs"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                  <span>{badge}</span>
+                                </span>
+                              ))}
                             </div>
 
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
