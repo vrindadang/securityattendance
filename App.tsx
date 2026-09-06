@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ViewState, AttendanceRecord, Sewadar, Volunteer, Gender, DutyGroup, Issue, VehicleRecord, SewadarDetails, Requirement, GroupPhoto, DutySession, FlaggedVehicle, Notice } from './types';
 import { INITIAL_SEWADARS, LOCATIONS_LIST, INITIAL_SEWADAR_DETAILS } from './constants';
 import AttendanceManager from './components/AttendanceManager';
@@ -356,28 +356,39 @@ const App: React.FC = () => {
     }
   }, [isWorkshopCoordinator, activeView]);
 
+  const prevShowSettingsModalRef = useRef(false);
+
   useEffect(() => {
-    if (showSettingsModal && activeVolunteer) {
+    // Only initialize form when the modal transitions from closed to open
+    const isOpening = !prevShowSettingsModalRef.current && showSettingsModal;
+    prevShowSettingsModalRef.current = showSettingsModal;
+
+    if (isOpening && activeVolunteer) {
       const sessionToLoad = activeView === 'Dashboard' ? dashboardSelectedSession : activeSession;
       if (sessionToLoad) {
         const start = new Date(sessionToLoad.start_time);
         const end = new Date(sessionToLoad.end_time);
         
         const formatTime = (date: Date) => {
+          if (isNaN(date.getTime())) return '07:00';
           return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
         };
 
         const formatDate = (date: Date) => {
+          if (isNaN(date.getTime())) return getLocalDate();
           const d = new Date(date);
           d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
           return d.toISOString().split('T')[0];
         };
 
+        const rawStart = sessionToLoad.date ? normalizeDate(sessionToLoad.date) : formatDate(start);
+        const rawEnd = sessionToLoad.end_time ? formatDate(end) : getTomorrowDate();
+
         setConfigForm({
           locations: isPermanentKirpalBagh ? ['Kirpal Bagh'] : (sessionToLoad.location ? sessionToLoad.location.split(', ').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)) : []),
-          startDate: sessionToLoad.date || formatDate(start),
+          startDate: rawStart || getLocalDate(),
           startTime: formatTime(start),
-          endDate: formatDate(end),
+          endDate: rawEnd || getTomorrowDate(),
           endTime: formatTime(end)
         });
       } else {
@@ -599,21 +610,24 @@ const App: React.FC = () => {
 
         setAllSessions(deduplicatedSessions);
         
-        // Set activeSession to the latest one by default
-        setActiveSession(deduplicatedSessions[0] || null);
+        const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
+        const activeTarget = (activeSession?.id && deduplicatedSessions.find(s => s.id === activeSession.id))
+          || (savedSessionId && deduplicatedSessions.find(s => s.id === savedSessionId))
+          || deduplicatedSessions[0] 
+          || null;
+        setActiveSession(activeTarget);
 
         if (isInitial) {
-          const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
-          const savedSession = deduplicatedSessions.find(s => s.id === savedSessionId);
-          
-          if (savedSession) {
-            setDashboardSelectedSession(savedSession);
-          } else if (deduplicatedSessions[0]) {
-            setDashboardSelectedSession(deduplicatedSessions[0]);
-            localStorage.setItem(STORAGE_KEY_SESSION_ID, deduplicatedSessions[0].id);
-          } else {
-            setDashboardSelectedSession(null);
+          const dashboardTarget = (savedSessionId && deduplicatedSessions.find(s => s.id === savedSessionId))
+            || activeTarget
+            || deduplicatedSessions[0]
+            || null;
+          setDashboardSelectedSession(dashboardTarget);
+
+          if (!activeTarget && !dashboardTarget) {
             if (activeVolunteer.role !== 'Super Admin' && !isHrTable) setShowSettingsModal(true);
+          } else if (activeTarget) {
+            localStorage.setItem(STORAGE_KEY_SESSION_ID, activeTarget.id);
           }
         }
       } else {
@@ -1637,6 +1651,10 @@ const App: React.FC = () => {
         return dt.toISOString();
       };
 
+      const dateTimestamp = Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
+      const startTimeIso = getISO(configForm.startDate, configForm.startTime);
+      const endTimeIso = getISO(configForm.endDate, configForm.endTime);
+
       const q = query(
         collection(db, 'daily_settings'),
         where('date', '>=', startOfDay),
@@ -1646,40 +1664,50 @@ const App: React.FC = () => {
       const allExisting = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       const existing = allExisting.filter((s: any) => s.group === groupName);
 
+      let targetSessionId: string;
       if (existing && existing.length > 0) {
+        targetSessionId = existing[0].id;
         const payload = {
+          date: dateTimestamp,
           location: finalLocations.join(', '),
-          start_time: getISO(configForm.startDate, configForm.startTime),
-          end_time: getISO(configForm.endDate, configForm.endTime),
+          start_time: startTimeIso,
+          end_time: endTimeIso,
         };
-        await updateDoc(doc(db, 'daily_settings', existing[0].id), payload);
-        const mappedSession = { ...existing[0], ...payload, id: String(existing[0].id), date: configForm.startDate } as DutySession;
-        setAllSessions(prev => [mappedSession, ...prev.filter(s => s.id !== mappedSession.id)]);
-        setActiveSession(mappedSession);
-        setDashboardSelectedSession(mappedSession);
-        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
-        setSaveSuccess(true);
-        setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
+        await updateDoc(doc(db, 'daily_settings', targetSessionId), payload);
       } else {
-        const id = generateNumericId();
+        targetSessionId = generateNumericId();
         const payload = {
-          id,
-          date: Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0)), 
+          id: targetSessionId,
+          date: dateTimestamp, 
           group: groupName,
           location: finalLocations.join(', '),
-          start_time: getISO(configForm.startDate, configForm.startTime),
-          end_time: getISO(configForm.endDate, configForm.endTime),
+          start_time: startTimeIso,
+          end_time: endTimeIso,
           completed: false
         };
-        await setDoc(doc(db, 'daily_settings', id), payload);
-        const mappedSession = { ...payload, id: String(id), date: configForm.startDate } as DutySession;
-        setAllSessions(prev => [mappedSession, ...prev]);
-        setActiveSession(mappedSession);
-        setDashboardSelectedSession(mappedSession);
-        localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
-        setSaveSuccess(true);
-        setTimeout(() => { setShowSettingsModal(false); setSaveSuccess(false); setActiveView('Attendance'); }, 600);
+        await setDoc(doc(db, 'daily_settings', targetSessionId), payload);
       }
+
+      const mappedSession: DutySession = {
+        id: String(targetSessionId),
+        date: configForm.startDate,
+        group: groupName as DutyGroup,
+        location: finalLocations.join(', '),
+        start_time: startTimeIso,
+        end_time: endTimeIso,
+        completed: false
+      };
+
+      setAllSessions(prev => [mappedSession, ...prev.filter(s => s.id !== mappedSession.id)]);
+      setActiveSession(mappedSession);
+      setDashboardSelectedSession(mappedSession);
+      localStorage.setItem(STORAGE_KEY_SESSION_ID, mappedSession.id);
+      setSaveSuccess(true);
+      setTimeout(() => { 
+        setShowSettingsModal(false); 
+        setSaveSuccess(false); 
+        setActiveView('Attendance'); 
+      }, 600);
     } catch (err) { 
       console.error("Config error details:", err);
       alert("Config error: " + (err instanceof Error ? err.message : "Unknown error")); 
@@ -1878,15 +1906,52 @@ const App: React.FC = () => {
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Start</label>
                       <div className="grid grid-cols-2 gap-3">
-                        <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startDate} onChange={e => setConfigForm(p => ({...p, startDate: e.target.value}))} />
-                        <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.startTime} onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} />
+                        <input 
+                          type="date" 
+                          className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm cursor-pointer" 
+                          value={configForm.startDate} 
+                          onChange={e => {
+                            const newStart = e.target.value;
+                            setConfigForm(p => {
+                              const updated = { ...p, startDate: newStart };
+                              if (newStart && p.endDate && p.endDate < newStart) {
+                                updated.endDate = newStart;
+                              }
+                              return updated;
+                            });
+                          }} 
+                          onClick={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                          onFocus={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                        />
+                        <input 
+                          type="time" 
+                          className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm cursor-pointer" 
+                          value={configForm.startTime} 
+                          onChange={e => setConfigForm(p => ({...p, startTime: e.target.value}))} 
+                          onClick={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                          onFocus={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty End</label>
                       <div className="grid grid-cols-2 gap-3">
-                        <input type="date" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endDate} onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} />
-                        <input type="time" className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm" value={configForm.endTime} onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} />
+                        <input 
+                          type="date" 
+                          className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm cursor-pointer" 
+                          value={configForm.endDate} 
+                          onChange={e => setConfigForm(p => ({...p, endDate: e.target.value}))} 
+                          onClick={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                          onFocus={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                        />
+                        <input 
+                          type="time" 
+                          className="px-4 py-3.5 bg-slate-50 border-2 rounded-2xl font-black text-sm cursor-pointer" 
+                          value={configForm.endTime} 
+                          onChange={e => setConfigForm(p => ({...p, endTime: e.target.value}))} 
+                          onClick={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                          onFocus={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                        />
                       </div>
                     </div>
                   </div>
