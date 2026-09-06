@@ -19,8 +19,12 @@ interface HrTableAddSewadarProps {
       weeklyOff?: string | null;
       sewaDays?: string[];
       selectedOptions?: string[];
+      interestedGroups?: string[];
+      securityGentsGroups?: string[];
+      securityLadiesGroups?: string[];
       handoverDayGroup?: string | null;
       handoverIncharge?: string | null;
+      handoverDate?: string | null;
       createdAt?: number;
       updatedAt?: number;
     };
@@ -60,6 +64,9 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   const [weeklyOff, setWeeklyOff] = useState('');
   const [sewaDays, setSewaDays] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [interestedGroups, setInterestedGroups] = useState<string[]>([]);
+  const [securityGentsGroups, setSecurityGentsGroups] = useState<string[]>([]);
+  const [securityLadiesGroups, setSecurityLadiesGroups] = useState<string[]>([]);
 
   // Action states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,8 +144,27 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   }, [routedSewadars, searchTerm, genderFilter, dayFilter]);
 
   const toggleOption = (opt: string) => {
-    setSelectedOptions(prev => 
-      prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt]
+    setSelectedOptions(prev => {
+      const isChecked = prev.includes(opt);
+      if (isChecked) {
+        if (opt === 'Security gents') setSecurityGentsGroups([]);
+        if (opt === 'Security ladies') setSecurityLadiesGroups([]);
+        return prev.filter(o => o !== opt);
+      } else {
+        return [...prev, opt];
+      }
+    });
+  };
+
+  const toggleSecurityGentsGroup = (day: string) => {
+    setSecurityGentsGroups(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
+
+  const toggleSecurityLadiesGroup = (day: string) => {
+    setSecurityLadiesGroups(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
     );
   };
 
@@ -159,6 +185,9 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setWeeklyOff('');
     setSewaDays([]);
     setSelectedOptions([]);
+    setInterestedGroups([]);
+    setSecurityGentsGroups([]);
+    setSecurityLadiesGroups([]);
   };
 
   const handleStartEdit = (s: Sewadar) => {
@@ -172,6 +201,14 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setWeeklyOff(s.hrTableData?.weeklyOff || '');
     setSewaDays(s.hrTableData?.sewaDays || []);
     setSelectedOptions(s.hrTableData?.selectedOptions || []);
+
+    const gentsGrp = s.hrTableData?.securityGentsGroups || [];
+    const ladiesGrp = s.hrTableData?.securityLadiesGroups || [];
+    const legacyGrp = s.hrTableData?.interestedGroups || [];
+    setSecurityGentsGroups(gentsGrp.length > 0 ? gentsGrp : (s.gender === 'Gents' ? legacyGrp : []));
+    setSecurityLadiesGroups(ladiesGrp.length > 0 ? ladiesGrp : (s.gender === 'Ladies' ? legacyGrp : []));
+    setInterestedGroups(legacyGrp);
+
     setActiveTab('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -194,6 +231,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
       const keepHandoverGroup = existing?.hrTableData?.handoverDayGroup || (targetDay !== 'HR Table' ? targetDay : null);
       const keepHandoverDate = existing?.hrTableData?.handoverDate || null;
 
+      const combinedInterestedGroups = Array.from(new Set([...securityGentsGroups, ...securityLadiesGroups]));
+
       await onSaveSewadar({
         id: editingId || undefined,
         name: name.trim(),
@@ -207,6 +246,9 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
           weeklyOff: weeklyOff || null,
           sewaDays: sewaDays.length > 0 ? sewaDays : [],
           selectedOptions: selectedOptions.length > 0 ? selectedOptions : [],
+          interestedGroups: combinedInterestedGroups,
+          securityGentsGroups: securityGentsGroups,
+          securityLadiesGroups: securityLadiesGroups,
           handoverDayGroup: keepHandoverGroup,
           handoverIncharge: keepIncharge,
           handoverDate: keepHandoverDate,
@@ -252,6 +294,9 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
           weeklyOff: sewadar.hrTableData?.weeklyOff || null,
           sewaDays: sewadar.hrTableData?.sewaDays || [],
           selectedOptions: sewadar.hrTableData?.selectedOptions || [],
+          interestedGroups: sewadar.hrTableData?.interestedGroups || [],
+          securityGentsGroups: sewadar.hrTableData?.securityGentsGroups || [],
+          securityLadiesGroups: sewadar.hrTableData?.securityLadiesGroups || [],
           handoverDayGroup: targetDay,
           handoverIncharge: inchargeName,
           handoverDate: todayStr,
@@ -609,32 +654,113 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {SEWA_OPTIONS.map(option => {
                     const isChecked = selectedOptions.includes(option);
+                    const isSecurityGents = option === 'Security gents';
+                    const isSecurityLadies = option === 'Security ladies';
+                    const hasSubOptions = (isSecurityGents || isSecurityLadies) && isChecked;
+                    const currentSubGroups = isSecurityGents ? securityGentsGroups : securityLadiesGroups;
+
                     return (
-                      <button
+                      <div
                         key={option}
-                        type="button"
-                        onClick={() => toggleOption(option)}
-                        className={`p-3.5 rounded-2xl text-left font-bold text-xs flex items-center justify-between border-2 transition-all active:scale-[0.98] ${
+                        className={`rounded-2xl border-2 transition-all overflow-hidden ${
                           isChecked
-                            ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
+                            ? 'bg-emerald-50/70 border-emerald-600 text-emerald-950 shadow-xs'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
-                        }`}
+                        } ${hasSubOptions ? 'sm:col-span-2' : ''}`}
                       >
-                        <span className="truncate pr-2">{option}</span>
-                        <div
-                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
-                            isChecked
-                              ? 'bg-emerald-600 border-emerald-600 text-white'
-                              : 'border-slate-300 bg-white'
-                          }`}
+                        <button
+                          type="button"
+                          onClick={() => toggleOption(option)}
+                          className="w-full p-3.5 text-left font-bold text-xs flex items-center justify-between active:scale-[0.99] transition-all"
                         >
-                          {isChecked && (
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </button>
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className="truncate">{option}</span>
+                            {hasSubOptions && currentSubGroups.length > 0 && (
+                              <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md text-[10px] font-black shrink-0">
+                                {currentSubGroups.length} group{currentSubGroups.length > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+                              isChecked
+                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          >
+                            {isChecked && (
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+
+                        {/* Sub-options for Groups (Monday - Sunday) */}
+                        {hasSubOptions && (
+                          <div className="px-3.5 pb-3.5 pt-2 border-t border-emerald-200/80 space-y-2.5 bg-white/60">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                                  <span>🗓️</span> Interested Group(s) for {option}
+                                </span>
+                                <p className="text-[10px] text-emerald-700/80 font-semibold mt-0.5">
+                                  Select which day group they are interested in (separate from handover)
+                                </p>
+                              </div>
+                              {currentSubGroups.length > 0 && (
+                                <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100/90 text-emerald-800 rounded-lg border border-emerald-200">
+                                  {currentSubGroups.join(', ')}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {DAYS_LIST.map(day => {
+                                const isGroupSelected = currentSubGroups.includes(day);
+                                return (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isSecurityGents) {
+                                        toggleSecurityGentsGroup(day);
+                                      } else {
+                                        toggleSecurityLadiesGroup(day);
+                                      }
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border active:scale-95 ${
+                                      isGroupSelected
+                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                        : 'bg-white text-slate-700 border-emerald-200/90 hover:border-emerald-400 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    {day}
+                                  </button>
+                                );
+                              })}
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (currentSubGroups.length === DAYS_LIST.length) {
+                                    if (isSecurityGents) setSecurityGentsGroups([]);
+                                    else setSecurityLadiesGroups([]);
+                                  } else {
+                                    if (isSecurityGents) setSecurityGentsGroups([...DAYS_LIST]);
+                                    else setSecurityLadiesGroups([...DAYS_LIST]);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl text-xs font-black border border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-100/60 transition-all"
+                              >
+                                {currentSubGroups.length === DAYS_LIST.length ? 'Clear' : 'All Days'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

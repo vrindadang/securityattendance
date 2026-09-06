@@ -33,6 +33,9 @@ export interface Sewadar {
     weeklyOff?: string | null;
     sewaDays?: string[];
     selectedOptions?: string[];
+    interestedGroups?: string[];
+    securityGentsGroups?: string[];
+    securityLadiesGroups?: string[];
     handoverDayGroup?: string | null;
     handoverIncharge?: string | null;
     handoverDate?: string | null;

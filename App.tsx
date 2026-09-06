@@ -1297,6 +1297,9 @@ const App: React.FC = () => {
       weeklyOff?: string | null;
       sewaDays?: string[];
       selectedOptions?: string[];
+      interestedGroups?: string[];
+      securityGentsGroups?: string[];
+      securityLadiesGroups?: string[];
       handoverDayGroup?: string | null;
       handoverIncharge?: string | null;
       handoverDate?: string | null;
@@ -1321,6 +1324,9 @@ const App: React.FC = () => {
       weeklyOff: rawHrData.weeklyOff || null,
       sewaDays: Array.isArray(rawHrData.sewaDays) ? rawHrData.sewaDays : [],
       selectedOptions: Array.isArray(rawHrData.selectedOptions) ? rawHrData.selectedOptions : [],
+      interestedGroups: Array.isArray(rawHrData.interestedGroups) ? rawHrData.interestedGroups : (existing?.hrTableData?.interestedGroups || []),
+      securityGentsGroups: Array.isArray(rawHrData.securityGentsGroups) ? rawHrData.securityGentsGroups : (existing?.hrTableData?.securityGentsGroups || []),
+      securityLadiesGroups: Array.isArray(rawHrData.securityLadiesGroups) ? rawHrData.securityLadiesGroups : (existing?.hrTableData?.securityLadiesGroups || []),
       handoverDayGroup: rawHrData.handoverDayGroup || null,
       handoverIncharge: rawHrData.handoverIncharge || null,
       handoverDate: rawHrData.handoverDate || null,

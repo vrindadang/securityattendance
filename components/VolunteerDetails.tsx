@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Sewadar, Volunteer, SewadarDetails } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { GENTS_GROUPS } from '../constants';
+import { GENTS_GROUPS, DAYS_LIST } from '../constants';
 
 interface Props {
   sewadars: Sewadar[];
@@ -51,7 +51,10 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
     timing: '',
     weeklyOff: '',
     sewaDays: [] as string[],
-    selectedOptions: [] as string[]
+    selectedOptions: [] as string[],
+    interestedGroups: [] as string[],
+    securityGentsGroups: [] as string[],
+    securityLadiesGroups: [] as string[]
   });
   const [isSavingHr, setIsSavingHr] = useState(false);
 
@@ -73,6 +76,10 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
 
   const handleEdit = (s: Sewadar) => {
     if (isHrTable || s.hrTableData || s.routedByHrTable) {
+      const gentsGrp = s.hrTableData?.securityGentsGroups || [];
+      const ladiesGrp = s.hrTableData?.securityLadiesGroups || [];
+      const legacyGrp = s.hrTableData?.interestedGroups || [];
+
       setEditFormData({
         name: s.name,
         gender: (s.gender as 'Gents' | 'Ladies') || 'Gents',
@@ -82,7 +89,10 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         timing: s.hrTableData?.timing || '',
         weeklyOff: s.hrTableData?.weeklyOff || '',
         sewaDays: s.hrTableData?.sewaDays || [],
-        selectedOptions: s.hrTableData?.selectedOptions || []
+        selectedOptions: s.hrTableData?.selectedOptions || [],
+        interestedGroups: legacyGrp,
+        securityGentsGroups: gentsGrp.length > 0 ? gentsGrp : (s.gender === 'Gents' ? legacyGrp : []),
+        securityLadiesGroups: ladiesGrp.length > 0 ? ladiesGrp : (s.gender === 'Ladies' ? legacyGrp : [])
       });
       setEditingHrSewadar(s);
       return;
@@ -112,6 +122,11 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
     setIsSavingHr(true);
     try {
       if (onSaveHrTableSewadar) {
+        const combinedInterested = Array.from(new Set([
+          ...editFormData.securityGentsGroups,
+          ...editFormData.securityLadiesGroups
+        ]));
+
         await onSaveHrTableSewadar({
           id: editingHrSewadar.id,
           name: editFormData.name.trim(),
@@ -125,6 +140,9 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
             weeklyOff: editFormData.weeklyOff || null,
             sewaDays: editFormData.sewaDays,
             selectedOptions: editFormData.selectedOptions,
+            interestedGroups: combinedInterested,
+            securityGentsGroups: editFormData.securityGentsGroups,
+            securityLadiesGroups: editFormData.securityLadiesGroups,
             handoverDayGroup: editingHrSewadar.hrTableData?.handoverDayGroup || null,
             handoverIncharge: editingHrSewadar.hrTableData?.handoverIncharge || null,
             handoverDate: editingHrSewadar.hrTableData?.handoverDate || null,
@@ -599,6 +617,16 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                               </span>
                             ))}
                           </div>
+                          {s.hrTableData.interestedGroups && s.hrTableData.interestedGroups.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold text-slate-500">Interested Group(s):</span>
+                              {s.hrTableData.interestedGroups.map(g => (
+                                <span key={g} className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[9px] font-black">
+                                  {g}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -839,39 +867,129 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {SEWA_OPTIONS.map(option => {
                     const isChecked = editFormData.selectedOptions.includes(option);
+                    const isSecurityGents = option === 'Security gents';
+                    const isSecurityLadies = option === 'Security ladies';
+                    const hasSubOptions = (isSecurityGents || isSecurityLadies) && isChecked;
+                    const currentSubGroups = isSecurityGents ? editFormData.securityGentsGroups : editFormData.securityLadiesGroups;
+
                     return (
-                      <button
+                      <div
                         key={option}
-                        type="button"
-                        onClick={() => {
-                          setEditFormData(p => ({
-                            ...p,
-                            selectedOptions: isChecked
-                              ? p.selectedOptions.filter(o => o !== option)
-                              : [...p.selectedOptions, option]
-                          }));
-                        }}
-                        className={`p-3.5 rounded-2xl text-left font-bold text-xs flex items-center justify-between border-2 transition-all active:scale-[0.98] ${
+                        className={`rounded-2xl border-2 transition-all overflow-hidden ${
                           isChecked
-                            ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
+                            ? 'bg-emerald-50/70 border-emerald-600 text-emerald-950 shadow-xs'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
-                        }`}
+                        } ${hasSubOptions ? 'sm:col-span-2' : ''}`}
                       >
-                        <span className="truncate pr-2">{option}</span>
-                        <div
-                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
-                            isChecked
-                              ? 'bg-emerald-600 border-emerald-600 text-white'
-                              : 'border-slate-300 bg-white'
-                          }`}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditFormData(p => {
+                              const willBeChecked = !isChecked;
+                              return {
+                                ...p,
+                                selectedOptions: isChecked
+                                  ? p.selectedOptions.filter(o => o !== option)
+                                  : [...p.selectedOptions, option],
+                                securityGentsGroups: (option === 'Security gents' && !willBeChecked) ? [] : p.securityGentsGroups,
+                                securityLadiesGroups: (option === 'Security ladies' && !willBeChecked) ? [] : p.securityLadiesGroups
+                              };
+                            });
+                          }}
+                          className="w-full p-3.5 text-left font-bold text-xs flex items-center justify-between active:scale-[0.99] transition-all"
                         >
-                          {isChecked && (
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </button>
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className="truncate">{option}</span>
+                            {hasSubOptions && currentSubGroups.length > 0 && (
+                              <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md text-[10px] font-black shrink-0">
+                                {currentSubGroups.length} group{currentSubGroups.length > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+                              isChecked
+                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          >
+                            {isChecked && (
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+
+                        {/* Sub-options for Groups (Monday - Sunday) */}
+                        {hasSubOptions && (
+                          <div className="px-3.5 pb-3.5 pt-2 border-t border-emerald-200/80 space-y-2.5 bg-white/60">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                                  <span>🗓️</span> Interested Group(s) for {option}
+                                </span>
+                                <p className="text-[10px] text-emerald-700/80 font-semibold mt-0.5">
+                                  Select which day group they are interested in (separate from handover)
+                                </p>
+                              </div>
+                              {currentSubGroups.length > 0 && (
+                                <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100/90 text-emerald-800 rounded-lg border border-emerald-200">
+                                  {currentSubGroups.join(', ')}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {DAYS_LIST.map(day => {
+                                const isGroupSelected = currentSubGroups.includes(day);
+                                return (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditFormData(p => {
+                                        const targetKey = isSecurityGents ? 'securityGentsGroups' : 'securityLadiesGroups';
+                                        const currentList = p[targetKey];
+                                        const updatedList = currentList.includes(day)
+                                          ? currentList.filter(d => d !== day)
+                                          : [...currentList, day];
+                                        return { ...p, [targetKey]: updatedList };
+                                      });
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border active:scale-95 ${
+                                      isGroupSelected
+                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                        : 'bg-white text-slate-700 border-emerald-200/90 hover:border-emerald-400 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    {day}
+                                  </button>
+                                );
+                              })}
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditFormData(p => {
+                                    const targetKey = isSecurityGents ? 'securityGentsGroups' : 'securityLadiesGroups';
+                                    const currentList = p[targetKey];
+                                    return {
+                                      ...p,
+                                      [targetKey]: currentList.length === DAYS_LIST.length ? [] : [...DAYS_LIST]
+                                    };
+                                  });
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl text-xs font-black border border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-100/60 transition-all"
+                              >
+                                {currentSubGroups.length === DAYS_LIST.length ? 'Clear' : 'All Days'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
