@@ -207,6 +207,11 @@ const App: React.FC = () => {
     return combined.filter(s => !deletedSewadarIds.has(s.id));
   }, [customSewadars, deletedSewadarIds]);
 
+  const allSewadarsListRef = useRef<Sewadar[]>(allSewadarsList);
+  allSewadarsListRef.current = allSewadarsList;
+  const customSewadarsRef = useRef<Sewadar[]>(customSewadars);
+  customSewadarsRef.current = customSewadars;
+
   const normalizeName = useCallback((name: string): string => {
     if (!name) return "";
     let n = name.toUpperCase().trim();
@@ -428,7 +433,7 @@ const App: React.FC = () => {
         };
 
         // Scan only for dates that ACTUALLY have handovers specific to this gender & Punjab zone
-        const pool = customList || (allSewadarsList && allSewadarsList.length > 0 ? allSewadarsList : customSewadars);
+        const pool = customList || (allSewadarsListRef.current && allSewadarsListRef.current.length > 0 ? allSewadarsListRef.current : customSewadarsRef.current);
         pool.forEach(s => {
           if (s.gender !== zoneGender) return;
 
@@ -465,7 +470,12 @@ const App: React.FC = () => {
         );
 
         setAllSessions(zoneSessions);
-        setActiveSession(zoneSessions[0]);
+        setActiveSession(prev => {
+          if (prev && zoneSessions.some(s => s.id === prev.id)) {
+            return prev;
+          }
+          return zoneSessions[0] || null;
+        });
         if (isInitial) {
           const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
           const savedSession = zoneSessions.find(s => s.id === savedSessionId);
@@ -480,7 +490,7 @@ const App: React.FC = () => {
             if (prev && zoneSessions.some(s => s.id === prev.id)) {
               return prev;
             }
-            return zoneSessions[0];
+            return zoneSessions[0] || null;
           });
         }
         return;
@@ -502,7 +512,7 @@ const App: React.FC = () => {
         };
 
         // Scan for all dates where sewadars were registered or handed over by HR Table
-        const pool = customList || (allSewadarsList && allSewadarsList.length > 0 ? allSewadarsList : customSewadars);
+        const pool = customList || (allSewadarsListRef.current && allSewadarsListRef.current.length > 0 ? allSewadarsListRef.current : customSewadarsRef.current);
         pool.forEach(s => {
           const isHrSewadar = s.routedByHrTable || s.group === 'HR Table' || Boolean(s.hrTableData) || s.tag === 'HR Table';
           if (!isHrSewadar) return;
@@ -529,7 +539,12 @@ const App: React.FC = () => {
         );
 
         setAllSessions(hrSessions);
-        setActiveSession(hrSessions[0]);
+        setActiveSession(prev => {
+          if (prev && hrSessions.some(s => s.id === prev.id)) {
+            return prev;
+          }
+          return hrSessions[0] || null;
+        });
         if (isInitial) {
           const savedSessionId = localStorage.getItem(STORAGE_KEY_SESSION_ID);
           const savedSession = hrSessions.find(s => s.id === savedSessionId);
@@ -544,7 +559,7 @@ const App: React.FC = () => {
             if (prev && hrSessions.some(s => s.id === prev.id)) {
               return prev;
             }
-            return hrSessions[0];
+            return hrSessions[0] || null;
           });
         }
         return;
@@ -615,14 +630,20 @@ const App: React.FC = () => {
           || (savedSessionId && deduplicatedSessions.find(s => s.id === savedSessionId))
           || deduplicatedSessions[0] 
           || null;
-        setActiveSession(activeTarget);
+        setActiveSession(prev => {
+          if (prev && activeTarget && prev.id === activeTarget.id) return prev;
+          return activeTarget;
+        });
 
         if (isInitial) {
           const dashboardTarget = (savedSessionId && deduplicatedSessions.find(s => s.id === savedSessionId))
             || activeTarget
             || deduplicatedSessions[0]
             || null;
-          setDashboardSelectedSession(dashboardTarget);
+          setDashboardSelectedSession(prev => {
+            if (prev && dashboardTarget && prev.id === dashboardTarget.id) return prev;
+            return dashboardTarget;
+          });
 
           if (!activeTarget && !dashboardTarget) {
             if (activeVolunteer.role !== 'Super Admin' && !isHrTable) setShowSettingsModal(true);
@@ -656,7 +677,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Fetch Sessions Error:", err);
     }
-  }, [activeVolunteer, allSewadarsList, customSewadars]);
+  }, [activeVolunteer?.id, activeVolunteer?.role, isHrTable]);
 
   const fetchSewadarDetails = useCallback(async () => {
     try {
@@ -973,6 +994,15 @@ const App: React.FC = () => {
         setVehicles(mappedVehicles);
       }
 
+    } catch (err) {
+      console.error("Fetch Data Error:", err);
+    } finally {
+      if (target === 'dashboard') setLoading(false);
+    }
+  }, [calculateFlaggedVehicles]);
+
+  const fetchCustomSewadars = useCallback(async () => {
+    try {
       const customSnapshot = await getDocs(collection(db, 'custom_sewadars'));
       const customData = customSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       if (customData) {
@@ -991,24 +1021,18 @@ const App: React.FC = () => {
           hrTableData: s.hrTableData || undefined
         }));
         setCustomSewadars(mappedCustom);
-        fetchSessions(true, mappedCustom);
-      } else {
-        fetchSessions(true);
       }
-
     } catch (err) {
-      console.error("Fetch Data Error:", err);
-    } finally {
-      if (target === 'dashboard') setLoading(false);
+      console.error("Fetch Custom Sewadars Error:", err);
     }
-  }, [activeVolunteer, calculateFlaggedVehicles, fetchSessions]);
+  }, []);
 
   useEffect(() => {
     const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
     if (isZone) {
       fetchSessions(false);
     }
-  }, [activeVolunteer, customSewadars, fetchSessions]);
+  }, [activeVolunteer?.role, customSewadars.length, fetchSessions]);
 
   useEffect(() => {
     fetchSecurityPhoto();
@@ -1023,20 +1047,25 @@ const App: React.FC = () => {
   }, [activeView]);
 
   useEffect(() => {
-    if (activeVolunteer) {
+    if (activeVolunteer?.id) {
+      fetchCustomSewadars();
       fetchSessions(true);
       fetchSewadarDetails();
       fetchRequirements();
       fetchDeletedSewadars();
     }
-  }, [activeVolunteer, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars]);
+  }, [activeVolunteer?.id, fetchCustomSewadars, fetchSessions, fetchSewadarDetails, fetchRequirements, fetchDeletedSewadars]);
 
   useEffect(() => {
-    fetchData(activeSession, 'active');
+    if (activeSession?.id) {
+      fetchData(activeSession, 'active');
+    }
   }, [activeSession?.id, fetchData]);
 
   useEffect(() => {
-    fetchData(dashboardSelectedSession, 'dashboard');
+    if (dashboardSelectedSession?.id) {
+      fetchData(dashboardSelectedSession, 'dashboard');
+    }
   }, [dashboardSelectedSession?.id, fetchData]);
 
   const generateNumericId = () => {
@@ -1303,6 +1332,8 @@ const App: React.FC = () => {
       handoverDayGroup?: string | null;
       handoverIncharge?: string | null;
       handoverDate?: string | null;
+      filledBy?: string | null;
+      registrationDate?: string | null;
       createdAt?: number;
       updatedAt?: number;
     };
@@ -1330,6 +1361,8 @@ const App: React.FC = () => {
       handoverDayGroup: rawHrData.handoverDayGroup || null,
       handoverIncharge: rawHrData.handoverIncharge || null,
       handoverDate: rawHrData.handoverDate || null,
+      filledBy: rawHrData.filledBy || existing?.hrTableData?.filledBy || null,
+      registrationDate: rawHrData.registrationDate || existing?.hrTableData?.registrationDate || null,
       createdAt: rawHrData.createdAt || existing?.hrTableData?.createdAt || Date.now(),
       updatedAt: Date.now()
     };
@@ -2024,7 +2057,11 @@ const App: React.FC = () => {
             }} 
             onDeleteSewadar={handleDeleteSewadar}
             onEditSewadar={handleEditSewadar}
-            onHandoverSewadar={handleHandoverZoneSewadar}
+            onHandoverSewadar={
+              (isHrTable || activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeSession?.group === 'Punjab')
+                ? handleHandoverZoneSewadar
+                : undefined
+            }
             sessionGroup={activeSession?.group as DutyGroup || null}
           />
         ) : activeView === 'VolunteerDetails' ? (
@@ -2046,7 +2083,12 @@ const App: React.FC = () => {
             onUpdateRequirementStatus={handleUpdateRequirementStatus}
           />
         ) : activeView === 'WeeklyReports' ? (
-          <WeeklyReportsView activeVolunteer={activeVolunteer} />
+          <WeeklyReportsView 
+            activeVolunteer={activeVolunteer} 
+            sewadars={visibleSewadars}
+            allSewadars={allSewadarsList}
+            details={enrichedDetailsMap}
+          />
         ) : activeView === 'WorkshopAttendance' && isWorkshopCoordinator ? (
           <WorkshopAttendanceView 
             allSewadars={allSewadarsList}
@@ -2103,6 +2145,7 @@ const App: React.FC = () => {
             onDeleteSession={handleDeleteSession}
             sewadars={visibleSewadars}
             allSewadars={allSewadarsList}
+            details={enrichedDetailsMap}
           />
         )}
       </main>

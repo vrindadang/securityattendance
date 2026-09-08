@@ -25,6 +25,8 @@ interface HrTableAddSewadarProps {
       handoverDayGroup?: string | null;
       handoverIncharge?: string | null;
       handoverDate?: string | null;
+      filledBy?: string | null;
+      registrationDate?: string | null;
       createdAt?: number;
       updatedAt?: number;
     };
@@ -113,6 +115,57 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
   const [interestedGroups, setInterestedGroups] = useState<string[]>([]);
   const [securityGentsGroups, setSecurityGentsGroups] = useState<string[]>([]);
   const [securityLadiesGroups, setSecurityLadiesGroups] = useState<string[]>([]);
+  const [filledBy, setFilledBy] = useState(activeVolunteer?.name || '');
+
+  // Current date & registration date memos
+  const currentDateStr = useMemo(() => {
+    const today = new Date();
+    return today.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  }, []);
+
+  const todayIsoDate = useMemo(() => {
+    return new Date().toISOString().split('T')[0];
+  }, []);
+
+  const editingSewadar = useMemo(() => {
+    return editingId ? customSewadars.find(s => s.id === editingId) : null;
+  }, [editingId, customSewadars]);
+
+  const displayAddedDate = useMemo(() => {
+    if (editingSewadar) {
+      if (editingSewadar.hrTableData?.registrationDate) {
+        try {
+          const d = new Date(editingSewadar.hrTableData.registrationDate);
+          if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('en-GB', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            });
+          }
+          return editingSewadar.hrTableData.registrationDate;
+        } catch {
+          return editingSewadar.hrTableData.registrationDate;
+        }
+      }
+      if (editingSewadar.hrTableData?.createdAt) {
+        const d = new Date(editingSewadar.hrTableData.createdAt);
+        return d.toLocaleDateString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+      }
+    }
+    return currentDateStr;
+  }, [editingSewadar, currentDateStr]);
 
   // Action states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -248,6 +301,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setInterestedGroups([]);
     setSecurityGentsGroups([]);
     setSecurityLadiesGroups([]);
+    setFilledBy(activeVolunteer?.name || '');
   };
 
   const handleStartEdit = (s: Sewadar) => {
@@ -261,6 +315,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
     setWeeklyOff(s.hrTableData?.weeklyOff || '');
     setSewaDays(s.hrTableData?.sewaDays || []);
     setSelectedOptions(s.hrTableData?.selectedOptions || []);
+    setFilledBy(s.hrTableData?.filledBy || activeVolunteer?.name || '');
 
     const gentsGrp = s.hrTableData?.securityGentsGroups || [];
     const ladiesGrp = s.hrTableData?.securityLadiesGroups || [];
@@ -292,6 +347,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
       const keepHandoverDate = existing?.hrTableData?.handoverDate || null;
 
       const combinedInterestedGroups = Array.from(new Set([...securityGentsGroups, ...securityLadiesGroups]));
+      const defaultVolunteer = activeVolunteer?.name || 'HR Table Admin';
+      const finalFilledBy = filledBy.trim() || existing?.hrTableData?.filledBy || defaultVolunteer;
 
       await onSaveSewadar({
         id: editingId || undefined,
@@ -312,6 +369,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
           handoverDayGroup: keepHandoverGroup,
           handoverIncharge: keepIncharge,
           handoverDate: keepHandoverDate,
+          filledBy: finalFilledBy,
+          registrationDate: existing?.hrTableData?.registrationDate || todayIsoDate,
           createdAt: existing?.hrTableData?.createdAt || Date.now(),
           updatedAt: Date.now()
         }
@@ -360,6 +419,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
           handoverDayGroup: targetDay,
           handoverIncharge: inchargeName,
           handoverDate: todayStr,
+          filledBy: sewadar.hrTableData?.filledBy || null,
+          registrationDate: sewadar.hrTableData?.registrationDate || null,
           createdAt: sewadar.hrTableData?.createdAt || Date.now(),
           updatedAt: Date.now()
         }
@@ -529,6 +590,28 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                 <span className="text-[11px] font-bold text-slate-400">All fields</span>
               </div>
 
+              {/* Registration Date / Current Date Display at Top */}
+              <div className="bg-indigo-50/70 border border-indigo-100/90 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-indigo-900 uppercase tracking-wider block">
+                      {editingId ? 'Volunteer Added On (Registration Date)' : 'Volunteer Registration Date (Today)'}
+                    </span>
+                    <span className="text-sm font-extrabold text-slate-800 block">
+                      {displayAddedDate}
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-white text-indigo-700 text-xs font-black rounded-lg border border-indigo-200/80 shadow-2xs shrink-0">
+                  {editingId ? 'Recorded Date' : 'Current Date'}
+                </span>
+              </div>
+
               {/* Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
@@ -558,7 +641,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                         : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <span>👨</span> Gents
+                    Gents
                   </button>
                   <button
                     type="button"
@@ -569,7 +652,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                         : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <span>👩</span> Ladies
+                    Ladies
                   </button>
                 </div>
               </div>
@@ -762,7 +845,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <div>
                                 <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                                  <span>🗓️</span> Interested Group(s) for {option}
+                                  Interested Group(s) for {option}
                                 </span>
                                 <p className="text-[10px] text-emerald-700/80 font-semibold mt-0.5">
                                   Select which day group they are interested in (separate from handover)
@@ -825,6 +908,23 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                   })}
                 </div>
 
+                {/* Form Filled By Field */}
+                <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    Filled By
+                  </label>
+                  <input
+                    type="text"
+                    value={filledBy}
+                    onChange={e => setFilledBy(e.target.value)}
+                    placeholder="Enter name of volunteer filling this form"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all outline-none text-sm"
+                  />
+                  <p className="text-[11px] font-semibold text-slate-400">
+                    Name of the volunteer filling and submitting this form
+                  </p>
+                </div>
+
                 <button
                   type="button"
                   disabled={isSubmitting || !name.trim()}
@@ -885,7 +985,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                       genderFilter === 'Gents' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
                     }`}
                   >
-                    👨 Gents
+                    Gents
                   </button>
                   <button
                     onClick={() => setGenderFilter('Ladies')}
@@ -893,7 +993,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                       genderFilter === 'Ladies' ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500'
                     }`}
                   >
-                    👩 Ladies
+                    Ladies
                   </button>
                 </div>
 
@@ -903,7 +1003,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                   className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none"
                 >
                   <option value="ALL">All Groups</option>
-                  <option value="HR Table">⏳ Pending Handover</option>
+                  <option value="HR Table">Pending Handover</option>
                   {DAYS_LIST.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
@@ -997,11 +1097,33 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
 
                             {isHandedOver && (
                               <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[10px] font-black flex items-center gap-1 shrink-0">
-                                <span>🤝 Handed over:</span>
+                                <span>Handed over:</span>
                                 <span>{data.handoverDayGroup || s.group} ({data.handoverIncharge})</span>
                               </span>
                             )}
                           </div>
+
+                          {/* Added Date and Volunteer Info */}
+                          {(() => {
+                            const addedDate = data.registrationDate || (data.createdAt ? new Date(data.createdAt).toISOString().split('T')[0] : '');
+                            const volunteerName = data.filledBy || activeVolunteer?.name || 'HR Table Admin';
+                            return (
+                              <div className="flex items-center gap-2 mt-1.5 text-[10px] font-bold text-slate-500 flex-wrap">
+                                {addedDate && (
+                                  <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/80">
+                                    <span>Added:</span>
+                                    <span className="text-slate-800 font-black">{addedDate}</span>
+                                  </span>
+                                )}
+                                {volunteerName && (
+                                  <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/80">
+                                    <span>Added by:</span>
+                                    <span className="text-slate-800 font-black">{volunteerName}</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Handover Button */}
@@ -1186,7 +1308,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                       genderFilter === 'Gents' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
                     }`}
                   >
-                    👨 Gents
+                    Gents
                   </button>
                   <button
                     onClick={() => setGenderFilter('Ladies')}
@@ -1194,7 +1316,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                       genderFilter === 'Ladies' ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500'
                     }`}
                   >
-                    👩 Ladies
+                    Ladies
                   </button>
                 </div>
 
@@ -1288,14 +1410,29 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                               </span>
 
                               <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-black flex items-center gap-1.5 shadow-xs">
-                                <span>👤</span>
                                 <span>Incharge:</span>
                                 <span className="font-extrabold">{data.handoverIncharge}</span>
                               </span>
 
                               {data.handoverDate && (
                                 <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-[10px] font-bold">
-                                  🗓️ {data.handoverDate}
+                                  {data.handoverDate}
+                                </span>
+                              )}
+
+                              {(data.registrationDate || data.createdAt) && (
+                                <span className="px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-bold flex items-center gap-1">
+                                  <span>Added:</span>
+                                  <span className="font-extrabold text-slate-800">
+                                    {data.registrationDate || (data.createdAt ? new Date(data.createdAt).toISOString().split('T')[0] : '')}
+                                  </span>
+                                </span>
+                              )}
+
+                              {(data.filledBy || activeVolunteer?.name || 'HR Table Admin') && (
+                                <span className="px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-bold flex items-center gap-1">
+                                  <span>Added by:</span>
+                                  <span className="font-extrabold text-slate-800">{data.filledBy || activeVolunteer?.name || 'HR Table Admin'}</span>
                                 </span>
                               )}
                             </div>

@@ -4,6 +4,7 @@ import { Sewadar, Volunteer, SewadarDetails } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { GENTS_GROUPS, DAYS_LIST } from '../constants';
+import { SuperAdminReports } from './SuperAdminReports';
 
 interface Props {
   sewadars: Sewadar[];
@@ -366,7 +367,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
 
   return (
     <>
-      <div className="space-y-6 max-w-2xl mx-auto animate-fade-in pb-12">
+      <div className="space-y-6 max-w-4xl mx-auto animate-fade-in pb-12">
         <div className="bg-indigo-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-2xl font-black mb-1">Member Directory</h2>
@@ -376,6 +377,15 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
           </div>
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
         </div>
+
+        {/* Super Admin Deduplicated Roster & Count Reports - Strictly for Super Admin Only */}
+        {isSuperAdmin && (
+          <SuperAdminReports
+            sewadars={sewadars}
+            allSewadars={allSewadars}
+            details={details}
+          />
+        )}
 
         {/* Printable Volunteer Trackers Collection */}
         {visibleDaysToDownload.length > 0 && (

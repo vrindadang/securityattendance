@@ -39,6 +39,8 @@ export interface Sewadar {
     handoverDayGroup?: string | null;
     handoverIncharge?: string | null;
     handoverDate?: string | null;
+    filledBy?: string | null;
+    registrationDate?: string | null;
     createdAt?: number;
     updatedAt?: number;
   };

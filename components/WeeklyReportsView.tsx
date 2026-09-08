@@ -1,17 +1,26 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { WeeklyReport, AttendanceRecord, Issue, VehicleRecord, DutySession, Volunteer, Gender } from '../types';
+import { WeeklyReport, AttendanceRecord, Issue, VehicleRecord, DutySession, Volunteer, Gender, Sewadar, SewadarDetails } from '../types';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, addDoc, orderBy, Timestamp, limit } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { generateTillDatePerformanceReport } from './TillDateReportPDFGenerator';
+import { SuperAdminReports } from './SuperAdminReports';
 
 interface Props {
   activeVolunteer: Volunteer | null;
+  sewadars?: Sewadar[];
+  allSewadars?: Sewadar[];
+  details?: Record<string, SewadarDetails>;
 }
 
-const WeeklyReportsView: React.FC<Props> = ({ activeVolunteer }) => {
+const WeeklyReportsView: React.FC<Props> = ({ 
+  activeVolunteer,
+  sewadars = [],
+  allSewadars = [],
+  details = {}
+}) => {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -415,6 +424,15 @@ const WeeklyReportsView: React.FC<Props> = ({ activeVolunteer }) => {
           </button>
         </div>
       </div>
+
+      {/* Super Admin Deduplicated Master Rosters & Count Reports */}
+      {activeVolunteer?.role === 'Super Admin' && sewadars && sewadars.length > 0 && (
+        <SuperAdminReports
+          sewadars={sewadars}
+          allSewadars={allSewadars}
+          details={details}
+        />
+      )}
 
       {/* Cumulative Till Date Performance Audit Report Card */}
       <div className="bg-gradient-to-r from-[#171e3d] via-[#101b33] to-[#0d1527] p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden border border-indigo-400/20">

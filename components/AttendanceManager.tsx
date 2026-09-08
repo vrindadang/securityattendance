@@ -105,7 +105,15 @@ const AttendanceManager: React.FC<Props> = ({
     return workshopLocation.split(',').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)).join(', ');
   }, [workshopLocation]);
 
-  const isZoneLogin = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+  const isHrTable = activeVolunteer?.assignedGroup === 'HR Table' || 
+                    activeVolunteer?.id === 'admin_hr_table' || 
+                    activeVolunteer?.name === 'HR Table Admin' || 
+                    activeVolunteer?.name?.includes('HR Table');
+
+  const isZoneLogin = activeVolunteer?.role?.includes('Zone') || 
+                      activeVolunteer?.role?.startsWith('Punjab') ||
+                      sessionGroup === 'Punjab';
+  const canShowHandover = (isZoneLogin || isHrTable) && Boolean(onHandoverSewadar);
   const hasConfig = !!workshopLocation || isZoneLogin;
   const isLocked = !hasConfig;
 
@@ -844,8 +852,8 @@ const AttendanceManager: React.FC<Props> = ({
                            )}
                         </div>
 
-                                                {/* Handover To Section for Zone Attendance or Super Admin */}
-                        {(isZoneLogin || Boolean(onHandoverSewadar)) && (
+                        {/* Handover To Section: only visible to HR Table and Punjab Zone */}
+                        {canShowHandover && (
                           <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-3xl p-5 border-2 border-indigo-100 space-y-4">
                             <div className="flex items-center justify-between">
                               <div>

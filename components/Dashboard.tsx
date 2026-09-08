@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession, Notice, Sewadar } from '../types';
+import { AttendanceRecord, Volunteer, Issue, VehicleRecord, Requirement, GroupPhoto, DutySession, Notice, Sewadar, SewadarDetails } from '../types';
 import { VOLUNTEERS, GENTS_GROUPS } from '../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { generateGroupPerformanceReport, generateGentsRawDataReport, generateMultipleGroupOverlapReport } from './GroupReportPDFGenerator';
 import { generateTillDatePerformanceReport } from './TillDateReportPDFGenerator';
+import { SuperAdminReports } from './SuperAdminReports';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -42,6 +43,7 @@ interface Props {
   onDeleteSession?: (id: string) => void;
   sewadars?: Sewadar[];
   allSewadars?: Sewadar[];
+  details?: Record<string, SewadarDetails>;
 }
 
 const Dashboard: React.FC<Props> = ({ 
@@ -70,7 +72,8 @@ const Dashboard: React.FC<Props> = ({
   onDeleteNotice,
   onDeleteSession,
   sewadars = [],
-  allSewadars = []
+  allSewadars = [],
+  details = {}
 }) => {
   const [issueDesc, setIssueDesc] = useState('');
   const [issuePhoto, setIssuePhoto] = useState<string | null>(null);
@@ -1322,6 +1325,15 @@ const Dashboard: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
+      {/* Super Admin Deduplicated Master Rosters & Count Reports */}
+      {isSuperAdmin && (
+        <SuperAdminReports
+          sewadars={sewadars}
+          allSewadars={allSewadars}
+          details={details}
+        />
+      )}
+
       {isZoneLogin ? (
         <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
           <div className="relative z-10">
