@@ -103,13 +103,8 @@ export const PunjabZoneStructure: React.FC<PunjabZoneStructureProps> = ({
         if (districtRaw.toLowerCase() === 'ludhiyana') {
           districtRaw = 'Ludhiana';
         }
-        // Fallback for known IDs in PZ-G-1 to 22 if district not explicitly entered
         let finalDistrict = districtRaw;
-        if (!finalDistrict && s.id.startsWith('PZ-G-')) {
-          const idx = parseInt(s.id.replace('PZ-G-', ''), 10);
-          if (idx <= 22) finalDistrict = 'Pathankot';
-          else finalDistrict = 'Ludhiana';
-        } else if (!finalDistrict) {
+        if (!finalDistrict) {
           finalDistrict = 'Ludhiana';
         } else if (finalDistrict.toLowerCase() === 'ludhiyana') {
           finalDistrict = 'Ludhiana';
@@ -130,10 +125,6 @@ export const PunjabZoneStructure: React.FC<PunjabZoneStructureProps> = ({
     return punjabSewadarsEnriched.filter(m => {
       if (m.sewadar.gender !== 'Gents') return false;
       const d = m.district.toLowerCase();
-      if (m.sewadar.id.startsWith('PZ-G-')) {
-        const idx = parseInt(m.sewadar.id.replace('PZ-G-', ''), 10);
-        if (idx <= 22) return true;
-      }
       return d.includes('pathankot') || d.includes('gurdaspur');
     });
   }, [punjabSewadarsEnriched]);
@@ -142,12 +133,6 @@ export const PunjabZoneStructure: React.FC<PunjabZoneStructureProps> = ({
     return punjabSewadarsEnriched.filter(m => {
       if (m.sewadar.gender !== 'Gents') return false;
       const d = m.district.toLowerCase();
-      if (m.sewadar.id.startsWith('PZ-G-')) {
-        const idx = parseInt(m.sewadar.id.replace('PZ-G-', ''), 10);
-        if (idx > 22) return true;
-        if (idx <= 22) return false;
-      }
-      // For custom added gents, if not pathankot/gurdaspur -> ludhiana branch
       return !(d.includes('pathankot') || d.includes('gurdaspur'));
     });
   }, [punjabSewadarsEnriched]);
