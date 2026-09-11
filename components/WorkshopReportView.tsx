@@ -15,6 +15,7 @@ import {
   clearStoredTestData
 } from '../workshopTestUtils';
 import { getWorkshopTeam, isWorkshopDate } from './WorkshopAttendanceView';
+import { formatTimeToAMPM } from '../utils/timeUtils';
 
 interface WorkshopReportViewProps {
   allSewadars: Sewadar[];
@@ -781,7 +782,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
               `#${idx + 1}`,
               m.name,
               m.shift || '-',
-              m.inTime || '—',
+              formatTimeToAMPM(m.inTime),
               m.attendancePoints === 100
                 ? 'Early (100 pts)'
                 : m.attendancePoints === 50

@@ -9,6 +9,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { generateGroupPerformanceReport, generateGentsRawDataReport, generateMultipleGroupOverlapReport } from './GroupReportPDFGenerator';
 import { generateTillDatePerformanceReport } from './TillDateReportPDFGenerator';
 import { SuperAdminReports } from './SuperAdminReports';
+import { formatTimeToAMPM } from '../utils/timeUtils';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -376,8 +377,8 @@ const Dashboard: React.FC<Props> = ({
             (sNo + 1).toString(),
             formattedDate,
             r.group,
-            r.inTime,
-            r.outTime,
+            formatTimeToAMPM(r.inTime),
+            formatTimeToAMPM(r.outTime),
             formatMinutesHelper(r.durationMinutes)
           ];
         });
@@ -567,7 +568,7 @@ const Dashboard: React.FC<Props> = ({
     if (!iso) return '-';
     const d = new Date(iso);
     const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '/');
-    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     return `${date} ${time}`;
   };
 
@@ -709,7 +710,7 @@ const Dashboard: React.FC<Props> = ({
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`,
           14,
           287
         );
@@ -843,7 +844,7 @@ const Dashboard: React.FC<Props> = ({
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`,
           14,
           287
         );
@@ -1179,7 +1180,7 @@ const Dashboard: React.FC<Props> = ({
         head: [['#', 'Description', 'Time', 'Reported By']],
         body: issues.map((issue, idx) => [
           idx + 1, issue.description,
-          new Date(issue.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          new Date(issue.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
           issue.volunteerName
         ]),
         headStyles: { fillColor: [180, 50, 50], textColor: 255, fontStyle: 'bold' },
@@ -1206,7 +1207,7 @@ const Dashboard: React.FC<Props> = ({
         head: [['#', 'Plate Number', 'Type', 'Model', 'Observation', 'Time']],
         body: vehicles.map((v, idx) => [
           idx + 1, v.plateNumber, v.type, v.model || '-', v.remarks || '-',
-          new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          new Date(v.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
         ]),
         headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold' },
         bodyStyles: { fontSize: 8.5 },
@@ -1232,7 +1233,7 @@ const Dashboard: React.FC<Props> = ({
         try {
           doc.addImage(gp.photo, 'JPEG', photoX, currentY, photoW, photoH);
           doc.setFontSize(7); doc.setFont("helvetica", "italic"); doc.setTextColor(100, 100, 100);
-          doc.text(`Photo by ${gp.volunteerName} - ${new Date(gp.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`, photoX, currentY + photoH + 4);
+          doc.text(`Photo by ${gp.volunteerName} - ${new Date(gp.timestamp).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true})}`, photoX, currentY + photoH + 4);
         } catch (e) { console.error("PDF Image Error", e); }
         photoX += photoW + gap;
       });
@@ -1271,10 +1272,26 @@ const Dashboard: React.FC<Props> = ({
       head: [['#', 'Name', 'In', 'Out', 'Dur', 'Location', 'Spot', 'Verified By', 'Status']],
       body: sortedAttendance.map((a, i) => {
         const verifier = VOLUNTEERS.find(v => v.id === a.volunteerId)?.name || 'Incharge';
-        return [i + 1, a.name, a.inTime || '-', a.outTime || '-', calculateDuration(a.inTime, a.outTime), a.workshopLocation || '-', a.sewaPoint || '-', verifier, ''];
+        return [
+          i + 1,
+          a.name,
+          formatTimeToAMPM(a.inTime),
+          formatTimeToAMPM(a.outTime),
+          calculateDuration(a.inTime, a.outTime),
+          a.workshopLocation || '-',
+          a.sewaPoint || '-',
+          verifier,
+          ''
+        ];
       }),
       headStyles: { fillColor: [50, 60, 120], textColor: 255, fontSize: 8, halign: 'center' },
-      columnStyles: { 0: { halign: 'center' }, 8: { halign: 'center', cellWidth: 15 } },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 10 },
+        2: { halign: 'center', cellWidth: 20 },
+        3: { halign: 'center', cellWidth: 20 },
+        4: { halign: 'center', cellWidth: 16 },
+        8: { halign: 'center', cellWidth: 15 }
+      },
       bodyStyles: { fontSize: 7.5 },
       theme: 'grid',
       didDrawCell: (data) => {
