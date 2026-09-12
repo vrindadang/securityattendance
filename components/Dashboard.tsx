@@ -91,6 +91,7 @@ const Dashboard: React.FC<Props> = ({
   const [overlapProgress, setOverlapProgress] = useState('');
   const [downloadingTillDate, setDownloadingTillDate] = useState<'Gents' | 'Ladies' | 'Combined' | null>(null);
   const [tillDateProgress, setTillDateProgress] = useState('');
+  const [whatsAppNotice, setWhatsAppNotice] = useState<string | null>(null);
 
   const handleDownloadTillDate = async (gender: 'Gents' | 'Ladies' | 'Combined') => {
     if (downloadingTillDate) return;
@@ -1316,6 +1317,190 @@ const Dashboard: React.FC<Props> = ({
     doc.save(`SKRM_Security_Report_${groupName}_${dateDisplay.replace(/\//g, '-')}.pdf`);
   };
 
+  const buildWhatsAppDutySummary = (): string => {
+    const currentSession = allSessions.find(s => s.id === selectedSessionId) || allSessions[0];
+    
+    // Robust date resolution so the date of the report is always present
+    const rawDate = 
+      (currentSession?.date && typeof currentSession.date === 'string' && currentSession.date.trim() !== '' && currentSession.date !== '-') 
+        ? currentSession.date 
+        : (attendance.find(a => a.date && typeof a.date === 'string' && a.date.trim() !== '')?.date
+           || (allSessions.length > 0 && allSessions[0]?.date)
+           || new Date().toISOString().split('T')[0]);
+
+    const formatReportDate = (dateStr: string): string => {
+      if (!dateStr) return '';
+      if (dateStr.includes('-')) {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          const year = parts[0];
+          const monthNum = parseInt(parts[1], 10);
+          const day = parts[2].padStart(2, '0');
+          const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+          ];
+          const monthName = monthNames[monthNum - 1] || parts[1];
+          return `${day}/${monthName}/${year}`;
+        }
+      } else if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3 && parts[2].length === 4) {
+          const day = parts[0].padStart(2, '0');
+          const monthNum = parseInt(parts[1], 10);
+          const year = parts[2];
+          const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+          ];
+          const monthName = (!isNaN(monthNum) && monthNames[monthNum - 1]) ? monthNames[monthNum - 1] : parts[1];
+          return `${day}/${monthName}/${year}`;
+        }
+      }
+      return dateStr;
+    };
+
+    const dateDisplay = formatReportDate(rawDate);
+    const groupName = activeVolunteer?.assignedGroup || 'Security';
+    const isLadies = activeVolunteer?.role?.includes('Ladies');
+    const reportingGroupName = isLadies ? 'Ladies' : `${groupName} Gents`;
+    const cleanLocation = (currentSession?.location && currentSession.location !== 'General Ashram')
+      ? currentSession.location.replace(/^\[|\]$/g, '').trim()
+      : 'Kirpal Ashram, Kirpal Bagh';
+    const inchargeName = activeVolunteer?.name || 'Incharge';
+
+    const totalSewadarsOnDuty = new Set(attendance.map(a => a.sewadarId)).size;
+
+    // Shift Logic in minutes (exact same as PDF report)
+    const MOR_S = 7 * 60;
+    const MOR_E = 13 * 60;
+    const DAY_S = 13 * 60; 
+    const DAY_E = 19 * 60;
+    const EVE_S = 19 * 60;
+    const EVE_E = 2 * 60;
+    const NIT_S = 2 * 60;
+    const NIT_E = 7 * 60;
+
+    const timeToMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const shiftCounts = { 
+      Morning: { total: new Set<string>() }, 
+      Day: { total: new Set<string>() }, 
+      Evening: { total: new Set<string>() }, 
+      Night: { total: new Set<string>() } 
+    };
+
+    attendance.forEach(a => {
+      if (a.inTime) {
+        const start = timeToMins(a.inTime);
+        const end = a.outTime ? timeToMins(a.outTime) : (start + 1);
+        const intervals: [number, number][] = [];
+        if (end < start) { intervals.push([start, 1440]); intervals.push([0, end]); }
+        else { intervals.push([start, end]); }
+
+        const shifts = [
+          { name: 'Morning' as const, s: MOR_S, e: MOR_E },
+          { name: 'Day' as const, s: DAY_S, e: DAY_E },
+          { name: 'Evening' as const, s: EVE_S, e: 1440, wrap: EVE_E },
+          { name: 'Night' as const, s: NIT_S, e: NIT_E }
+        ];
+
+        shifts.forEach(shift => {
+          let overlap = 0;
+          intervals.forEach(([is, ie]) => {
+            if (shift.wrap !== undefined) {
+              overlap += Math.max(0, Math.min(ie, 1440) - Math.max(is, shift.s));
+              overlap += Math.max(0, Math.min(ie, shift.wrap) - Math.max(is, 0));
+            } else {
+              overlap += Math.max(0, Math.min(ie, shift.e) - Math.max(is, shift.s));
+            }
+          });
+
+          if (overlap > 0) {
+            shiftCounts[shift.name].total.add(a.sewadarId);
+          }
+        });
+      }
+    });
+
+    const sewadarShiftAppearance: Record<string, number> = {};
+    (['Morning', 'Day', 'Evening', 'Night'] as const).forEach(shiftName => {
+      shiftCounts[shiftName].total.forEach(sewadarId => {
+        sewadarShiftAppearance[sewadarId] = (sewadarShiftAppearance[sewadarId] || 0) + 1;
+      });
+    });
+    const doubleShiftSewadarsCount = Object.values(sewadarShiftAppearance).filter(c => c > 1).length;
+
+    const incidentsText = issues.length === 0
+      ? 'No incident to be reported'
+      : `${issues.length} incident(s) reported`;
+
+    return `With the blessings of H.H. Sant Rajinder Singh Ji Maharaj
+
+*SKRM Security Sewa – Daily Duty Summary*
+${dateDisplay} - ${reportingGroupName}
+[${cleanLocation}]
+
+*Total Sewadars on Duty:* ${totalSewadarsOnDuty}
+
+*Shift-wise Count:*
+Morning (7 AM–1 PM): ${shiftCounts.Morning.total.size}
+Day (1 PM–7 PM): ${shiftCounts.Day.total.size}
+Evening (7 PM–2 AM): ${shiftCounts.Evening.total.size}
+Night (2 AM–7 AM): ${shiftCounts.Night.total.size}
+
+*Double Shift Sewadars:* ${doubleShiftSewadarsCount} sewadars covered more than one shift today
+
+*Incidents Reported:* ${incidentsText}
+
+Regards,
+${inchargeName}`;
+  };
+
+  const handleSendWhatsAppSummary = async () => {
+    const summaryText = buildWhatsAppDutySummary();
+
+    // 1. Copy that text to the clipboard
+    let copied = false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(summaryText);
+        copied = true;
+      }
+    } catch (_) {
+      // Fallback below
+    }
+
+    if (!copied) {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = summaryText;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        copied = true;
+      } catch (_) {}
+    }
+
+    // 2. Show brief on-screen confirmation
+    setWhatsAppNotice("Summary copied — opening WhatsApp");
+    setTimeout(() => {
+      setWhatsAppNotice(null);
+    }, 4000);
+
+    // 3. Open WhatsApp's share link (wa.me) with that same text pre-filled
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(summaryText)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1403,9 +1588,18 @@ const Dashboard: React.FC<Props> = ({
               Shift Record
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 relative z-10">
+          <div className="flex flex-wrap items-center gap-2 relative z-10">
             <button onClick={onOpenSettings} className="bg-slate-800/50 border border-white/10 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95">Change Session</button>
             <button onClick={generateAttendancePDF} className="bg-indigo-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-400 transition-all active:scale-95">Download PDF</button>
+            <button 
+              onClick={handleSendWhatsAppSummary} 
+              className="bg-emerald-600 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-500 transition-all active:scale-95 flex items-center gap-2 text-white"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+              </svg>
+              <span>Send to WhatsApp</span>
+            </button>
           </div>
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
         </div>
@@ -2250,6 +2444,16 @@ const Dashboard: React.FC<Props> = ({
                 <button onClick={handleReportIssueSubmit} className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-red-200 active:scale-95 transition-all">Confirm Report</button>
              </div>
           </div>
+        </div>
+      )}
+
+      {/* Brief On-Screen Confirmation for WhatsApp Summary */}
+      {whatsAppNotice && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-slate-900/95 border border-emerald-500/50 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md animate-fade-in">
+          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
+            ✓
+          </div>
+          <span className="text-xs font-bold tracking-wide">{whatsAppNotice}</span>
         </div>
       )}
     </div>
