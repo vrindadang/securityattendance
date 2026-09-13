@@ -825,7 +825,28 @@ export const UP_ZONE_GENTS_RAW: RawPunjabSewadar[] = [
   { name: "Manoj Kumar", dob: "", phone: "6306141301", district: "Rampur" },
   { name: "Sunil Kumar", dob: "", phone: "9720139151", district: "Rampur" },
   { name: "Manohar Lal", dob: "", phone: "9536870738", district: "Rampur" },
-  { name: "Bharatpal Singh", dob: "", phone: "8474938715", district: "Rampur" }
+  { name: "Bharatpal Singh", dob: "", phone: "8474938715", district: "Rampur" },
+  { name: "Suresh Kumar Dhyani", age: 73, dob: "1953-11-28", phone: "9837283270", district: "Meerut" },
+  { name: "Chhadda Singh Pal", age: 91, dob: "1935-11-23", phone: "9756075866", district: "Meerut" },
+  { name: "Mamchand Pal", age: 69, dob: "1957-07-14", phone: "8923623991", district: "Meerut" },
+  { name: "Vijay Pal Sharma", age: 61, dob: "1965-04-05", phone: "9412201378", district: "Meerut" },
+  { name: "Kalesh Chand Sharma", age: 68, dob: "1958-03-26", phone: "9758709587", district: "Meerut" },
+  { name: "Jag Mohan Khurana", age: 58, dob: "1968-06-25", phone: "7520452101", district: "Meerut" },
+  { name: "Ashok Kumar Marwah", age: 67, dob: "1959-07-11", phone: "9837446652", district: "Meerut" },
+  { name: "Rajveer Singh", age: 58, dob: "1968-09-17", phone: "8923638272", district: "Meerut" },
+  { name: "Bhopal Singh", age: 70, dob: "1956-01-01", phone: "9012998174", district: "Meerut" },
+  { name: "Yougendra Pal", age: 54, dob: "1972-08-03", phone: "7952070820", district: "Meerut" },
+  { name: "Ghyan Prakash", age: 56, dob: "1970-03-11", phone: "8171055784", district: "Meerut" },
+  { name: "Bharat Arora", age: 45, dob: "1981-11-29", phone: "7579338461", district: "Meerut" },
+  { name: "Shri Devraj", dob: "", phone: "9917554248", district: "Hapur" },
+  { name: "Shri Mehar Singh", dob: "", phone: "9917185816", district: "Hapur" },
+  { name: "Shri Santosh Kumar", dob: "", phone: "9634048606", district: "Hapur" },
+  { name: "Shri Banwari Lal", dob: "", phone: "8859479570", district: "Hapur" },
+  { name: "Shri Daya Ram", dob: "", phone: "8755683845", district: "Hapur" },
+  { name: "Shri Rohit Kumar", dob: "", phone: "", district: "Hapur" },
+  { name: "Shri Atul Kumar", dob: "", phone: "9012378233", district: "Hapur" },
+  { name: "Shri Shobhit Kumar", dob: "", phone: "9457283462", district: "Hapur" },
+  { name: "Shri Manoj Kumar", dob: "", phone: "8178349292", district: "Hapur" }
 ];
 
 export const UP_ZONE_LADIES_RAW: RawPunjabSewadar[] = [
@@ -866,7 +887,14 @@ export const UP_ZONE_LADIES_RAW: RawPunjabSewadar[] = [
   { name: "Reena", dob: "", phone: "", district: "Rampur" },
   { name: "Mithilesh Devi", dob: "", phone: "7351449549", district: "Rampur" },
   { name: "Anita Devi", dob: "", phone: "9761418503", district: "Rampur" },
-  { name: "Rekha Rani", dob: "", phone: "9259879203", district: "Rampur" }
+  { name: "Rekha Rani", dob: "", phone: "9259879203", district: "Rampur" },
+  { name: "Smt. Saroj Devi", dob: "", phone: "9634077900", district: "Hapur" },
+  { name: "Smt. Lata Devi", dob: "", phone: "", district: "Hapur" },
+  { name: "Smt. Prabha Devi", dob: "", phone: "8510053131", district: "Hapur" },
+  { name: "Smt. Uma Devi", dob: "", phone: "8178349292", district: "Hapur" },
+  { name: "Smt. Bala Devi", dob: "", phone: "9691817171", district: "Hapur" },
+  { name: "Smt. Meena Devi", dob: "", phone: "9457330636", district: "Hapur" },
+  { name: "Smt. Indra Devi", dob: "", phone: "7302272014", district: "Hapur" }
 ];
 
 interface RawDetail {
