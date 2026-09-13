@@ -435,15 +435,22 @@ const Dashboard: React.FC<Props> = ({
     activeVolunteer?.role?.includes('Zone') || 
     activeVolunteer?.role?.startsWith('Punjab') || 
     activeVolunteer?.role?.startsWith('Uttar Pradesh') ||
+    activeVolunteer?.role?.startsWith('Other Zones') ||
     activeVolunteer?.assignedGroup === 'Punjab' ||
-    activeVolunteer?.assignedGroup === 'Uttar Pradesh'
+    activeVolunteer?.assignedGroup === 'Uttar Pradesh' ||
+    activeVolunteer?.assignedGroup === 'Other Zones'
+  );
+  const isOtherZones = Boolean(
+    activeVolunteer?.role?.includes('Other Zones') || 
+    activeVolunteer?.name?.includes('Other Zones') || 
+    activeVolunteer?.assignedGroup === 'Other Zones'
   );
   const isUttarPradeshZone = Boolean(
     activeVolunteer?.role?.includes('Uttar Pradesh') || 
     activeVolunteer?.name?.includes('Uttar Pradesh') || 
     activeVolunteer?.assignedGroup === 'Uttar Pradesh'
   );
-  const zoneName = isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab';
+  const zoneName = isOtherZones ? 'Other Zones' : (isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab');
   const isLadiesZone = Boolean(activeVolunteer?.role?.includes('Ladies') || activeVolunteer?.name?.includes('Ladies'));
   const zoneTargetGender = isLadiesZone ? 'Ladies' : 'Gents';
   const zoneGroup = isLadiesZone ? `${zoneName} Zone Ladies` : zoneName;
@@ -547,7 +554,7 @@ const Dashboard: React.FC<Props> = ({
         s.originZone === `${zoneName} Zone` || 
         s.tag === `${zoneName} Zone` || 
         s.routedByZone || 
-        (isUttarPradeshZone ? s.id?.startsWith('UPZ-') : s.id?.startsWith('PZ-'));
+        (isOtherZones ? s.id?.startsWith('OZ-') : (isUttarPradeshZone ? s.id?.startsWith('UPZ-') : s.id?.startsWith('PZ-')));
       if (!isMatchZone) return;
 
       const hasHandover = Boolean(s.hrTableData?.handoverIncharge) && 

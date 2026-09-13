@@ -182,17 +182,26 @@ const App: React.FC = () => {
       
       const matchGender = isLadies ? s.gender === 'Ladies' : s.gender === 'Gents';
 
-      const isZone = activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role.startsWith('Uttar Pradesh');
+      const isZone = activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role.startsWith('Uttar Pradesh') || activeVolunteer.role.startsWith('Other Zones');
       if (isZone) {
-        const isUttarPradesh = activeVolunteer.role.includes('Uttar Pradesh') || activeVolunteer.name?.includes('Uttar Pradesh') || Boolean(activeVolunteer.assignedGroup?.includes('Uttar Pradesh'));
-        const targetZoneName = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
+        const isOtherZones = Boolean(
+          activeVolunteer.role.includes('Other Zones') || 
+          activeVolunteer.name?.includes('Other Zones') || 
+          activeVolunteer.assignedGroup?.includes('Other Zones')
+        );
+        const isUttarPradesh = Boolean(
+          activeVolunteer.role.includes('Uttar Pradesh') || 
+          activeVolunteer.name?.includes('Uttar Pradesh') || 
+          activeVolunteer.assignedGroup?.includes('Uttar Pradesh')
+        );
+        const targetZoneName = isOtherZones ? 'Other Zones' : (isUttarPradesh ? 'Uttar Pradesh' : 'Punjab');
         const targetZoneLadies = `${targetZoneName} Zone Ladies`;
 
         const isMatchZoneSewadar = s.group === targetZoneName || 
           s.group === targetZoneLadies || 
           s.originZone === `${targetZoneName} Zone` || 
           s.tag === `${targetZoneName} Zone` || 
-          (isUttarPradesh ? s.id.startsWith('UPZ-') : s.id.startsWith('PZ-')) ||
+          (isOtherZones ? s.id.startsWith('OZ-') : (isUttarPradesh ? s.id.startsWith('UPZ-') : s.id.startsWith('PZ-'))) ||
           (s.routedByZone && (s.originZone === `${targetZoneName} Zone` || s.tag === `${targetZoneName} Zone`));
 
         return matchGender && (isMatchZoneSewadar || isMarked);
@@ -420,15 +429,22 @@ const App: React.FC = () => {
       const isZone = activeVolunteer.role?.includes('Zone') || 
         activeVolunteer.role?.startsWith('Punjab') || 
         activeVolunteer.role?.startsWith('Uttar Pradesh') ||
+        activeVolunteer.role?.startsWith('Other Zones') ||
         activeVolunteer.assignedGroup === 'Punjab' ||
-        activeVolunteer.assignedGroup === 'Uttar Pradesh';
+        activeVolunteer.assignedGroup === 'Uttar Pradesh' ||
+        activeVolunteer.assignedGroup === 'Other Zones';
       if (isZone) {
+        const isOtherZones = Boolean(
+          activeVolunteer.role?.includes('Other Zones') || 
+          activeVolunteer.name?.includes('Other Zones') || 
+          activeVolunteer.assignedGroup?.includes('Other Zones')
+        );
         const isUttarPradesh = Boolean(
           activeVolunteer.role?.includes('Uttar Pradesh') || 
           activeVolunteer.name?.includes('Uttar Pradesh') || 
           activeVolunteer.assignedGroup === 'Uttar Pradesh'
         );
-        const targetZoneName = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
+        const targetZoneName = isOtherZones ? 'Other Zones' : (isUttarPradesh ? 'Uttar Pradesh' : 'Punjab');
         const isLadiesZone = Boolean(activeVolunteer.role?.includes('Ladies') || activeVolunteer.name?.includes('Ladies'));
         const zoneGroup = isLadiesZone ? `${targetZoneName} Zone Ladies` : targetZoneName;
         const zoneGender = isLadiesZone ? 'Ladies' : 'Gents';
@@ -456,7 +472,7 @@ const App: React.FC = () => {
             s.originZone === `${targetZoneName} Zone` || 
             s.tag === `${targetZoneName} Zone` || 
             s.routedByZone || 
-            (isUttarPradesh ? s.id?.startsWith('UPZ-') : s.id?.startsWith('PZ-'));
+            (isOtherZones ? s.id?.startsWith('OZ-') : (isUttarPradesh ? s.id?.startsWith('UPZ-') : s.id?.startsWith('PZ-')));
           if (!isMatchZoneSewadar) return;
 
           const hasHandover = Boolean(s.hrTableData?.handoverIncharge) && 
@@ -1043,7 +1059,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh') || activeVolunteer?.role?.startsWith('Other Zones');
     if (isZone) {
       fetchSessions(false);
     }
@@ -1088,11 +1104,12 @@ const App: React.FC = () => {
   };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
-    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh') || activeVolunteer?.role?.startsWith('Other Zones');
     let session = activeSession;
     if (!session && isZone) {
+      const isOtherZones = activeVolunteer?.role?.includes('Other Zones') || activeVolunteer?.name?.includes('Other Zones') || Boolean(activeVolunteer?.assignedGroup?.includes('Other Zones'));
       const isUttarPradesh = activeVolunteer?.role?.includes('Uttar Pradesh') || activeVolunteer?.name?.includes('Uttar Pradesh') || Boolean(activeVolunteer?.assignedGroup?.includes('Uttar Pradesh'));
-      const defaultGroup = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
+      const defaultGroup = isOtherZones ? 'Other Zones' : (isUttarPradesh ? 'Uttar Pradesh' : 'Punjab');
       const todayStr = new Date().toISOString().split('T')[0];
       session = {
         id: `zone-${activeVolunteer?.assignedGroup || defaultGroup}-${todayStr}`,
@@ -1234,7 +1251,7 @@ const App: React.FC = () => {
     g: Gender,
     grp: DutyGroup,
     shift?: 'DAY' | 'NIGHT',
-    details?: { dob: string; phone: string; address: string },
+    details?: { dob?: string; phone?: string; address?: string; age?: number; district?: string },
     isRestored?: boolean
   ) => {
     const newSewadar = {
@@ -1257,10 +1274,11 @@ const App: React.FC = () => {
       if (details) {
         await handleSaveSewadarDetails({
           sewadar_id: newSewadar.id,
-          dob: details.dob,
-          phone: details.phone,
-          address: details.address,
-          district: details.address
+          dob: details.dob || '',
+          phone: details.phone || '',
+          address: details.address || '',
+          age: details.age,
+          district: details.district || details.address || ''
         }, newSewadar.name);
       }
       setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);
@@ -1458,6 +1476,14 @@ const App: React.FC = () => {
   };
 
   const handleHandoverZoneSewadar = async (sewadar: Sewadar, targetDay: string, inchargeName: string) => {
+    const isOtherZones = Boolean(
+      activeVolunteer?.role?.includes('Other Zones') || 
+      activeVolunteer?.name?.includes('Other Zones') || 
+      activeVolunteer?.assignedGroup === 'Other Zones' ||
+      activeVolunteer?.assignedGroup === 'Other Zones Zone Ladies' ||
+      activeSession?.group === 'Other Zones' ||
+      activeSession?.group === 'Other Zones Zone Ladies'
+    );
     const isUttarPradesh = Boolean(
       activeVolunteer?.role?.includes('Uttar Pradesh') || 
       activeVolunteer?.name?.includes('Uttar Pradesh') || 
@@ -1465,7 +1491,7 @@ const App: React.FC = () => {
       activeSession?.group === 'Uttar Pradesh' ||
       activeSession?.group === 'Uttar Pradesh Zone Ladies'
     );
-    const zoneName = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
+    const zoneName = isOtherZones ? 'Other Zones' : (isUttarPradesh ? 'Uttar Pradesh' : 'Punjab');
     const zoneTag = sewadar.originZone || sewadar.tag || `${zoneName} Zone`;
     const todayStr = activeSession?.date || new Date().toISOString().split('T')[0];
     const sanitizedHrData = {
@@ -1810,7 +1836,7 @@ const App: React.FC = () => {
     } else {
       localStorage.removeItem(STORAGE_KEY_SESSION_ID);
     }
-    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh') || activeVolunteer?.role?.startsWith('Other Zones');
     if (!isZone) {
       setActiveView('Attendance');
     }
@@ -1917,7 +1943,7 @@ const App: React.FC = () => {
         </div>
       ) : (
         <>
-          {showSettingsModal && !isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh') && (
+          {showSettingsModal && !isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh') && !activeVolunteer?.role?.startsWith('Other Zones') && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
               <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
                 <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
@@ -2077,14 +2103,14 @@ const App: React.FC = () => {
             dutyEndTime={activeSession?.end_time || ''} 
             isCompleted={!!activeSession?.completed} 
             onChangeLocation={() => {
-              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh')) {
+              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh') && !activeVolunteer?.role?.startsWith('Other Zones')) {
                 setShowSettingsModal(true);
               }
             }} 
             onDeleteSewadar={handleDeleteSewadar}
             onEditSewadar={handleEditSewadar}
             onHandoverSewadar={
-              (isHrTable || activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh') || activeSession?.group === 'Punjab' || activeSession?.group === 'Uttar Pradesh')
+              (isHrTable || activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh') || activeVolunteer?.role?.startsWith('Other Zones') || activeSession?.group === 'Punjab' || activeSession?.group === 'Uttar Pradesh' || activeSession?.group === 'Other Zones')
                 ? handleHandoverZoneSewadar
                 : undefined
             }
@@ -2158,7 +2184,7 @@ const App: React.FC = () => {
             dutyStartTime={dashboardSelectedSession?.start_time || ''} 
             dutyEndTime={dashboardSelectedSession?.end_time || ''} 
             onOpenSettings={() => {
-              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh')) {
+              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh') && !activeVolunteer?.role?.startsWith('Other Zones')) {
                 setShowSettingsModal(true);
               }
             }} 
@@ -2194,7 +2220,7 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
               </svg>
               <span className="text-[8px] font-black uppercase">
-                {(activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role.startsWith('Uttar Pradesh')) ? 'Sewadars' : 'Mark Sewa'}
+                {(activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role.startsWith('Uttar Pradesh') || activeVolunteer.role.startsWith('Other Zones')) ? 'Sewadars' : 'Mark Sewa'}
               </span>
             </button>
           )}

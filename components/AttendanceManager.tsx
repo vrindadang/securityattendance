@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle } from '../types';
+import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle, SewadarDetails } from '../types';
 import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday, normalizeName, DAYS_LIST, GENTS_INCHARGES, LADIES_INCHARGES } from '../constants';
 
 interface Props {
@@ -8,9 +8,10 @@ interface Props {
   attendance: AttendanceRecord[];
   vehicles: VehicleRecord[];
   flaggedVehicles?: FlaggedVehicle[];
+  details?: Record<string, SewadarDetails>;
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
-  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob: string, phone: string, address: string }, isRestored?: boolean) => void;
+  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob?: string; phone?: string; address?: string; age?: number; district?: string }, isRestored?: boolean) => void;
   onDeleteSewadar?: (id: string) => void;
   onEditSewadar?: (id: string, newName: string) => void;
   onHandoverSewadar?: (sewadar: Sewadar, targetDay: string, inchargeName: string) => Promise<void> | void;
@@ -29,6 +30,7 @@ const AttendanceManager: React.FC<Props> = ({
   attendance, 
   vehicles = [],
   flaggedVehicles = [],
+  details = {},
   onSaveAttendance, 
   onSaveVehicle,
   onAddSewadar, 
@@ -77,7 +79,9 @@ const AttendanceManager: React.FC<Props> = ({
   );
   const [newShift, setNewShift] = useState<'DAY' | 'NIGHT' | undefined>(undefined);
   const [newDob, setNewDob] = useState('');
+  const [newAge, setNewAge] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newDistrict, setNewDistrict] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [restorePrompt, setRestorePrompt] = useState<{
@@ -85,7 +89,7 @@ const AttendanceManager: React.FC<Props> = ({
     gender: Gender;
     group: DutyGroup;
     shift?: 'DAY' | 'NIGHT';
-    details: { dob: string; phone: string; address: string };
+    details: { dob?: string; phone?: string; address?: string; age?: number; district?: string };
   } | null>(null);
 
   // Vehicle Form state
@@ -113,18 +117,91 @@ const AttendanceManager: React.FC<Props> = ({
   const isZoneLogin = activeVolunteer?.role?.includes('Zone') || 
                       activeVolunteer?.role?.startsWith('Punjab') ||
                       activeVolunteer?.role?.startsWith('Uttar Pradesh') ||
+                      activeVolunteer?.role?.startsWith('Other Zones') ||
                       sessionGroup === 'Punjab' ||
-                      sessionGroup === 'Uttar Pradesh';
+                      sessionGroup === 'Uttar Pradesh' ||
+                      sessionGroup === 'Other Zones';
+
+  const isOtherZones = activeVolunteer?.role?.includes('Other Zones') ||
+                       activeVolunteer?.name?.includes('Other Zones') ||
+                       activeVolunteer?.assignedGroup === 'Other Zones' ||
+                       sessionGroup === 'Other Zones';
 
   const isUttarPradeshZone = activeVolunteer?.role?.includes('Uttar Pradesh') ||
                              activeVolunteer?.name?.includes('Uttar Pradesh') ||
                              activeVolunteer?.assignedGroup === 'Uttar Pradesh' ||
                              sessionGroup === 'Uttar Pradesh';
 
-  const currentZoneName = isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab';
+  const currentZoneName = isOtherZones ? 'Other Zones' : (isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab');
   const canShowHandover = (isZoneLogin || isHrTable) && Boolean(onHandoverSewadar);
   const hasConfig = !!workshopLocation || isZoneLogin;
   const isLocked = !hasConfig;
+
+  const zoneDistricts = useMemo(() => {
+    if (isUttarPradeshZone) {
+      return ['Rampur', 'Meerut', 'Hapur', 'Moradabad', 'Bareilly'];
+    }
+    if (isOtherZones) {
+      return ['Delhi', 'Haryana', 'Rajasthan', 'Himachal Pradesh', 'Uttarakhand'];
+    }
+    if (isZoneLogin) {
+      return ['Ludhiana', 'Pathankot', 'Jagraon', 'Amritsar', 'Jalandhar'];
+    }
+    return ['Ludhiana', 'Pathankot', 'Rampur', 'Meerut', 'Hapur', 'Moradabad'];
+  }, [isUttarPradeshZone, isOtherZones, isZoneLogin]);
+
+  const allDistrictList = useMemo(() => {
+    return [
+      'Ludhiana', 'Pathankot', 'Jagraon', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali',
+      'Rampur', 'Meerut', 'Hapur', 'Moradabad', 'Bareilly', 'Ghaziabad', 'Noida', 'Saharanpur', 'Muzaffarnagar',
+      'Delhi', 'Haryana', 'Rajasthan', 'Himachal Pradesh', 'Uttarakhand', 'Jammu & Kashmir'
+    ];
+  }, []);
+
+  const handleDobChange = (dobVal: string) => {
+    setNewDob(dobVal);
+    if (dobVal) {
+      const yr = parseInt(dobVal.split('-')[0], 10);
+      if (!isNaN(yr) && yr > 1900 && yr <= 2026) {
+        setNewAge(String(2026 - yr));
+      }
+    }
+  };
+
+  const handleAgeChange = (ageVal: string) => {
+    setNewAge(ageVal);
+    const num = parseInt(ageVal, 10);
+    if (!isNaN(num) && num > 0 && num < 120 && !newDob) {
+      setNewDob(`${2026 - num}-01-01`);
+    }
+  };
+
+  const handleOpenAddModal = () => {
+    setDuplicateError(null);
+    setNewName('');
+    setNewDob('');
+    setNewAge('');
+    setNewPhone('');
+    setNewAddress('');
+    
+    if (isUttarPradeshZone) {
+      setNewDistrict('Rampur');
+    } else if (isZoneLogin && !isOtherZones) {
+      setNewDistrict('Ludhiana');
+    } else {
+      setNewDistrict('');
+    }
+
+    const defaultG: Gender = activeVolunteer.role.includes('Ladies') ? 'Ladies' : 'Gents';
+    setNewGender(defaultG);
+    if (isZoneLogin) {
+      setNewGroup(defaultG === 'Ladies' ? `${currentZoneName} Zone Ladies` : currentZoneName);
+    } else {
+      setNewGroup(activeVolunteer.assignedGroup || (defaultG === 'Ladies' ? 'Ladies' : 'Monday'));
+    }
+
+    setShowAddModal(true);
+  };
 
   const normalizeDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -165,8 +242,15 @@ const AttendanceManager: React.FC<Props> = ({
 
   const filtered = useMemo(() => {
     const list = sewadars.filter(s => {
+      const sDetail = details?.[s.id];
+      const matchSearch = !searchTerm || 
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sDetail?.district?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sDetail?.phone?.includes(searchTerm) ||
+        sDetail?.address?.toLowerCase().includes(searchTerm.toLowerCase());
+
       if (s.isRestored || activeRestoredNorms.has(normalizeName(s.name))) {
-        return s.name.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchSearch;
       }
       if (isGentsSaturday && isRemovedSaturday(s.name)) {
         return false;
@@ -174,7 +258,7 @@ const AttendanceManager: React.FC<Props> = ({
       if (isGentsTuesday && isRemovedTuesday(s)) {
         return false;
       }
-      return s.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchSearch;
     });
 
     // Deduplicate in case a restored member exists as both custom and legacy
@@ -195,7 +279,7 @@ const AttendanceManager: React.FC<Props> = ({
       if (!aMarked && bMarked) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [sewadars, searchTerm, attendance, normalizedSessionDate, isGentsSaturday, isGentsTuesday, activeRestoredNorms]);
+  }, [sewadars, searchTerm, attendance, normalizedSessionDate, isGentsSaturday, isGentsTuesday, activeRestoredNorms, details]);
 
   const markedCount = useMemo(() => {
     const markedIds = new Set(attendance.filter(a => normalizeDate(a.date) === normalizedSessionDate).map(a => a.sewadarId));
@@ -325,6 +409,13 @@ const AttendanceManager: React.FC<Props> = ({
       return;
     }
 
+    const parsedAge = newAge.trim() ? parseInt(newAge.trim(), 10) : undefined;
+    let finalDob = newDob;
+    if (!finalDob && parsedAge && !isNaN(parsedAge) && parsedAge > 0 && parsedAge < 120) {
+      finalDob = `${2026 - parsedAge}-01-01`;
+    }
+    const finalDistrict = newDistrict.trim();
+
     // If member is removed (in removed lists or was hidden in existing sewadars)
     if (isRemoved || existingMatching.length > 0) {
       setRestorePrompt({
@@ -333,23 +424,29 @@ const AttendanceManager: React.FC<Props> = ({
         group: newGroup,
         shift: newShift,
         details: {
-          dob: newDob,
+          dob: finalDob,
           phone: newPhone.trim(),
-          address: newAddress.trim()
+          address: newAddress.trim(),
+          age: parsedAge,
+          district: finalDistrict
         }
       });
       return;
     }
 
     onAddSewadar(trimmedName, newGender, newGroup, newShift, {
-      dob: newDob,
+      dob: finalDob,
       phone: newPhone.trim(),
-      address: newAddress.trim()
+      address: newAddress.trim(),
+      age: parsedAge,
+      district: finalDistrict
     });
 
     setNewName('');
     setNewDob('');
+    setNewAge('');
     setNewPhone('');
+    setNewDistrict('');
     setNewAddress('');
     setNewShift(undefined);
     setDuplicateError(null);
@@ -368,7 +465,9 @@ const AttendanceManager: React.FC<Props> = ({
     );
     setNewName('');
     setNewDob('');
+    setNewAge('');
     setNewPhone('');
+    setNewDistrict('');
     setNewAddress('');
     setNewShift(undefined);
     setDuplicateError(null);
@@ -445,53 +544,158 @@ const AttendanceManager: React.FC<Props> = ({
 
       {/* Add Sewadar Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto no-scrollbar">
-              <h2 className="text-2xl font-black text-slate-900">Add New Member</h2>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-fade-in">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-6 md:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto no-scrollbar">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 leading-tight">Add New Member</h2>
+                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                    {isZoneLogin 
+                      ? `${currentZoneName} Zone Attendance Portal` 
+                      : `${sessionGroup || activeVolunteer.assignedGroup || 'General'} Attendance`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddModal(false); setDuplicateError(null); }}
+                  className="w-9 h-9 rounded-xl bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center font-bold text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {isZoneLogin && (
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl">
+                  <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-xs text-base">
+                    📍
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-900">
+                      Adding to {currentZoneName} Zone
+                    </p>
+                    <p className="text-[10px] font-bold text-indigo-600">
+                      Roster: {newGender} • Record will appear in {currentZoneName} attendance
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleCreateSewadar} className="space-y-4">
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Name</label>
-                    <input type="text" required className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black" value={newName} onChange={e => { setNewName(e.target.value); setDuplicateError(null); }} placeholder="Full Name" />
-                 </div>
-
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Date of Birth (DOB) (Optional)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-wider">
+                      Full Name <strong className="text-red-500">*</strong>
+                    </label>
                     <input 
-                       type="date" 
-                       className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none" 
-                       value={newDob} 
-                       onChange={e => setNewDob(e.target.value)} 
+                      type="text" 
+                      required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-black text-slate-800 outline-none transition-all placeholder:text-slate-400" 
+                      value={newName} 
+                      onChange={e => { setNewName(e.target.value); setDuplicateError(null); }} 
+                      placeholder="e.g. Gurpreet Singh" 
                     />
                  </div>
 
+                 {/* DOB and Age side by side */}
+                 <div className="grid grid-cols-2 gap-3">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-wider">
+                        DOB (Optional)
+                      </label>
+                      <input 
+                         type="date" 
+                         className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-bold text-sm text-slate-800 outline-none transition-all" 
+                         value={newDob} 
+                         onChange={e => handleDobChange(e.target.value)} 
+                      />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-wider">
+                        Age (Years)
+                      </label>
+                      <input 
+                         type="number" 
+                         min="1"
+                         max="120"
+                         className="w-full px-4 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-bold text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400" 
+                         placeholder="e.g. 42" 
+                         value={newAge} 
+                         onChange={e => handleAgeChange(e.target.value)} 
+                      />
+                   </div>
+                 </div>
+
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Mobile Number (Optional)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-wider">
+                      Mobile Number (Optional)
+                    </label>
                     <input 
                        type="tel" 
                        maxLength={10}
-                       className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none" 
+                       className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-black text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400" 
                        placeholder="10-Digit Mobile Number" 
                        value={newPhone} 
-                       onChange={e => setNewPhone(e.target.value)} 
+                       onChange={e => setNewPhone(e.target.value.replace(/\D/g, ''))} 
                     />
                  </div>
 
+                 {/* District with datalist & quick suggestion buttons */}
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Address (Optional)</label>
+                    <div className="flex items-center justify-between ml-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        District (Optional)
+                      </label>
+                      <span className="text-[9px] font-bold text-indigo-500">Quick select or type</span>
+                    </div>
+                    <input 
+                       type="text" 
+                       list="member-district-options"
+                       className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-black text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400" 
+                       placeholder={isUttarPradeshZone ? "e.g. Rampur, Meerut, Hapur..." : (isZoneLogin ? "e.g. Ludhiana, Pathankot..." : "District / City")} 
+                       value={newDistrict} 
+                       onChange={e => setNewDistrict(e.target.value)} 
+                    />
+                    <datalist id="member-district-options">
+                      {allDistrictList.map(d => (
+                        <option key={d} value={d} />
+                      ))}
+                    </datalist>
+                    {/* Suggestion Chips */}
+                    <div className="flex flex-wrap gap-1.5 pt-1 px-1">
+                      {zoneDistricts.map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setNewDistrict(d)}
+                          className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                            newDistrict.toLowerCase() === d.toLowerCase()
+                              ? 'bg-indigo-600 text-white shadow-xs' 
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-wider">
+                      Address (Optional)
+                    </label>
                     <textarea 
-                       className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none min-h-[60px]" 
-                       placeholder="Residential Address" 
+                       className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-medium text-sm text-slate-800 outline-none transition-all min-h-[56px] placeholder:text-slate-400" 
+                       placeholder="Residential Address / House No. / Area" 
                        value={newAddress} 
                        onChange={e => setNewAddress(e.target.value)} 
                     />
                  </div>
                  
                  {isSuperAdmin && (
-                   <div className="grid grid-cols-2 gap-3">
+                   <div className="grid grid-cols-2 gap-3 pt-1">
                      <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Gender</label>
                         <select 
-                          className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none"
                           value={newGender}
                           onChange={e => {
                             const val = e.target.value as Gender;
@@ -507,7 +711,7 @@ const AttendanceManager: React.FC<Props> = ({
                      <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Group</label>
                         <select 
-                          className="w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl font-black text-sm outline-none"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-sm outline-none"
                           value={newGroup}
                           onChange={e => { setNewGroup(e.target.value as DutyGroup); setDuplicateError(null); }}
                         >
@@ -515,9 +719,17 @@ const AttendanceManager: React.FC<Props> = ({
                             <>
                               <option value="Ladies">Ladies</option>
                               <option value="Monday">Monday</option>
+                              <option value="Punjab Zone Ladies">Punjab Zone Ladies</option>
+                              <option value="Uttar Pradesh Zone Ladies">Uttar Pradesh Zone Ladies</option>
+                              <option value="Other Zones Zone Ladies">Other Zones Zone Ladies</option>
                             </>
                           ) : (
-                            GENTS_GROUPS.map(g => <option key={g} value={g}>{g}</option>)
+                            <>
+                              {GENTS_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                              <option value="Punjab">Punjab Zone</option>
+                              <option value="Uttar Pradesh">Uttar Pradesh Zone</option>
+                              <option value="Other Zones">Other Zones</option>
+                            </>
                           )}
                         </select>
                      </div>
@@ -531,14 +743,14 @@ const AttendanceManager: React.FC<Props> = ({
                        <button 
                          type="button"
                          onClick={() => setNewShift('DAY')}
-                         className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${newShift === 'DAY' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                         className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${newShift === 'DAY' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
                        >
                          Day
                        </button>
                        <button 
                          type="button"
                          onClick={() => setNewShift('NIGHT')}
-                         className={`flex-1 py-3.5 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${newShift === 'NIGHT' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                         className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${newShift === 'NIGHT' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
                        >
                          Night
                        </button>
@@ -547,14 +759,25 @@ const AttendanceManager: React.FC<Props> = ({
                  )}
 
                  {duplicateError && (
-                   <div className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl">
+                   <div className="p-3.5 bg-red-50 border-2 border-red-100 rounded-2xl">
                      <p className="text-xs font-bold text-red-600 text-center">{duplicateError}</p>
                    </div>
                  )}
 
-                 <div className="flex gap-2 pt-4">
-                    <button type="button" onClick={() => { setShowAddModal(false); setDuplicateError(null); }} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs">Cancel</button>
-                    <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
+                 <div className="flex gap-3 pt-3">
+                    <button 
+                      type="button" 
+                      onClick={() => { setShowAddModal(false); setDuplicateError(null); }} 
+                      className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-xs active:scale-95 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <span>+ Add Member</span>
+                    </button>
                  </div>
               </form>
            </div>
@@ -605,7 +828,7 @@ const AttendanceManager: React.FC<Props> = ({
                 <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
                 <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
                   {isZoneLogin 
-                    ? `Handed Over: ${sewadars.filter(s => s.hrTableData?.handoverIncharge && s.group !== currentZoneName).length} / ${sewadars.length}`
+                    ? `Handed Over: ${sewadars.filter(s => s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName)).length} / ${sewadars.length}`
                     : `Marked: ${markedCount}`
                   }
                 </p>
@@ -626,7 +849,7 @@ const AttendanceManager: React.FC<Props> = ({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <button onClick={() => { setDuplicateError(null); setShowAddModal(true); }} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
+                <button onClick={handleOpenAddModal} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0">
                   <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                 </button>
               </div>
@@ -655,6 +878,7 @@ const AttendanceManager: React.FC<Props> = ({
                 </div>
               ) : filtered.map((s, idx) => {
                 const records = attendance.filter(a => a.sewadarId === s.id && normalizeDate(a.date) === normalizedSessionDate);
+                const sDetail = details?.[s.id];
                 const isExpanded = expandedId === s.id;
                 const isMarked = records.length > 0;
                 const isWorkshopMarked = records.some(r => r.workshopLocation === 'Workshop');
@@ -665,7 +889,7 @@ const AttendanceManager: React.FC<Props> = ({
                       onClick={() => handleToggle(s)} 
                       className={
                         isZoneLogin 
-                          ? (s.hrTableData?.handoverIncharge && s.group !== 'Punjab'
+                          ? (s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName)
                               ? "w-full bg-indigo-50/40 px-5 py-4 rounded-[2.2rem] shadow-sm border-2 border-indigo-200 flex items-center justify-between transition-all hover:bg-indigo-50/70 text-left"
                               : "w-full bg-white px-5 py-4 rounded-[2.2rem] shadow-sm border-2 border-slate-100 hover:border-indigo-300 flex items-center justify-between transition-all text-left"
                             )
@@ -678,18 +902,18 @@ const AttendanceManager: React.FC<Props> = ({
                       {isZoneLogin ? (
                         <>
                           <div className="flex items-center gap-4">
-                            <div className={`text-[10px] font-black w-6 text-center ${s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? 'text-indigo-400' : 'text-slate-300'}`}>{idx + 1}</div>
+                            <div className={`text-[10px] font-black w-6 text-center ${s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) ? 'text-indigo-400' : 'text-slate-300'}`}>{idx + 1}</div>
                             <div className="text-left">
                               <div className="flex items-center flex-wrap gap-1.5">
                                 <p className="font-black text-base text-slate-900 leading-tight">{s.name}</p>
-                                {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                                {(s.tag?.includes('Zone') || s.originZone?.includes('Zone') || s.routedByZone) && (
                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                                    Punjab Zone
+                                    {s.originZone || s.tag || `${currentZoneName} Zone`}
                                   </span>
                                 )}
                               </div>
                               <div className="mt-1">
-                                {s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? (
+                                {s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) ? (
                                   <p className="text-[11px] font-bold text-indigo-700 flex items-center gap-1">
                                     <span>🤝</span>
                                     <span>Handed over to <strong className="font-black">{s.group} {s.gender}</strong> ({s.hrTableData?.handoverIncharge})</span>
@@ -699,11 +923,30 @@ const AttendanceManager: React.FC<Props> = ({
                                     Ready for Handover
                                   </p>
                                 )}
+                                {sDetail && (sDetail.phone || sDetail.district || sDetail.age || sDetail.dob) && (
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {sDetail.phone && (
+                                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded-md text-[9px] font-bold">
+                                        📞 {sDetail.phone}
+                                      </span>
+                                    )}
+                                    {(sDetail.district || sDetail.address) && (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/70 rounded-md text-[9px] font-bold">
+                                        📍 {(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}
+                                      </span>
+                                    )}
+                                    {sDetail.age !== undefined && sDetail.age !== null && (
+                                      <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/70 rounded-md text-[9px] font-bold">
+                                        Age: {sDetail.age}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
                           <div>
-                            {s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? (
+                            {s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) ? (
                               <span className="px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs">
                                 <span>Reassign ↗</span>
                               </span>
@@ -778,8 +1021,27 @@ const AttendanceManager: React.FC<Props> = ({
                                    </span>
                                  )}
                                </div>
-                               <div className="flex flex-wrap gap-2 mt-2">
+                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                                   <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest">Available</span>
+                                  {sDetail && (sDetail.phone || sDetail.district || sDetail.age) && (
+                                    <>
+                                      {sDetail.phone && (
+                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded-md text-[9px] font-bold">
+                                          📞 {sDetail.phone}
+                                        </span>
+                                      )}
+                                      {(sDetail.district || sDetail.address) && (
+                                        <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/70 rounded-md text-[9px] font-bold">
+                                          📍 {(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}
+                                        </span>
+                                      )}
+                                      {sDetail.age !== undefined && sDetail.age !== null && (
+                                        <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/70 rounded-md text-[9px] font-bold">
+                                          Age: {sDetail.age}
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
                                </div>
                             </div>
                           </div>
@@ -857,6 +1119,40 @@ const AttendanceManager: React.FC<Props> = ({
                                  {s.gender} • {s.group} {s.shift ? `(${s.shift})` : ''}
                                  {s.hrTableData?.handoverIncharge ? ` • Handover: ${s.hrTableData.handoverIncharge}` : ''}
                                </p>
+                               {sDetail && (sDetail.phone || sDetail.district || sDetail.age || sDetail.dob || sDetail.address) && (
+                                 <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-2 gap-2 text-left">
+                                   {sDetail.phone && (
+                                     <div>
+                                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Mobile</p>
+                                       <p className="text-xs font-black text-slate-800">{sDetail.phone}</p>
+                                     </div>
+                                   )}
+                                   {(sDetail.district || sDetail.address) && (
+                                     <div>
+                                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">District</p>
+                                       <p className="text-xs font-black text-slate-800">{(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}</p>
+                                     </div>
+                                   )}
+                                   {(sDetail.age !== undefined && sDetail.age !== null) && (
+                                     <div>
+                                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Age</p>
+                                       <p className="text-xs font-black text-slate-800">{sDetail.age} Years</p>
+                                     </div>
+                                   )}
+                                   {sDetail.dob && (
+                                     <div>
+                                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Date of Birth</p>
+                                       <p className="text-xs font-black text-slate-800">{sDetail.dob}</p>
+                                     </div>
+                                   )}
+                                   {sDetail.address && (
+                                     <div className="col-span-2">
+                                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Address</p>
+                                       <p className="text-xs font-medium text-slate-700">{sDetail.address}</p>
+                                     </div>
+                                   )}
+                                 </div>
+                               )}
                              </div>
                            )}
                         </div>
@@ -967,7 +1263,7 @@ const AttendanceManager: React.FC<Props> = ({
                                               await onHandoverSewadar(s, handoverDay, incName);
                                               setHandoverMessage({
                                                 type: 'success',
-                                                text: `✓ Handed over "${s.name}" to ${incName} in ${handoverDay} Gents group with "Punjab Zone" tag!`
+                                                text: `✓ Handed over "${s.name}" to ${incName} in ${handoverDay} Gents group with "${currentZoneName} Zone" tag!`
                                               });
                                               setIsHandoverOpen(false);
                                             } catch (e: any) {
@@ -1002,7 +1298,7 @@ const AttendanceManager: React.FC<Props> = ({
                                                   await onHandoverSewadar(s, handoverDay, incName);
                                                   setHandoverMessage({
                                                     type: 'success',
-                                                    text: `✓ Handed over "${s.name}" to ${incName} in ${handoverDay} Ladies group with "Punjab Zone" tag!`
+                                                    text: `✓ Handed over "${s.name}" to ${incName} in ${handoverDay} Ladies group with "${currentZoneName} Zone" tag!`
                                                   });
                                                   setIsHandoverOpen(false);
                                                 } catch (e: any) {

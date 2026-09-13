@@ -3,7 +3,7 @@ import { Sewadar, DutyGroup, Volunteer, SewadarDetails } from './types';
 
 export const GENTS_GROUPS: DutyGroup[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-  'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Punjab', 'Uttar Pradesh'
+  'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Punjab', 'Uttar Pradesh', 'Other Zones'
 ];
 
 export const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -500,6 +500,20 @@ const generateVolunteers = (): Volunteer[] => {
     role: 'Uttar Pradesh - Zone Attendance (Gents)',
     password: 'up123',
     assignedGroup: 'Uttar Pradesh'
+  });
+  vols.push({
+    id: 'other_zone_att_gents',
+    name: 'Other Zones Incharge',
+    role: 'Other Zones - Zone Attendance (Gents)',
+    password: '123',
+    assignedGroup: 'Other Zones'
+  });
+  vols.push({
+    id: 'other_zone_att_ladies',
+    name: 'Other Zones Ladies Incharge',
+    role: 'Other Zones - Zone Attendance (Ladies)',
+    password: '123',
+    assignedGroup: 'Other Zones Zone Ladies'
   });
   return vols;
 };

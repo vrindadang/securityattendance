@@ -245,6 +245,18 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
     }
   };
 
+  const handleOtherZonesPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPass = password.trim().toLowerCase();
+    if (cleanPass === 'other123' || cleanPass === 'oz123' || cleanPass === 'other' || cleanPass === '123' || cleanPass === 'oz') {
+      setIsZoneAuthorized(true);
+      setPassword('');
+      setError('');
+    } else {
+      setError('Incorrect password.');
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 font-sans">
       <div className="max-w-md w-full py-8">
@@ -336,6 +348,17 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl">🏛️</div>
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Uttar Pradesh</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Zone Portal</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => { setSelectedZone('Other Zones'); setPassword(''); setError(''); }}
+                className="group bg-white p-6 rounded-[2rem] border-2 border-amber-100 hover:border-amber-500 transition-all flex items-center gap-6 active:scale-95 text-left"
+              >
+                <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl">🌐</div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Other Zones</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Zone Portal</p>
                 </div>
               </button>
@@ -570,6 +593,106 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Ladies</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh Zone Attendance</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Zones Screen: Other Zones Password Login */}
+        {portalType === 'ZONES' && selectedZone === 'Other Zones' && !isZoneAuthorized && (
+          <div className="animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              </button>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-1">
+                  Other Zones Login
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleOtherZonesPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zone Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter Zone password..."
+                  className="w-full mt-2 px-6 py-4 bg-white rounded-2xl border-2 border-slate-200 focus:border-amber-500 focus:outline-none font-black text-lg text-slate-800 transition-all shadow-inner"
+                  autoFocus
+                />
+              </div>
+
+              {error && (
+                <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-black border border-red-100 flex items-center gap-2">
+                  <span>⚠️</span> {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-amber-200 transition-all active:scale-95"
+              >
+                Unlock Other Zones
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Zones Screen: Other Zones Zone Attendance Menu (Gents & Ladies) */}
+        {portalType === 'ZONES' && selectedZone === 'Other Zones' && isZoneAuthorized && (
+          <div className="animate-in fade-in slide-in-from-right-4">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              </button>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 leading-none">Zone Attendance</h2>
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
+                  Other Zones • Select Category
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <button
+                onClick={() => {
+                  onLogin({
+                    id: 'other_zone_att_gents',
+                    name: 'Other Zones (Gents)',
+                    role: 'Other Zones - Zone Attendance (Gents)',
+                    assignedGroup: 'Other Zones',
+                    password: password || '123'
+                  });
+                }}
+                className="group bg-white p-6 rounded-[2rem] border-2 border-indigo-100 hover:border-indigo-500 transition-all flex items-center gap-6 active:scale-95 text-left"
+              >
+                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl">👮‍♂️</div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Gents</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Other Zones Attendance</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  onLogin({
+                    id: 'other_zone_att_ladies',
+                    name: 'Other Zones (Ladies)',
+                    role: 'Other Zones - Zone Attendance (Ladies)',
+                    assignedGroup: 'Other Zones Zone Ladies',
+                    password: password || '123'
+                  });
+                }}
+                className="group bg-white p-6 rounded-[2rem] border-2 border-pink-100 hover:border-pink-500 transition-all flex items-center gap-6 active:scale-95 text-left"
+              >
+                <div className="w-16 h-16 bg-pink-50 rounded-2xl flex items-center justify-center text-3xl">👩</div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Ladies</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Other Zones Attendance</p>
                 </div>
               </button>
             </div>
