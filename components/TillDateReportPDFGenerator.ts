@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { INITIAL_SEWADARS } from '../constants';
+import { parseTimeToMinutes } from '../utils/timeUtils';
 
 // Helper to normalize names for merging comparison and map specific spelling variations
 export function normalizeName(name: string): string {
@@ -41,10 +42,9 @@ export function normalizeName(name: string): string {
 function calculateMinutes(inTime?: string, outTime?: string): number {
   if (!inTime || !outTime) return 0;
   try {
-    const [inH, inM] = inTime.split(':').map(Number);
-    const [outH, outM] = outTime.split(':').map(Number);
-    if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) return 0;
-    let diff = (outH * 60 + outM) - (inH * 60 + inM);
+    const inTotal = parseTimeToMinutes(inTime);
+    const outTotal = parseTimeToMinutes(outTime);
+    let diff = outTotal - inTotal;
     if (diff < 0) diff += 24 * 60;
     return diff;
   } catch { return 0; }

@@ -1415,7 +1415,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
                                     {m.shift || '-'}
                                   </td>
                                   <td className="py-2.5 px-4 font-mono font-bold text-slate-600 text-[11px]">
-                                    {m.inTime ? m.inTime : '—'}
+                                    {m.inTime ? formatTimeToAMPM(m.inTime) : '—'}
                                   </td>
                                   <td className="py-2.5 px-4 text-right">
                                     <span
@@ -1605,7 +1605,7 @@ export const WorkshopReportView: React.FC<WorkshopReportViewProps> = ({
                                     {m.shift || '-'}
                                   </td>
                                   <td className="py-2.5 px-4 font-mono font-bold text-slate-600 text-[11px]">
-                                    {m.inTime ? m.inTime : '—'}
+                                    {m.inTime ? formatTimeToAMPM(m.inTime) : '—'}
                                   </td>
                                   <td className="py-2.5 px-4 text-right">
                                     <span

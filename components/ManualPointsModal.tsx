@@ -5,6 +5,7 @@ import { doc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { saveStoredTestAttendance, saveStoredTestPoints } from '../workshopTestUtils';
 import { getWorkshopTeam, isWorkshopDate } from './WorkshopAttendanceView';
+import { formatTimeToAMPM } from '../utils/timeUtils';
 
 interface ManualPointsModalProps {
   isOpen: boolean;
@@ -401,7 +402,7 @@ export const ManualPointsModal: React.FC<ManualPointsModalProps> = ({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {sewadarHistory.attendanceRec ? (
                     <span className="text-[10px] font-black px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg">
-                      Checked In ({sewadarHistory.attendanceRec.inTime || 'Present'})
+                      Checked In ({sewadarHistory.attendanceRec.inTime ? formatTimeToAMPM(sewadarHistory.attendanceRec.inTime) : 'Present'})
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg">

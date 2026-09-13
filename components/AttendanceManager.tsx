@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Sewadar, Gender, AttendanceRecord, DutyGroup, Volunteer, VehicleRecord, FlaggedVehicle, SewadarDetails } from '../types';
+import { formatTimeToAMPM, getPeriod, setTimePeriod } from "../utils/timeUtils";
 import { LOCATIONS_LIST, KIRPAL_BAGH_POINTS, SDS_DHAM_POINTS, KIRPAL_ASHRAM_POINTS, SAWAN_ASHRAM_POINTS, GENTS_GROUPS, SATURDAY_REMOVED_NAMES, isRemovedSaturday, TUESDAY_REMOVED_NAMES, isRemovedTuesday, normalizeName, DAYS_LIST, GENTS_INCHARGES, LADIES_INCHARGES } from '../constants';
 
 interface Props {
@@ -342,7 +343,10 @@ const AttendanceManager: React.FC<Props> = ({
   };
 
   const resetForm = () => {
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const now = `${hh}:${mm}`;
     setEditInTime(now);
     setEditOutTime('');
     setEditLocation(availableLocs[0] || '');
@@ -1466,7 +1470,7 @@ const AttendanceManager: React.FC<Props> = ({
                                                 </span>
                                               )}
                                            </div>
-                                          <p className="text-[10px] font-bold text-slate-400">{rec.inTime} to {rec.outTime || 'On Duty'}</p>
+                                          <p className="text-[10px] font-bold text-slate-400">{formatTimeToAMPM(rec.inTime)} to {rec.outTime ? formatTimeToAMPM(rec.outTime) : 'On Duty'}</p>
                                        </div>
                                        <button 
                                          onClick={(e) => { e.stopPropagation(); onSaveAttendance(s.id, {}, rec.id, true); }} 
@@ -1557,12 +1561,111 @@ const AttendanceManager: React.FC<Props> = ({
 
                                   <div className="grid grid-cols-2 gap-4">
                                      <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">In Time</label>
-                                        <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editInTime} onChange={e => setEditInTime(e.target.value)} />
+                                        <div className="flex items-center justify-between ml-1">
+                                           <label className="text-[10px] font-black text-slate-400 uppercase">In Time</label>
+                                           <div className="flex items-center gap-1.5">
+                                              <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                  const now = new Date();
+                                                  const curH = String(now.getHours()).padStart(2, '0');
+                                                  const curM = String(now.getMinutes()).padStart(2, '0');
+                                                  setEditInTime(`${curH}:${curM}`);
+                                                }}
+                                                className="text-[9px] font-black text-indigo-600 hover:text-indigo-800 uppercase"
+                                              >
+                                                Now
+                                              </button>
+                                              <div className="flex bg-slate-200/90 p-0.5 rounded-lg">
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => setEditInTime(prev => setTimePeriod(prev, 'AM'))}
+                                                   className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
+                                                     getPeriod(editInTime) === 'AM'
+                                                       ? 'bg-indigo-600 text-white shadow-xs'
+                                                       : 'text-slate-600 hover:text-slate-900'
+                                                   }`}
+                                                 >
+                                                   AM
+                                                 </button>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => setEditInTime(prev => setTimePeriod(prev, 'PM'))}
+                                                   className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
+                                                     getPeriod(editInTime) === 'PM'
+                                                       ? 'bg-indigo-600 text-white shadow-xs'
+                                                       : 'text-slate-600 hover:text-slate-900'
+                                                   }`}
+                                                 >
+                                                   PM
+                                                 </button>
+                                              </div>
+                                           </div>
+                                        </div>
+                                        <input 
+                                          type="time" 
+                                          className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" 
+                                          value={editInTime} 
+                                          onChange={e => setEditInTime(e.target.value)} 
+                                        />
                                      </div>
                                      <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Out Time</label>
-                                        <input type="time" className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" value={editOutTime} onChange={e => setEditOutTime(e.target.value)} />
+                                        <div className="flex items-center justify-between ml-1">
+                                           <label className="text-[10px] font-black text-slate-400 uppercase">Out Time</label>
+                                           <div className="flex items-center gap-1.5">
+                                              {editOutTime && (
+                                                <button 
+                                                  type="button" 
+                                                  onClick={() => setEditOutTime('')}
+                                                  className="text-[9px] font-black text-rose-500 hover:text-rose-700 uppercase"
+                                                >
+                                                  Clear
+                                                </button>
+                                              )}
+                                              <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                  const now = new Date();
+                                                  const curH = String(now.getHours()).padStart(2, '0');
+                                                  const curM = String(now.getMinutes()).padStart(2, '0');
+                                                  setEditOutTime(`${curH}:${curM}`);
+                                                }}
+                                                className="text-[9px] font-black text-indigo-600 hover:text-indigo-800 uppercase"
+                                              >
+                                                Now
+                                              </button>
+                                              <div className="flex bg-slate-200/90 p-0.5 rounded-lg">
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => setEditOutTime(prev => setTimePeriod(prev, 'AM'))}
+                                                   className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
+                                                     getPeriod(editOutTime) === 'AM'
+                                                       ? 'bg-indigo-600 text-white shadow-xs'
+                                                       : 'text-slate-600 hover:text-slate-900'
+                                                   }`}
+                                                 >
+                                                   AM
+                                                 </button>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => setEditOutTime(prev => setTimePeriod(prev, 'PM'))}
+                                                   className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
+                                                     getPeriod(editOutTime) === 'PM'
+                                                       ? 'bg-indigo-600 text-white shadow-xs'
+                                                       : 'text-slate-600 hover:text-slate-900'
+                                                   }`}
+                                                 >
+                                                   PM
+                                                 </button>
+                                              </div>
+                                           </div>
+                                        </div>
+                                        <input 
+                                          type="time" 
+                                          className="w-full px-5 py-4 bg-slate-50 border rounded-2xl font-black text-base text-center outline-none" 
+                                          value={editOutTime} 
+                                          onChange={e => setEditOutTime(e.target.value)} 
+                                        />
                                      </div>
                                   </div>
 

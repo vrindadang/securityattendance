@@ -9,7 +9,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { generateGroupPerformanceReport, generateGentsRawDataReport, generateMultipleGroupOverlapReport } from './GroupReportPDFGenerator';
 import { generateTillDatePerformanceReport } from './TillDateReportPDFGenerator';
 import { SuperAdminReports } from './SuperAdminReports';
-import { formatTimeToAMPM } from '../utils/timeUtils';
+import { formatTimeToAMPM, parseTimeToMinutes } from '../utils/timeUtils';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -207,10 +207,9 @@ const Dashboard: React.FC<Props> = ({
       const calculateMinutesHelper = (inTime?: string, outTime?: string): number => {
         if (!inTime || !outTime) return 0;
         try {
-          const [inH, inM] = inTime.split(':').map(Number);
-          const [outH, outM] = outTime.split(':').map(Number);
-          if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) return 0;
-          let diff = (outH * 60 + outM) - (inH * 60 + inM);
+          const inTotal = parseTimeToMinutes(inTime);
+          const outTotal = parseTimeToMinutes(outTime);
+          let diff = outTotal - inTotal;
           if (diff < 0) diff += 24 * 60;
           return diff;
         } catch { return 0; }
@@ -595,9 +594,9 @@ const Dashboard: React.FC<Props> = ({
   const calculateDuration = (inTime?: string, outTime?: string): string => {
     if (!inTime || !outTime) return '-';
     try {
-      const [inH, inM] = inTime.split(':').map(Number);
-      const [outH, outM] = outTime.split(':').map(Number);
-      let diff = (outH * 60 + outM) - (inH * 60 + inM);
+      const inTotal = parseTimeToMinutes(inTime);
+      const outTotal = parseTimeToMinutes(outTime);
+      let diff = outTotal - inTotal;
       if (diff < 0) diff += 24 * 60;
       return `${Math.floor(diff / 60)}h ${diff % 60}m`;
     } catch { return '-'; }
@@ -954,8 +953,7 @@ const Dashboard: React.FC<Props> = ({
     const NIT_E = 7 * 60;
 
     const timeToMins = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
+      return parseTimeToMinutes(t);
     };
 
     const getStatusDots = (inTime: string, outTime?: string) => {
@@ -1401,8 +1399,7 @@ const Dashboard: React.FC<Props> = ({
     const NIT_E = 7 * 60;
 
     const timeToMins = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
+      return parseTimeToMinutes(t);
     };
 
     const shiftCounts = { 

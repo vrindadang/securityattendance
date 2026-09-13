@@ -1,3 +1,4 @@
+import { formatTimeToAMPM } from '../utils/timeUtils';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Sewadar, AttendanceRecord, DutyGroup, Gender, WorkshopPoint } from '../types';
 import { GENTS_GROUPS, LADIES_GROUPS } from '../constants';
@@ -1001,7 +1002,7 @@ export const WorkshopAttendanceView: React.FC<WorkshopAttendanceViewProps> = ({
                       {isMarked ? (
                         <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                          In: {record.inTime || 'Present'} {attPoints > 0 ? `(+${attPoints} pts)` : ''}
+                          In: {record.inTime ? formatTimeToAMPM(record.inTime) : 'Present'} {attPoints > 0 ? `(+${attPoints} pts)` : ''}
                         </span>
                       ) : (
                         <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-lg">
