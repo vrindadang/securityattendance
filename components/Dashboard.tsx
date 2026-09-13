@@ -431,10 +431,22 @@ const Dashboard: React.FC<Props> = ({
   const [sessionFilterGroup, setSessionFilterGroup] = useState<string>('All');
 
   const isSuperAdmin = activeVolunteer?.role === 'Super Admin';
-  const isZoneLogin = Boolean(activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab'));
+  const isZoneLogin = Boolean(
+    activeVolunteer?.role?.includes('Zone') || 
+    activeVolunteer?.role?.startsWith('Punjab') || 
+    activeVolunteer?.role?.startsWith('Uttar Pradesh') ||
+    activeVolunteer?.assignedGroup === 'Punjab' ||
+    activeVolunteer?.assignedGroup === 'Uttar Pradesh'
+  );
+  const isUttarPradeshZone = Boolean(
+    activeVolunteer?.role?.includes('Uttar Pradesh') || 
+    activeVolunteer?.name?.includes('Uttar Pradesh') || 
+    activeVolunteer?.assignedGroup === 'Uttar Pradesh'
+  );
+  const zoneName = isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab';
   const isLadiesZone = Boolean(activeVolunteer?.role?.includes('Ladies') || activeVolunteer?.name?.includes('Ladies'));
   const zoneTargetGender = isLadiesZone ? 'Ladies' : 'Gents';
-  const zoneGroup = isLadiesZone ? 'Punjab Zone Ladies' : 'Punjab';
+  const zoneGroup = isLadiesZone ? `${zoneName} Zone Ladies` : zoneName;
   const isHrTable = Boolean(
     activeVolunteer?.assignedGroup === 'HR Table' || 
     activeVolunteer?.id === 'admin_hr_table' || 
@@ -531,12 +543,12 @@ const Dashboard: React.FC<Props> = ({
     pool.forEach(s => {
       if (s.gender !== zoneTargetGender) return;
 
-      const isPunjab = s.group === zoneGroup || 
-        s.originZone === 'Punjab Zone' || 
-        s.tag === 'Punjab Zone' || 
+      const isMatchZone = s.group === zoneGroup || 
+        s.originZone === `${zoneName} Zone` || 
+        s.tag === `${zoneName} Zone` || 
         s.routedByZone || 
-        s.id?.startsWith('PZ-');
-      if (!isPunjab) return;
+        (isUttarPradeshZone ? s.id?.startsWith('UPZ-') : s.id?.startsWith('PZ-'));
+      if (!isMatchZone) return;
 
       const hasHandover = Boolean(s.hrTableData?.handoverIncharge) && 
         (s.group !== zoneGroup || Boolean(s.hrTableData?.handoverDayGroup));
@@ -591,7 +603,7 @@ const Dashboard: React.FC<Props> = ({
     if (isZoneLogin) {
       const doc = new jsPDF('p', 'mm', 'a4');
       const wingText = isLadiesZone ? 'Ladies Wing' : 'Gents Wing';
-      const groupText = isLadiesZone ? 'Punjab Zone Ladies Security Group' : 'Punjab Zone Gents Security Group';
+      const groupText = isLadiesZone ? `${zoneName} Zone Ladies Security Group` : `${zoneName} Zone Gents Security Group`;
       
       let currentY = 15;
 
@@ -623,7 +635,7 @@ const Dashboard: React.FC<Props> = ({
       doc.setFontSize(12);
       doc.setTextColor(100, 100, 100);
       doc.setFont("helvetica", "normal");
-      doc.text(`Punjab Zone - Sewadar Handover Report (${wingText})`, 14, currentY);
+      doc.text(`${zoneName} Zone - Sewadar Handover Report (${wingText})`, 14, currentY);
       
       // Horizontal Divider
       currentY += 4;
@@ -642,8 +654,8 @@ const Dashboard: React.FC<Props> = ({
         startY: currentY + 3,
         head: [['Metric', 'Details']],
         body: [
-          ['Zone', 'Punjab'],
-          ['Reporting Wing', isLadiesZone ? 'Punjab Zone (Ladies)' : 'Punjab Zone (Gents)'],
+          ['Zone', zoneName],
+          ['Reporting Wing', isLadiesZone ? `${zoneName} Zone (Ladies)` : `${zoneName} Zone (Gents)`],
           ['Report Type', 'Sewadar Handover Report'],
           ['Session Date', dateDisplay],
           ['Total Sewadars Handed Over', String(handedOverSewadarsForSession.length)]
@@ -669,13 +681,13 @@ const Dashboard: React.FC<Props> = ({
             const incharge = s.hrTableData?.handoverIncharge || '-';
             return [
               String(idx + 1),
-              'Punjab',
+              s.originZone || s.tag || zoneName,
               s.name,
               groupDisplay,
               incharge
             ];
           })
-        : [['-', 'Punjab', 'No sewadars were handed over for this session date', '-', '-']];
+        : [['-', zoneName, 'No sewadars were handed over for this session date', '-', '-']];
 
       autoTable(doc, {
         startY: currentY + 3,
@@ -696,7 +708,7 @@ const Dashboard: React.FC<Props> = ({
       currentY = (doc as any).lastAutoTable.finalY + 8;
 
       // Note
-      const noteText = `Note: This report lists sewadars originating from Punjab Zone handed over to respective security duty groups along with the assigned group incharge name for session date ${dateDisplay}.`;
+      const noteText = `Note: This report lists sewadars originating from ${zoneName} Zone handed over to respective security duty groups along with the assigned group incharge name for session date ${dateDisplay}.`;
       const splitNote = doc.splitTextToSize(noteText, 182);
       ensureSpace(splitNote.length * 4 + 6);
       doc.setFontSize(8);
@@ -717,7 +729,7 @@ const Dashboard: React.FC<Props> = ({
         );
       }
 
-      doc.save(`SKRM_Punjab_Zone_Handover_Report_${isLadiesZone ? 'Ladies' : 'Gents'}_${dateDisplay.replace(/\//g, '-')}.pdf`);
+      doc.save(`SKRM_${zoneName.replace(/\s+/g, '_')}_Zone_Handover_Report_${isLadiesZone ? 'Ladies' : 'Gents'}_${dateDisplay.replace(/\//g, '-')}.pdf`);
       return;
     }
 
@@ -1540,7 +1552,7 @@ ${inchargeName}`;
         <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl overflow-hidden relative">
           <div className="relative z-10">
             <h2 className="text-2xl font-black mb-1">
-              {isLadiesZone ? 'Punjab Zone (Ladies)' : 'Punjab Zone (Gents)'} Handover Reports
+              {isLadiesZone ? `${zoneName} Zone (Ladies)` : `${zoneName} Zone (Gents)`} Handover Reports
             </h2>
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
               Zone Handover Record • {currentSession?.date ? (typeof currentSession.date === 'string' ? currentSession.date.split('-').reverse().join('/') : currentSession.date) : 'Current Session'}
@@ -1885,7 +1897,7 @@ ${inchargeName}`;
                 Handover Report - {(typeof sessionDate === 'string' ? sessionDate : '').split('-').reverse().join('/') || 'Selected Date'}
               </h3>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                Zone: Punjab • {handedOverSewadarsForSession.length} Sewadars Handed Over
+                Zone: {zoneName} • {handedOverSewadarsForSession.length} Sewadars Handed Over
               </p>
             </div>
             <button
@@ -1917,7 +1929,7 @@ ${inchargeName}`;
                       <td className="px-4 py-3 text-center font-bold text-slate-400">{idx + 1}</td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg font-bold text-[10px] uppercase">
-                          Punjab
+                          {s.originZone || s.tag || zoneName}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">{s.name}</td>

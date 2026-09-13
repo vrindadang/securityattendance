@@ -70,10 +70,14 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         sGroupLower === assignedLower || 
         sGroupLower === `ladies-${assignedLower}` || 
         sGroupLower.includes(assignedLower);
-      const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const sDetail = details[s.id];
+      const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (sDetail?.district && sDetail.district.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (sDetail?.address && sDetail.address.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (sDetail?.phone && sDetail.phone.includes(searchTerm));
       return matchGroup && matchSearch;
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [sewadars, activeVolunteer, searchTerm]);
+  }, [sewadars, activeVolunteer, searchTerm, details]);
 
   const handleEdit = (s: Sewadar) => {
     if (isHrTable || s.hrTableData || s.routedByHrTable) {
@@ -231,7 +235,10 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         .filter(s => {
           const sGroupLower = s.group.toLowerCase();
           const targetLower = groupName.toLowerCase();
-          const belongsToGroup = sGroupLower === targetLower || sGroupLower === `ladies-${targetLower}`;
+          const belongsToGroup = sGroupLower === targetLower || 
+            sGroupLower === `ladies-${targetLower}` ||
+            (targetLower.includes('uttar pradesh') && sGroupLower.includes('uttar pradesh')) ||
+            (targetLower.includes('punjab') && sGroupLower.includes('punjab'));
           const matchesGender = s.gender === gender;
           return belongsToGroup && matchesGender;
         })
@@ -510,9 +517,9 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                             Routed by HR table
                           </span>
                         )}
-                        {(s.tag === 'Punjab Zone' || s.originZone === 'Punjab Zone' || s.routedByZone) && (
+                        {(s.tag?.includes('Zone') || s.originZone?.includes('Zone') || s.routedByZone) && (
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider shadow-xs">
-                            Punjab Zone
+                            {s.originZone || s.tag || 'Zone'}
                           </span>
                         )}
                       </div>

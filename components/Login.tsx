@@ -233,6 +233,18 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
     }
   };
 
+  const handleUttarPradeshPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPass = password.trim().toLowerCase();
+    if (cleanPass === 'up123' || cleanPass === 'uttar123' || cleanPass === 'up' || cleanPass === '123') {
+      setIsZoneAuthorized(true);
+      setPassword('');
+      setError('');
+    } else {
+      setError('Incorrect password.');
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 font-sans">
       <div className="max-w-md w-full py-8">
@@ -313,6 +325,17 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl">🌾</div>
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Punjab</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Zone Portal</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => { setSelectedZone('Uttar Pradesh'); setPassword(''); setError(''); }}
+                className="group bg-white p-6 rounded-[2rem] border-2 border-amber-100 hover:border-amber-500 transition-all flex items-center gap-6 active:scale-95 text-left"
+              >
+                <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl">🏛️</div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Uttar Pradesh</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Zone Portal</p>
                 </div>
               </button>
@@ -456,6 +479,97 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Ladies</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Punjab Zone Attendance</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Zones Screen: Uttar Pradesh Password Login */}
+        {portalType === 'ZONES' && selectedZone === 'Uttar Pradesh' && !isZoneAuthorized && (
+          <div className="animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              </button>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-1">
+                  Uttar Pradesh Zone Login
+                </p>
+              </div>
+            </div>
+            <form onSubmit={handleUttarPradeshPasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zone Password</label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  className="w-full px-5 py-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-amber-500"
+                  placeholder="••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+              <button type="submit" className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                Unlock Uttar Pradesh Zone
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Zones Screen: Uttar Pradesh Zone Attendance Menu (Gents & Ladies) */}
+        {portalType === 'ZONES' && selectedZone === 'Uttar Pradesh' && isZoneAuthorized && (
+          <div className="animate-in fade-in slide-in-from-right-4">
+            <div className="flex items-center gap-4 mb-8">
+              <button onClick={goBackStep} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 active:scale-95 transition-all">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              </button>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 leading-none">Zone Attendance</h2>
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
+                  Uttar Pradesh Zone • Select Category
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <button
+                onClick={() => {
+                  onLogin({
+                    id: 'up_zone_att_gents',
+                    name: 'Uttar Pradesh Zone (Gents)',
+                    role: 'Uttar Pradesh - Zone Attendance (Gents)',
+                    assignedGroup: 'Uttar Pradesh',
+                    password: password || 'up123'
+                  });
+                }}
+                className="group bg-white p-6 rounded-[2rem] border-2 border-indigo-100 hover:border-indigo-500 transition-all flex items-center gap-6 active:scale-95 text-left"
+              >
+                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl">👮‍♂️</div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Gents</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh Zone Attendance</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  onLogin({
+                    id: 'up_zone_att_ladies',
+                    name: 'Uttar Pradesh Zone (Ladies)',
+                    role: 'Uttar Pradesh - Zone Attendance (Ladies)',
+                    assignedGroup: 'Uttar Pradesh Zone Ladies',
+                    password: password || 'up123'
+                  });
+                }}
+                className="group bg-white p-6 rounded-[2rem] border-2 border-pink-100 hover:border-pink-500 transition-all flex items-center gap-6 active:scale-95 text-left"
+              >
+                <div className="w-16 h-16 bg-pink-50 rounded-2xl flex items-center justify-center text-3xl">👩</div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Ladies</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh Zone Attendance</p>
                 </div>
               </button>
             </div>

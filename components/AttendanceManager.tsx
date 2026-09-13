@@ -112,7 +112,16 @@ const AttendanceManager: React.FC<Props> = ({
 
   const isZoneLogin = activeVolunteer?.role?.includes('Zone') || 
                       activeVolunteer?.role?.startsWith('Punjab') ||
-                      sessionGroup === 'Punjab';
+                      activeVolunteer?.role?.startsWith('Uttar Pradesh') ||
+                      sessionGroup === 'Punjab' ||
+                      sessionGroup === 'Uttar Pradesh';
+
+  const isUttarPradeshZone = activeVolunteer?.role?.includes('Uttar Pradesh') ||
+                             activeVolunteer?.name?.includes('Uttar Pradesh') ||
+                             activeVolunteer?.assignedGroup === 'Uttar Pradesh' ||
+                             sessionGroup === 'Uttar Pradesh';
+
+  const currentZoneName = isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab';
   const canShowHandover = (isZoneLogin || isHrTable) && Boolean(onHandoverSewadar);
   const hasConfig = !!workshopLocation || isZoneLogin;
   const isLocked = !hasConfig;
@@ -589,14 +598,14 @@ const AttendanceManager: React.FC<Props> = ({
                 {isZoneLogin ? 'Zone Attendance' : (hasConfig ? (normalizedSessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config')}
               </p>
               <h2 className="text-base font-black text-slate-800">
-                {isZoneLogin ? 'Punjab Zone Session' : (cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set'))}
+                {isZoneLogin ? `${currentZoneName} Zone Session` : (cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set'))}
               </h2>
               <div className="flex items-center gap-3">
                 <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
                 <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
                 <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
                   {isZoneLogin 
-                    ? `Handed Over: ${sewadars.filter(s => s.hrTableData?.handoverIncharge && s.group !== 'Punjab').length} / ${sewadars.length}`
+                    ? `Handed Over: ${sewadars.filter(s => s.hrTableData?.handoverIncharge && s.group !== currentZoneName).length} / ${sewadars.length}`
                     : `Marked: ${markedCount}`
                   }
                 </p>

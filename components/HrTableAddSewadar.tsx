@@ -188,8 +188,8 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
       s.group === 'HR Table' || 
       s.routedByHrTable || 
       s.routedByZone || 
-      s.tag === 'Punjab Zone' || 
-      s.originZone === 'Punjab Zone' || 
+      s.tag?.includes('Zone') || 
+      s.originZone?.includes('Zone') || 
       Boolean(s.hrTableData)
     );
   }, [customSewadars]);

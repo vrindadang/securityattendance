@@ -3,7 +3,7 @@ import { Sewadar, DutyGroup, Volunteer, SewadarDetails } from './types';
 
 export const GENTS_GROUPS: DutyGroup[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-  'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Punjab'
+  'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Punjab', 'Uttar Pradesh'
 ];
 
 export const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -494,6 +494,13 @@ const generateVolunteers = (): Volunteer[] => {
     password: 'pun123',
     assignedGroup: 'Punjab'
   });
+  vols.push({
+    id: 'up_zone_att_gents',
+    name: 'Uttar Pradesh Zone Incharge',
+    role: 'Uttar Pradesh - Zone Attendance (Gents)',
+    password: 'up123',
+    assignedGroup: 'Uttar Pradesh'
+  });
   return vols;
 };
 
@@ -594,6 +601,14 @@ const generateInitialSewadars = (): Sewadar[] => {
 
   PUNJAB_ZONE_GENTS_RAW.forEach((s, i) => {
     sewadars.push({ id: `PZ-G-${i + 1}`, name: s.name, gender: 'Gents', group: 'Punjab' });
+  });
+
+  UP_ZONE_GENTS_RAW.forEach((s, i) => {
+    sewadars.push({ id: `UPZ-G-${i + 1}`, name: s.name, gender: 'Gents', group: 'Uttar Pradesh' });
+  });
+
+  UP_ZONE_LADIES_RAW.forEach((s, i) => {
+    sewadars.push({ id: `UPZ-L-${i + 1}`, name: s.name, gender: 'Ladies', group: 'Uttar Pradesh Zone Ladies' });
   });
 
   return sewadars;
@@ -718,6 +733,140 @@ export const PUNJAB_ZONE_GENTS_RAW: RawPunjabSewadar[] = [
   { name: "Maghar Singh", age: undefined, dob: "", phone: "", district: "Jagraon" },
   { name: "Tara Singh", age: 67, dob: "1959-02-25", phone: "9815690565", district: "Jalandhar" },
   { name: "Darshan Singh", age: 55, dob: "1971-01-01", phone: "", district: "Ludhiana" }
+];
+
+export const UP_ZONE_GENTS_RAW: RawPunjabSewadar[] = [
+  { name: "Sh. Mehar Singh", age: 66, dob: "1960-11-20", phone: "9720655584", district: "Moradabad" },
+  { name: "Chandra Sain", age: 57, dob: "1969-05-20", phone: "7248097286", district: "Moradabad" },
+  { name: "Abhishek Grover", age: 51, dob: "1975-09-01", phone: "9737092233", district: "Moradabad" },
+  { name: "Roop Kishore", age: 53, dob: "1973-07-05", phone: "7055505711", district: "Moradabad" },
+  { name: "Ramchandra", age: 67, dob: "1959-01-01", phone: "9927312906", district: "Moradabad" },
+  { name: "Sunil Sharma", age: 49, dob: "1977-08-11", phone: "9837953734", district: "Moradabad" },
+  { name: "Thakur Singh", age: 62, dob: "1964-12-30", phone: "7817063062", district: "Moradabad" },
+  { name: "Mohit Kumar Singh", age: 37, dob: "1989-06-28", phone: "8979686063", district: "Moradabad" },
+  { name: "Rajesh Prasad Sharma", age: 55, dob: "1971-01-01", phone: "8869410130", district: "Moradabad" },
+  { name: "Chet Ram Saini", age: 73, dob: "1953-06-15", phone: "8057257762", district: "Moradabad" },
+  { name: "Narayan Das", age: 62, dob: "1964-01-01", phone: "8193833186", district: "Moradabad" },
+  { name: "Himanshu Sagar", age: 45, dob: "1981-11-18", phone: "8958475833", district: "Moradabad" },
+  { name: "Ramesh Kumar", age: 70, dob: "1956-01-05", phone: "9759170099", district: "Moradabad" },
+  { name: "Natthu Singh", age: 82, dob: "1944-01-01", phone: "8193881730", district: "Moradabad" },
+  { name: "Gokul Singh", age: 69, dob: "1957-08-15", phone: "9105214532", district: "Moradabad" },
+  { name: "Daulat Singh", age: 67, dob: "1959-12-25", phone: "9720451954", district: "Moradabad" },
+  { name: "Harishchandra Singh", age: 56, dob: "1970-01-01", phone: "9528346498", district: "Moradabad" },
+  { name: "Raj Pal Singh", age: 68, dob: "1958-01-01", phone: "8475007526", district: "Moradabad" },
+  { name: "Munnu Singh", age: 62, dob: "1964-01-01", phone: "7830970172", district: "Moradabad" },
+  { name: "Rakesh Singh", age: 46, dob: "1980-01-01", phone: "9927234351", district: "Moradabad" },
+  { name: "Jadu Singh", age: 72, dob: "1954-01-01", phone: "9690857546", district: "Moradabad" },
+  { name: "Raghunath Singh", age: 82, dob: "1944-01-01", phone: "7055273128", district: "Moradabad" },
+  { name: "Shri Daya Ram", age: 64, dob: "1962-01-01", phone: "7248492411", district: "Moradabad" },
+  { name: "Harpal Singh", age: 65, dob: "1961-01-01", phone: "8057648778", district: "Moradabad" },
+  { name: "Kirpal Singh", age: 70, dob: "1956-07-07", phone: "9759575558", district: "Moradabad" },
+  { name: "Madan Pal Singh", age: 54, dob: "1972-08-04", phone: "9027933943", district: "Moradabad" },
+  { name: "Sanjay Singh", age: 32, dob: "1994-02-06", phone: "8449707651", district: "Moradabad" },
+  { name: "Devendra Kumar", age: 56, dob: "1970-01-01", phone: "8958054902", district: "Moradabad" },
+  { name: "Yogesh Kumar Pandey", age: 43, dob: "1983-07-01", phone: "9084225403", district: "Moradabad" },
+  { name: "Jay Prakash", age: 63, dob: "1963-01-01", phone: "8475080626", district: "Moradabad" },
+  { name: "Gopal Singh", age: 46, dob: "1980-01-01", phone: "9568480139", district: "Moradabad" },
+  { name: "Het Ram", age: 59, dob: "1967-01-01", phone: "9639083699", district: "Moradabad" },
+  { name: "Kishan Shroop", age: 72, dob: "1954-01-01", phone: "9758675660", district: "Moradabad" },
+  { name: "Braj Raj Singh", age: 74, dob: "1952-05-07", phone: "9568089084", district: "Moradabad" },
+  { name: "Satyapal Singh", dob: "", phone: "9012146307", district: "Rampur" },
+  { name: "Dhakan Lal", dob: "", phone: "9759787364", district: "Rampur" },
+  { name: "Anuj Kumar", dob: "", phone: "", district: "Rampur" },
+  { name: "Rajender Kumar", dob: "", phone: "", district: "Rampur" },
+  { name: "Mayank Kumar", dob: "", phone: "", district: "Rampur" },
+  { name: "Sumit", dob: "", phone: "", district: "Rampur" },
+  { name: "Krishna", dob: "", phone: "", district: "Rampur" },
+  { name: "Ankush", dob: "", phone: "", district: "Rampur" },
+  { name: "Ramdas", dob: "", phone: "9457671940", district: "Rampur" },
+  { name: "Shishyapal", dob: "", phone: "9761429756", district: "Rampur" },
+  { name: "Rahul Kumar (1)", dob: "", phone: "9837007011", district: "Rampur" },
+  { name: "Rajkumar", dob: "", phone: "6396141301", district: "Rampur" },
+  { name: "Anmol", dob: "", phone: "9756112275", district: "Rampur" },
+  { name: "Jamuna Prasad", dob: "", phone: "", district: "Rampur" },
+  { name: "Surjeet", dob: "", phone: "", district: "Rampur" },
+  { name: "Atul", dob: "", phone: "", district: "Rampur" },
+  { name: "Arjun Singh", dob: "", phone: "9948640152", district: "Rampur" },
+  { name: "Dinesh Kumar", dob: "", phone: "9639294519", district: "Rampur" },
+  { name: "Suresh Kumar", dob: "", phone: "7535802861", district: "Rampur" },
+  { name: "Raju", dob: "", phone: "6399717618", district: "Rampur" },
+  { name: "Rameshwar Singh", dob: "", phone: "6398037597", district: "Rampur" },
+  { name: "Jaypal Singh", dob: "", phone: "9756108630", district: "Rampur" },
+  { name: "Rajiv Kumar", dob: "", phone: "7505968779", district: "Rampur" },
+  { name: "Ajit Singh", dob: "", phone: "", district: "Rampur" },
+  { name: "Raghuvar Dayal", dob: "", phone: "", district: "Rampur" },
+  { name: "Manmohan Singh", dob: "", phone: "8433177173", district: "Rampur" },
+  { name: "Rampal", dob: "", phone: "9012059293", district: "Rampur" },
+  { name: "Karan Singh", dob: "", phone: "9675598243", district: "Rampur" },
+  { name: "Sompal", dob: "", phone: "7409641391", district: "Rampur" },
+  { name: "Kumarpal Singh", dob: "", phone: "9012696531", district: "Rampur" },
+  { name: "Pradeep Kumar", dob: "", phone: "7599710713", district: "Rampur" },
+  { name: "Patiram", dob: "", phone: "", district: "Rampur" },
+  { name: "Ramkishor (1)", dob: "", phone: "", district: "Rampur" },
+  { name: "Ramkishor (2)", dob: "", phone: "8449177895", district: "Rampur" },
+  { name: "Veer Singh", dob: "", phone: "9412595718", district: "Rampur" },
+  { name: "Ram Dhun", dob: "", phone: "9759451157", district: "Rampur" },
+  { name: "Sachin", dob: "", phone: "9389096661", district: "Rampur" },
+  { name: "Vikram Rajput", dob: "", phone: "9548796647", district: "Rampur" },
+  { name: "Krishna Gopal Verma", dob: "", phone: "9012561973", district: "Rampur" },
+  { name: "Parsadi Lal", dob: "", phone: "9675872719", district: "Rampur" },
+  { name: "Mohit Kumar", dob: "", phone: "8057586892", district: "Rampur" },
+  { name: "Rahul Kumar (2)", dob: "", phone: "8859132553", district: "Rampur" },
+  { name: "Vineet", dob: "", phone: "8218924137", district: "Rampur" },
+  { name: "Brijpal Singh", dob: "", phone: "9870621968", district: "Rampur" },
+  { name: "Rajendra Kumar", dob: "", phone: "9927762005", district: "Rampur" },
+  { name: "Ashok Babu", dob: "", phone: "8954268042", district: "Rampur" },
+  { name: "Bhagwat Sharan", dob: "", phone: "8279975276", district: "Rampur" },
+  { name: "Virpal", dob: "", phone: "9761837409", district: "Rampur" },
+  { name: "Rahul Kumar (3)", dob: "", phone: "8279971480", district: "Rampur" },
+  { name: "Arun", dob: "", phone: "9690436031", district: "Rampur" },
+  { name: "Aakash", dob: "", phone: "7017465504", district: "Rampur" },
+  { name: "Pankaj Kumar", dob: "", phone: "7505968779", district: "Rampur" },
+  { name: "Manoj Kumar", dob: "", phone: "6306141301", district: "Rampur" },
+  { name: "Sunil Kumar", dob: "", phone: "9720139151", district: "Rampur" },
+  { name: "Manohar Lal", dob: "", phone: "9536870738", district: "Rampur" },
+  { name: "Bharatpal Singh", dob: "", phone: "8474938715", district: "Rampur" }
+];
+
+export const UP_ZONE_LADIES_RAW: RawPunjabSewadar[] = [
+  { name: "Smt. Babli Rana", age: 56, dob: "1970-04-01", phone: "9917628031", district: "Moradabad" },
+  { name: "Dayavati", age: 78, dob: "1948-01-01", phone: "9917062851", district: "Moradabad" },
+  { name: "Ram Moorti", age: 77, dob: "1949-01-01", phone: "7037723397", district: "Moradabad" },
+  { name: "Vimla Devi", age: 62, dob: "1964-01-01", phone: "9997434388", district: "Moradabad" },
+  { name: "Anita Sharma", age: 61, dob: "1965-06-10", phone: "9456663268", district: "Moradabad" },
+  { name: "Santosh Kumari", age: 76, dob: "1950-07-05", phone: "9837565025", district: "Moradabad" },
+  { name: "Omvati", age: 47, dob: "1979-01-01", phone: "9389869716", district: "Moradabad" },
+  { name: "Jai Vati", age: 56, dob: "1970-01-01", phone: "9627716318", district: "Moradabad" },
+  { name: "Murti", age: 70, dob: "1956-06-05", phone: "8449281314", district: "Moradabad" },
+  { name: "Vimla", age: 61, dob: "1965-01-01", phone: "8192015739", district: "Moradabad" },
+  { name: "Chhati Devi", age: 64, dob: "1962-03-07", phone: "6399722906", district: "Moradabad" },
+  { name: "Vedwati", age: 58, dob: "1968-07-01", phone: "9690940387", district: "Moradabad" },
+  { name: "Chandrakala", age: 47, dob: "1979-01-01", phone: "6397215083", district: "Moradabad" },
+  { name: "Lachho Devi (Laxmi Devi)", age: 51, dob: "1975-01-01", phone: "7088459132", district: "Moradabad" },
+  { name: "Kusam Devi", age: 43, dob: "1983-01-01", phone: "9548217406", district: "Moradabad" },
+  { name: "Savitri Devi", age: 59, dob: "1967-01-01", phone: "9012512634", district: "Moradabad" },
+  { name: "Santosh Devi", age: 58, dob: "1968-06-01", phone: "6398086178", district: "Moradabad" },
+  { name: "Usha", age: 55, dob: "1971-01-01", phone: "9027933943", district: "Moradabad" },
+  { name: "Saroj Devi", age: 52, dob: "1974-01-01", phone: "8077351717", district: "Moradabad" },
+  { name: "Neetu", age: 24, dob: "2002-02-26", phone: "6398319764", district: "Moradabad" },
+  { name: "Kusum Devi", age: 46, dob: "1980-01-01", phone: "7668263047", district: "Moradabad" },
+  { name: "Rekha Rani", age: 28, dob: "1998-01-04", phone: "9870919270", district: "Moradabad" },
+  { name: "Mamta (1)", dob: "", phone: "9012146306", district: "Rampur" },
+  { name: "Mamta (2)", dob: "", phone: "6396733510", district: "Rampur" },
+  { name: "Mamta Devi (1)", dob: "", phone: "6398596301", district: "Rampur" },
+  { name: "Lakshmi", dob: "", phone: "6399717618", district: "Rampur" },
+  { name: "Sanjay Devi", dob: "", phone: "7830907051", district: "Rampur" },
+  { name: "Mamta Devi (2)", dob: "", phone: "9720184716", district: "Rampur" },
+  { name: "Pravesh Kumari (1)", dob: "", phone: "9568766568", district: "Rampur" },
+  { name: "Anjali Devi", dob: "", phone: "9759926332", district: "Rampur" },
+  { name: "Bharati Verma", dob: "", phone: "7599219246", district: "Rampur" },
+  { name: "Ramamurti", dob: "", phone: "8057778475", district: "Rampur" },
+  { name: "Sunita Devi", dob: "", phone: "9761407241", district: "Rampur" },
+  { name: "Pravesh Kumari (2)", dob: "", phone: "7983839046", district: "Rampur" },
+  { name: "Reena", dob: "", phone: "", district: "Rampur" },
+  { name: "Mithilesh Devi", dob: "", phone: "7351449549", district: "Rampur" },
+  { name: "Anita Devi", dob: "", phone: "9761418503", district: "Rampur" },
+  { name: "Rekha Rani", dob: "", phone: "9259879203", district: "Rampur" }
 ];
 
 interface RawDetail {
@@ -897,4 +1046,31 @@ PUNJAB_ZONE_GENTS_RAW.forEach((s, i) => {
     district: s.district || ''
   };
 });
+
+UP_ZONE_GENTS_RAW.forEach((s, i) => {
+  const calculatedAge = s.age !== undefined ? s.age : (s.dob ? 2026 - parseInt(s.dob.split('-')[0], 10) : undefined);
+  const calculatedDob = s.dob || (s.age ? `${2026 - s.age}-01-01` : '');
+  INITIAL_SEWADAR_DETAILS[`UPZ-G-${i + 1}`] = {
+    sewadar_id: `UPZ-G-${i + 1}`,
+    address: s.district || 'Rampur',
+    dob: calculatedDob,
+    phone: s.phone || '',
+    age: calculatedAge,
+    district: s.district || 'Rampur'
+  };
+});
+
+UP_ZONE_LADIES_RAW.forEach((s, i) => {
+  const calculatedAge = s.age !== undefined ? s.age : (s.dob ? 2026 - parseInt(s.dob.split('-')[0], 10) : undefined);
+  const calculatedDob = s.dob || (s.age ? `${2026 - s.age}-01-01` : '');
+  INITIAL_SEWADAR_DETAILS[`UPZ-L-${i + 1}`] = {
+    sewadar_id: `UPZ-L-${i + 1}`,
+    address: s.district || 'Rampur',
+    dob: calculatedDob,
+    phone: s.phone || '',
+    age: calculatedAge,
+    district: s.district || 'Rampur'
+  };
+});
+
 

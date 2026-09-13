@@ -182,15 +182,20 @@ const App: React.FC = () => {
       
       const matchGender = isLadies ? s.gender === 'Ladies' : s.gender === 'Gents';
 
-      const isZone = activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab');
+      const isZone = activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role.startsWith('Uttar Pradesh');
       if (isZone) {
-        const isPunjabSewadar = s.group === 'Punjab' || 
-          s.group === 'Punjab Zone Ladies' || 
-          s.originZone === 'Punjab Zone' || 
-          s.tag === 'Punjab Zone' || 
-          s.routedByZone || 
-          s.id.startsWith('PZ-');
-        return matchGender && (isPunjabSewadar || isMarked);
+        const isUttarPradesh = activeVolunteer.role.includes('Uttar Pradesh') || activeVolunteer.name?.includes('Uttar Pradesh') || Boolean(activeVolunteer.assignedGroup?.includes('Uttar Pradesh'));
+        const targetZoneName = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
+        const targetZoneLadies = `${targetZoneName} Zone Ladies`;
+
+        const isMatchZoneSewadar = s.group === targetZoneName || 
+          s.group === targetZoneLadies || 
+          s.originZone === `${targetZoneName} Zone` || 
+          s.tag === `${targetZoneName} Zone` || 
+          (isUttarPradesh ? s.id.startsWith('UPZ-') : s.id.startsWith('PZ-')) ||
+          (s.routedByZone && (s.originZone === `${targetZoneName} Zone` || s.tag === `${targetZoneName} Zone`));
+
+        return matchGender && (isMatchZoneSewadar || isMarked);
       }
 
       const matchGroup = !assignedGroup || s.group === assignedGroup;
@@ -412,10 +417,20 @@ const App: React.FC = () => {
     if (!activeVolunteer) return;
     
     try {
-      const isZone = activeVolunteer.role?.includes('Zone') || activeVolunteer.role?.startsWith('Punjab');
+      const isZone = activeVolunteer.role?.includes('Zone') || 
+        activeVolunteer.role?.startsWith('Punjab') || 
+        activeVolunteer.role?.startsWith('Uttar Pradesh') ||
+        activeVolunteer.assignedGroup === 'Punjab' ||
+        activeVolunteer.assignedGroup === 'Uttar Pradesh';
       if (isZone) {
+        const isUttarPradesh = Boolean(
+          activeVolunteer.role?.includes('Uttar Pradesh') || 
+          activeVolunteer.name?.includes('Uttar Pradesh') || 
+          activeVolunteer.assignedGroup === 'Uttar Pradesh'
+        );
+        const targetZoneName = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
         const isLadiesZone = Boolean(activeVolunteer.role?.includes('Ladies') || activeVolunteer.name?.includes('Ladies'));
-        const zoneGroup = isLadiesZone ? 'Punjab Zone Ladies' : 'Punjab';
+        const zoneGroup = isLadiesZone ? `${targetZoneName} Zone Ladies` : targetZoneName;
         const zoneGender = isLadiesZone ? 'Ladies' : 'Gents';
 
         const todayStr = new Date().toISOString().split('T')[0];
@@ -432,17 +447,17 @@ const App: React.FC = () => {
           completed: false
         };
 
-        // Scan only for dates that ACTUALLY have handovers specific to this gender & Punjab zone
+        // Scan only for dates that ACTUALLY have handovers specific to this gender & zone
         const pool = customList || (allSewadarsListRef.current && allSewadarsListRef.current.length > 0 ? allSewadarsListRef.current : customSewadarsRef.current);
         pool.forEach(s => {
           if (s.gender !== zoneGender) return;
 
-          const isPunjabSewadar = s.group === zoneGroup || 
-            s.originZone === 'Punjab Zone' || 
-            s.tag === 'Punjab Zone' || 
+          const isMatchZoneSewadar = s.group === zoneGroup || 
+            s.originZone === `${targetZoneName} Zone` || 
+            s.tag === `${targetZoneName} Zone` || 
             s.routedByZone || 
-            s.id?.startsWith('PZ-');
-          if (!isPunjabSewadar) return;
+            (isUttarPradesh ? s.id?.startsWith('UPZ-') : s.id?.startsWith('PZ-'));
+          if (!isMatchZoneSewadar) return;
 
           const hasHandover = Boolean(s.hrTableData?.handoverIncharge) && 
             (s.group !== zoneGroup || Boolean(s.hrTableData?.handoverDayGroup));
@@ -1028,7 +1043,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh');
     if (isZone) {
       fetchSessions(false);
     }
@@ -1073,14 +1088,16 @@ const App: React.FC = () => {
   };
 
   const saveAttendance = async (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete: boolean = false) => {
-    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh');
     let session = activeSession;
     if (!session && isZone) {
+      const isUttarPradesh = activeVolunteer?.role?.includes('Uttar Pradesh') || activeVolunteer?.name?.includes('Uttar Pradesh') || Boolean(activeVolunteer?.assignedGroup?.includes('Uttar Pradesh'));
+      const defaultGroup = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
       const todayStr = new Date().toISOString().split('T')[0];
       session = {
-        id: `zone-${activeVolunteer?.assignedGroup || 'Punjab'}-${todayStr}`,
+        id: `zone-${activeVolunteer?.assignedGroup || defaultGroup}-${todayStr}`,
         date: todayStr,
-        group: (activeVolunteer?.assignedGroup || 'Punjab') as DutyGroup,
+        group: (activeVolunteer?.assignedGroup || defaultGroup) as DutyGroup,
         location: LOCATIONS_LIST.join(', '),
         start_time: `${todayStr}T06:00:00`,
         end_time: `${todayStr}T21:00:00`,
@@ -1340,11 +1357,11 @@ const App: React.FC = () => {
   }) => {
     const id = data.id || generateNumericId();
     const existing = customSewadars.find(s => s.id === id);
-    const isPunjabZone = existing?.tag === 'Punjab Zone' || existing?.originZone === 'Punjab Zone' || existing?.routedByZone;
-    const originZone = isPunjabZone ? (existing?.originZone || 'Punjab Zone') : undefined;
-    const tag = isPunjabZone ? 'Punjab Zone' : undefined;
-    const routedByZone = Boolean(isPunjabZone);
-    const routedByHrTable = !isPunjabZone;
+    const isZoneSewadar = existing?.tag?.includes('Zone') || existing?.originZone?.includes('Zone') || existing?.routedByZone;
+    const originZone = isZoneSewadar ? (existing?.originZone || existing?.tag || 'Zone') : undefined;
+    const tag = isZoneSewadar ? (existing?.tag || existing?.originZone || 'Zone') : undefined;
+    const routedByZone = Boolean(isZoneSewadar);
+    const routedByHrTable = !isZoneSewadar;
 
     const rawHrData = data.hrTableData || {};
     const sanitizedHrData = {
@@ -1441,6 +1458,15 @@ const App: React.FC = () => {
   };
 
   const handleHandoverZoneSewadar = async (sewadar: Sewadar, targetDay: string, inchargeName: string) => {
+    const isUttarPradesh = Boolean(
+      activeVolunteer?.role?.includes('Uttar Pradesh') || 
+      activeVolunteer?.name?.includes('Uttar Pradesh') || 
+      activeVolunteer?.assignedGroup === 'Uttar Pradesh' ||
+      activeSession?.group === 'Uttar Pradesh' ||
+      activeSession?.group === 'Uttar Pradesh Zone Ladies'
+    );
+    const zoneName = isUttarPradesh ? 'Uttar Pradesh' : 'Punjab';
+    const zoneTag = sewadar.originZone || sewadar.tag || `${zoneName} Zone`;
     const todayStr = activeSession?.date || new Date().toISOString().split('T')[0];
     const sanitizedHrData = {
       ...(sewadar.hrTableData || {}),
@@ -1455,8 +1481,8 @@ const App: React.FC = () => {
       ...sewadar,
       group: targetDay as DutyGroup,
       isCustom: true,
-      tag: 'Punjab Zone',
-      originZone: 'Punjab Zone',
+      tag: zoneTag,
+      originZone: zoneTag,
       routedByZone: true,
       routedByHrTable: false,
       hrTableData: sanitizedHrData
@@ -1470,8 +1496,8 @@ const App: React.FC = () => {
         group: updatedSewadar.group,
         shift: updatedSewadar.shift || null,
         isCustom: true,
-        tag: 'Punjab Zone',
-        originZone: 'Punjab Zone',
+        tag: zoneTag,
+        originZone: zoneTag,
         routedByZone: true,
         routedByHrTable: false,
         hrTableData: sanitizedHrData
@@ -1784,7 +1810,7 @@ const App: React.FC = () => {
     } else {
       localStorage.removeItem(STORAGE_KEY_SESSION_ID);
     }
-    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab');
+    const isZone = activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh');
     if (!isZone) {
       setActiveView('Attendance');
     }
@@ -1891,7 +1917,7 @@ const App: React.FC = () => {
         </div>
       ) : (
         <>
-          {showSettingsModal && !isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && (
+          {showSettingsModal && !isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh') && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-xl">
               <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] relative">
                 <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100">
@@ -2051,14 +2077,14 @@ const App: React.FC = () => {
             dutyEndTime={activeSession?.end_time || ''} 
             isCompleted={!!activeSession?.completed} 
             onChangeLocation={() => {
-              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
+              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh')) {
                 setShowSettingsModal(true);
               }
             }} 
             onDeleteSewadar={handleDeleteSewadar}
             onEditSewadar={handleEditSewadar}
             onHandoverSewadar={
-              (isHrTable || activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeSession?.group === 'Punjab')
+              (isHrTable || activeVolunteer?.role?.includes('Zone') || activeVolunteer?.role?.startsWith('Punjab') || activeVolunteer?.role?.startsWith('Uttar Pradesh') || activeSession?.group === 'Punjab' || activeSession?.group === 'Uttar Pradesh')
                 ? handleHandoverZoneSewadar
                 : undefined
             }
@@ -2132,7 +2158,7 @@ const App: React.FC = () => {
             dutyStartTime={dashboardSelectedSession?.start_time || ''} 
             dutyEndTime={dashboardSelectedSession?.end_time || ''} 
             onOpenSettings={() => {
-              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab')) {
+              if (!isHrTable && !activeVolunteer?.role?.includes('Zone') && !activeVolunteer?.role?.startsWith('Punjab') && !activeVolunteer?.role?.startsWith('Uttar Pradesh')) {
                 setShowSettingsModal(true);
               }
             }} 
@@ -2168,7 +2194,7 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
               </svg>
               <span className="text-[8px] font-black uppercase">
-                {(activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab')) ? 'Sewadars' : 'Mark Sewa'}
+                {(activeVolunteer.role.includes('Zone') || activeVolunteer.role.startsWith('Punjab') || activeVolunteer.role.startsWith('Uttar Pradesh')) ? 'Sewadars' : 'Mark Sewa'}
               </span>
             </button>
           )}
