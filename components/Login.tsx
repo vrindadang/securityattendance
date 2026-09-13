@@ -347,7 +347,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               >
                 <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl">🏛️</div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Uttar Pradesh</h3>
+                  <h3 className="text-xl font-black text-slate-800">Uttar Pradesh - Zone 5</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Zone Portal</p>
                 </div>
               </button>
@@ -518,7 +518,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               <div>
                 <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
                 <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-1">
-                  Uttar Pradesh Zone Login
+                  Uttar Pradesh - Zone 5 Login
                 </p>
               </div>
             </div>
@@ -537,7 +537,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               </div>
               {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
               <button type="submit" className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                Unlock Uttar Pradesh Zone
+                Unlock Uttar Pradesh - Zone 5
               </button>
             </form>
           </div>
@@ -553,7 +553,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               <div>
                 <h2 className="text-2xl font-black text-slate-900 leading-none">Zone Attendance</h2>
                 <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
-                  Uttar Pradesh Zone • Select Category
+                  Uttar Pradesh - Zone 5 • Select Category
                 </p>
               </div>
             </div>
@@ -562,7 +562,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 onClick={() => {
                   onLogin({
                     id: 'up_zone_att_gents',
-                    name: 'Uttar Pradesh Zone (Gents)',
+                    name: 'Uttar Pradesh - Zone 5 (Gents)',
                     role: 'Uttar Pradesh - Zone Attendance (Gents)',
                     assignedGroup: 'Uttar Pradesh',
                     password: password || 'up123'
@@ -573,7 +573,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl">👮‍♂️</div>
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Gents</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh Zone Attendance</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh - Zone 5 Attendance</p>
                 </div>
               </button>
 
@@ -581,7 +581,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 onClick={() => {
                   onLogin({
                     id: 'up_zone_att_ladies',
-                    name: 'Uttar Pradesh Zone (Ladies)',
+                    name: 'Uttar Pradesh - Zone 5 (Ladies)',
                     role: 'Uttar Pradesh - Zone Attendance (Ladies)',
                     assignedGroup: 'Uttar Pradesh Zone Ladies',
                     password: password || 'up123'
@@ -592,7 +592,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 <div className="w-16 h-16 bg-pink-50 rounded-2xl flex items-center justify-center text-3xl">👩</div>
                 <div>
                   <h3 className="text-xl font-black text-slate-800">Ladies</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh Zone Attendance</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Uttar Pradesh - Zone 5 Attendance</p>
                 </div>
               </button>
             </div>

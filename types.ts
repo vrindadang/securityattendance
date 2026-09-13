@@ -53,6 +53,7 @@ export interface SewadarDetails {
   phone: string;
   age?: number;
   district?: string;
+  state?: string;
   updated_at?: string;
 }
 

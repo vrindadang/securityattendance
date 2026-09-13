@@ -11,7 +11,7 @@ interface Props {
   details?: Record<string, SewadarDetails>;
   onSaveAttendance: (sewadarId: string, details: Partial<AttendanceRecord>, recordId?: string, isDelete?: boolean) => void;
   onSaveVehicle: (v: Partial<VehicleRecord>, id?: string, isDelete?: boolean) => void;
-  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob?: string; phone?: string; address?: string; age?: number; district?: string }, isRestored?: boolean) => void;
+  onAddSewadar: (name: string, gender: Gender, group: DutyGroup, shift?: 'DAY' | 'NIGHT', details?: { dob?: string; phone?: string; address?: string; age?: number; district?: string; state?: string }, isRestored?: boolean) => void;
   onDeleteSewadar?: (id: string) => void;
   onEditSewadar?: (id: string, newName: string) => void;
   onHandoverSewadar?: (sewadar: Sewadar, targetDay: string, inchargeName: string) => Promise<void> | void;
@@ -81,6 +81,7 @@ const AttendanceManager: React.FC<Props> = ({
   const [newDob, setNewDob] = useState('');
   const [newAge, setNewAge] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newState, setNewState] = useState('');
   const [newDistrict, setNewDistrict] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
@@ -89,7 +90,7 @@ const AttendanceManager: React.FC<Props> = ({
     gender: Gender;
     group: DutyGroup;
     shift?: 'DAY' | 'NIGHT';
-    details: { dob?: string; phone?: string; address?: string; age?: number; district?: string };
+    details: { dob?: string; phone?: string; address?: string; age?: number; district?: string; state?: string };
   } | null>(null);
 
   // Vehicle Form state
@@ -133,6 +134,7 @@ const AttendanceManager: React.FC<Props> = ({
                              sessionGroup === 'Uttar Pradesh';
 
   const currentZoneName = isOtherZones ? 'Other Zones' : (isUttarPradeshZone ? 'Uttar Pradesh' : 'Punjab');
+  const currentZoneDisplayName = isOtherZones ? 'Other Zones' : (isUttarPradeshZone ? 'Uttar Pradesh - Zone 5' : 'Punjab');
   const canShowHandover = (isZoneLogin || isHrTable) && Boolean(onHandoverSewadar);
   const hasConfig = !!workshopLocation || isZoneLogin;
   const isLocked = !hasConfig;
@@ -142,7 +144,7 @@ const AttendanceManager: React.FC<Props> = ({
       return ['Rampur', 'Meerut', 'Hapur', 'Moradabad', 'Bareilly'];
     }
     if (isOtherZones) {
-      return ['Delhi', 'Haryana', 'Rajasthan', 'Himachal Pradesh', 'Uttarakhand'];
+      return [];
     }
     if (isZoneLogin) {
       return ['Ludhiana', 'Pathankot', 'Jagraon', 'Amritsar', 'Jalandhar'];
@@ -183,6 +185,7 @@ const AttendanceManager: React.FC<Props> = ({
     setNewAge('');
     setNewPhone('');
     setNewAddress('');
+    setNewState('');
     
     if (isUttarPradeshZone) {
       setNewDistrict('Rampur');
@@ -245,6 +248,7 @@ const AttendanceManager: React.FC<Props> = ({
       const sDetail = details?.[s.id];
       const matchSearch = !searchTerm || 
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sDetail?.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sDetail?.district?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sDetail?.phone?.includes(searchTerm) ||
         sDetail?.address?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -377,11 +381,30 @@ const AttendanceManager: React.FC<Props> = ({
   const handleCreateSewadar = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = newName.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) {
+      setDuplicateError("Name is required.");
+      return;
+    }
 
-    // Optional phone validation: only validate if phone is provided
-    if (newPhone.trim() && !/^\d{10}$/.test(newPhone.trim())) {
+    const trimmedPhone = newPhone.trim();
+    if (!trimmedPhone) {
+      setDuplicateError("Mobile number is required.");
+      return;
+    }
+    if (!/^\d{10}$/.test(trimmedPhone)) {
       setDuplicateError("Mobile number must be a valid 10-digit number.");
+      return;
+    }
+
+    const trimmedState = newState.trim();
+    if (isOtherZones && !trimmedState) {
+      setDuplicateError("State is required.");
+      return;
+    }
+
+    const finalDistrict = newDistrict.trim();
+    if (!finalDistrict) {
+      setDuplicateError("District is required.");
       return;
     }
 
@@ -414,7 +437,7 @@ const AttendanceManager: React.FC<Props> = ({
     if (!finalDob && parsedAge && !isNaN(parsedAge) && parsedAge > 0 && parsedAge < 120) {
       finalDob = `${2026 - parsedAge}-01-01`;
     }
-    const finalDistrict = newDistrict.trim();
+    const finalState = trimmedState || (isUttarPradeshZone ? 'Uttar Pradesh' : (isZoneLogin ? 'Punjab' : ''));
 
     // If member is removed (in removed lists or was hidden in existing sewadars)
     if (isRemoved || existingMatching.length > 0) {
@@ -425,10 +448,11 @@ const AttendanceManager: React.FC<Props> = ({
         shift: newShift,
         details: {
           dob: finalDob,
-          phone: newPhone.trim(),
+          phone: trimmedPhone,
           address: newAddress.trim(),
           age: parsedAge,
-          district: finalDistrict
+          district: finalDistrict,
+          state: finalState
         }
       });
       return;
@@ -436,16 +460,18 @@ const AttendanceManager: React.FC<Props> = ({
 
     onAddSewadar(trimmedName, newGender, newGroup, newShift, {
       dob: finalDob,
-      phone: newPhone.trim(),
+      phone: trimmedPhone,
       address: newAddress.trim(),
       age: parsedAge,
-      district: finalDistrict
+      district: finalDistrict,
+      state: finalState
     });
 
     setNewName('');
     setNewDob('');
     setNewAge('');
     setNewPhone('');
+    setNewState('');
     setNewDistrict('');
     setNewAddress('');
     setNewShift(undefined);
@@ -551,7 +577,7 @@ const AttendanceManager: React.FC<Props> = ({
                   <h2 className="text-2xl font-black text-slate-900 leading-tight">Add New Member</h2>
                   <p className="text-[11px] font-bold text-slate-400 mt-0.5">
                     {isZoneLogin 
-                      ? `${currentZoneName} Zone Attendance Portal` 
+                      ? `${currentZoneDisplayName} Zone Attendance Portal` 
                       : `${sessionGroup || activeVolunteer.assignedGroup || 'General'} Attendance`}
                   </p>
                 </div>
@@ -571,10 +597,10 @@ const AttendanceManager: React.FC<Props> = ({
                   </div>
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-wider text-indigo-900">
-                      Adding to {currentZoneName} Zone
+                      Adding to {currentZoneDisplayName} Zone
                     </p>
                     <p className="text-[10px] font-bold text-indigo-600">
-                      Roster: {newGender} • Record will appear in {currentZoneName} attendance
+                      Roster: {newGender} • Record will appear in {currentZoneDisplayName} attendance
                     </p>
                   </div>
                 </div>
@@ -626,10 +652,11 @@ const AttendanceManager: React.FC<Props> = ({
 
                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-wider">
-                      Mobile Number (Optional)
+                      Mobile Number <span className="text-rose-500 font-black">*</span>
                     </label>
                     <input 
                        type="tel" 
+                       required
                        maxLength={10}
                        className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-black text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400" 
                        placeholder="10-Digit Mobile Number" 
@@ -638,44 +665,90 @@ const AttendanceManager: React.FC<Props> = ({
                     />
                  </div>
 
-                 {/* District with datalist & quick suggestion buttons */}
+                 {/* State - Shown for Other Zones before District */}
+                 {isOtherZones && (
+                   <div className="space-y-1.5">
+                      <div className="flex items-center justify-between ml-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                          State <span className="text-rose-500 font-black">*</span>
+                        </label>
+                        <span className="text-[9px] font-bold text-indigo-500">Quick select or type</span>
+                      </div>
+                      <input 
+                         type="text" 
+                         required
+                         className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-black text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400" 
+                         placeholder="e.g. Delhi, Haryana, Rajasthan..." 
+                         value={newState} 
+                         onChange={e => setNewState(e.target.value)} 
+                      />
+                      {/* State Suggestion Chips */}
+                      <div className="flex flex-wrap gap-1.5 pt-1 px-1">
+                        {['Delhi', 'Haryana', 'Rajasthan', 'Himachal Pradesh', 'Uttarakhand', 'Jammu & Kashmir'].map(st => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => setNewState(st)}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                              newState.toLowerCase() === st.toLowerCase()
+                                ? 'bg-indigo-600 text-white shadow-xs' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+                   </div>
+                 )}
+
+                 {/* District */}
                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between ml-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                        District (Optional)
+                        District <span className="text-rose-500 font-black">*</span>
                       </label>
-                      <span className="text-[9px] font-bold text-indigo-500">Quick select or type</span>
+                      {!isOtherZones && zoneDistricts.length > 0 && (
+                        <span className="text-[9px] font-bold text-indigo-500">Quick select or type</span>
+                      )}
                     </div>
                     <input 
                        type="text" 
-                       list="member-district-options"
+                       required
+                       list={!isOtherZones ? "member-district-options" : undefined}
                        className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 rounded-2xl font-black text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400" 
-                       placeholder={isUttarPradeshZone ? "e.g. Rampur, Meerut, Hapur..." : (isZoneLogin ? "e.g. Ludhiana, Pathankot..." : "District / City")} 
+                       placeholder={isUttarPradeshZone ? "e.g. Rampur, Meerut, Hapur..." : (isOtherZones ? "District / City" : (isZoneLogin ? "e.g. Ludhiana, Pathankot..." : "District / City"))} 
                        value={newDistrict} 
                        onChange={e => setNewDistrict(e.target.value)} 
                     />
-                    <datalist id="member-district-options">
-                      {allDistrictList.map(d => (
-                        <option key={d} value={d} />
-                      ))}
-                    </datalist>
-                    {/* Suggestion Chips */}
-                    <div className="flex flex-wrap gap-1.5 pt-1 px-1">
-                      {zoneDistricts.map(d => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setNewDistrict(d)}
-                          className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                            newDistrict.toLowerCase() === d.toLowerCase()
-                              ? 'bg-indigo-600 text-white shadow-xs' 
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          {d}
-                        </button>
-                      ))}
-                    </div>
+                    {!isOtherZones && (
+                      <>
+                        <datalist id="member-district-options">
+                          {allDistrictList.map(d => (
+                            <option key={d} value={d} />
+                          ))}
+                        </datalist>
+                        {/* Suggestion Chips */}
+                        {zoneDistricts.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1 px-1">
+                            {zoneDistricts.map(d => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setNewDistrict(d)}
+                                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                  newDistrict.toLowerCase() === d.toLowerCase()
+                                    ? 'bg-indigo-600 text-white shadow-xs' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                  </div>
 
                  <div className="space-y-1.5">
@@ -821,7 +894,7 @@ const AttendanceManager: React.FC<Props> = ({
                 {isZoneLogin ? 'Zone Attendance' : (hasConfig ? (normalizedSessionDate === new Date().toISOString().split('T')[0] ? 'Current Session' : 'Session Record') : 'Pending Config')}
               </p>
               <h2 className="text-base font-black text-slate-800">
-                {isZoneLogin ? `${currentZoneName} Zone Session` : (cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set'))}
+                {isZoneLogin ? `${currentZoneDisplayName} Zone Session` : (cleanWorkshopLocation === LOCATIONS_LIST.join(', ') ? 'All Locations' : (cleanWorkshopLocation || 'No Location Set'))}
               </h2>
               <div className="flex items-center gap-3">
                 <p className="text-[10px] font-bold text-slate-400">{formatConfigHeader()}</p>
@@ -930,11 +1003,13 @@ const AttendanceManager: React.FC<Props> = ({
                                         📞 {sDetail.phone}
                                       </span>
                                     )}
-                                    {(sDetail.district || sDetail.address) && (
-                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/70 rounded-md text-[9px] font-bold">
-                                        📍 {(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}
-                                      </span>
-                                    )}
+                                    {(sDetail.district || sDetail.state || sDetail.address) && (
+                                       <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/70 rounded-md text-[9px] font-bold">
+                                         📍 {sDetail.district && sDetail.state 
+                                              ? `${sDetail.district.replace(/ludhiyana/gi, 'Ludhiana')}, ${sDetail.state}` 
+                                              : (sDetail.district || sDetail.state || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}
+                                       </span>
+                                     )}
                                     {sDetail.age !== undefined && sDetail.age !== null && (
                                       <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/70 rounded-md text-[9px] font-bold">
                                         Age: {sDetail.age}
@@ -1030,11 +1105,13 @@ const AttendanceManager: React.FC<Props> = ({
                                           📞 {sDetail.phone}
                                         </span>
                                       )}
-                                      {(sDetail.district || sDetail.address) && (
-                                        <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/70 rounded-md text-[9px] font-bold">
-                                          📍 {(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}
-                                        </span>
-                                      )}
+                                      {(sDetail.district || sDetail.state || sDetail.address) && (
+                                       <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/70 rounded-md text-[9px] font-bold">
+                                         📍 {sDetail.district && sDetail.state 
+                                              ? `${sDetail.district.replace(/ludhiyana/gi, 'Ludhiana')}, ${sDetail.state}` 
+                                              : (sDetail.district || sDetail.state || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}
+                                       </span>
+                                     )}
                                       {sDetail.age !== undefined && sDetail.age !== null && (
                                         <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/70 rounded-md text-[9px] font-bold">
                                           Age: {sDetail.age}
@@ -1127,12 +1204,18 @@ const AttendanceManager: React.FC<Props> = ({
                                        <p className="text-xs font-black text-slate-800">{sDetail.phone}</p>
                                      </div>
                                    )}
-                                   {(sDetail.district || sDetail.address) && (
-                                     <div>
-                                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">District</p>
-                                       <p className="text-xs font-black text-slate-800">{(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}</p>
-                                     </div>
-                                   )}
+                                   {sDetail.state && (
+                                      <div>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">State</p>
+                                        <p className="text-xs font-black text-slate-800">{sDetail.state}</p>
+                                      </div>
+                                    )}
+                                    {(sDetail.district || sDetail.address) && (
+                                      <div>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">District</p>
+                                        <p className="text-xs font-black text-slate-800">{(sDetail.district || sDetail.address).replace(/ludhiyana/gi, 'Ludhiana')}</p>
+                                      </div>
+                                    )}
                                    {(sDetail.age !== undefined && sDetail.age !== null) && (
                                      <div>
                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Age</p>

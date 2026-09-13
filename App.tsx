@@ -1221,7 +1221,8 @@ const App: React.FC = () => {
           dob: details.dob,
           phone: details.phone,
           age: details.age ?? null,
-          district: details.district || details.address || ''
+          district: details.district || details.address || '',
+          state: details.state || ''
         }, { merge: true });
       }
 
@@ -1235,7 +1236,8 @@ const App: React.FC = () => {
             dob: details.dob,
             phone: details.phone,
             age: details.age,
-            district: details.district || details.address || ''
+            district: details.district || details.address || '',
+            state: details.state || ''
           };
         });
         return next;
@@ -1251,7 +1253,7 @@ const App: React.FC = () => {
     g: Gender,
     grp: DutyGroup,
     shift?: 'DAY' | 'NIGHT',
-    details?: { dob?: string; phone?: string; address?: string; age?: number; district?: string },
+    details?: { dob?: string; phone?: string; address?: string; age?: number; district?: string; state?: string },
     isRestored?: boolean
   ) => {
     const newSewadar = {
@@ -1278,7 +1280,8 @@ const App: React.FC = () => {
           phone: details.phone || '',
           address: details.address || '',
           age: details.age,
-          district: details.district || details.address || ''
+          district: details.district || details.address || '',
+          state: details.state || ''
         }, newSewadar.name);
       }
       setCustomSewadars(prev => [...prev, { ...newSewadar, isCustom: true }]);

@@ -37,7 +37,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
   const isHrTable = activeVolunteer.role === 'HR Table' || activeVolunteer.assignedGroup === 'HR Table';
   const canManageBothGenders = isSuperAdmin || activeVolunteer.role === 'Back Office Admin';
   const [editingSewadar, setEditingSewadar] = useState<Sewadar | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '', age: '', district: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', dob: '', phone: '', age: '', district: '', state: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   // HR Table specific edit modal and expanded card state
@@ -72,6 +72,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         sGroupLower.includes(assignedLower);
       const sDetail = details[s.id];
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (sDetail?.state && sDetail.state.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (sDetail?.district && sDetail.district.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (sDetail?.address && sDetail.address.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (sDetail?.phone && sDetail.phone.includes(searchTerm));
@@ -103,14 +104,15 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
       return;
     }
 
-    const sDetails = details[s.id] || { address: '', dob: '', phone: '', age: undefined, district: '' };
+    const sDetails = details[s.id] || { address: '', dob: '', phone: '', age: undefined, district: '', state: '' };
     setFormData({
       name: s.name,
       address: sDetails.address,
       dob: sDetails.dob,
       phone: sDetails.phone,
       age: sDetails.age !== undefined && sDetails.age !== null ? String(sDetails.age) : '',
-      district: (sDetails.district || '').replace(/ludhiyana/gi, 'Ludhiana')
+      district: (sDetails.district || '').replace(/ludhiyana/gi, 'Ludhiana'),
+      state: sDetails.state || ''
     });
     setEditingSewadar(s);
   };
@@ -177,6 +179,24 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSewadar) return;
+
+    if (!formData.phone.trim()) {
+      alert("Mobile number is required.");
+      return;
+    }
+    if (!/^\d{10}$/.test(formData.phone.trim())) {
+      alert("Mobile number must be a valid 10-digit number.");
+      return;
+    }
+    if (!formData.state.trim()) {
+      alert("State is required.");
+      return;
+    }
+    if (!formData.district.trim()) {
+      alert("District is required.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (isSuperAdmin && onEditSewadar && formData.name.trim() && formData.name.trim() !== editingSewadar.name) {
@@ -188,7 +208,8 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         dob: formData.dob,
         phone: formData.phone,
         age: formData.age ? parseInt(formData.age, 10) : undefined,
-        district: formData.district
+        district: formData.district,
+        state: formData.state
       });
       setEditingSewadar(null);
     } catch (err) {
@@ -481,10 +502,10 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
         <div className="space-y-3">
           {filtered.map((s, idx) => {
             const sDetails = details[s.id];
-            const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone || sDetails.age || sDetails.district);
+            const hasDetails = sDetails && (sDetails.address || sDetails.dob || sDetails.phone || sDetails.age || sDetails.district || sDetails.state);
             const isExpanded = expandedSewadarId === s.id;
             const mobileNumber = s.hrTableData?.phoneNumber || sDetails?.phone;
-            const locationAddress = s.hrTableData?.address || sDetails?.address || sDetails?.district;
+            const locationAddress = s.hrTableData?.address || (sDetails?.district && sDetails?.state ? `${sDetails.district}, ${sDetails.state}` : (sDetails?.district || sDetails?.state || sDetails?.address));
 
             return (
               <div 
@@ -1053,13 +1074,17 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
               )}
               
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Phone Number</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-1">
+                  Phone Number <span className="text-rose-500 font-black">*</span>
+                </label>
                 <input 
                   type="tel" 
+                  required
+                  maxLength={10}
                   className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" 
                   placeholder="e.g. 9810012345"
                   value={formData.phone}
-                  onChange={e => setFormData(p => ({...p, phone: e.target.value}))}
+                  onChange={e => setFormData(p => ({...p, phone: e.target.value.replace(/\D/g, '')}))}
                 />
               </div>
               
@@ -1073,7 +1098,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Age</label>
                   <input 
@@ -1085,9 +1110,25 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">District</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-1">
+                    State <span className="text-rose-500 font-black">*</span>
+                  </label>
                   <input 
                     type="text" 
+                    required
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" 
+                    placeholder="e.g. Punjab, Delhi, Rajasthan..."
+                    value={formData.state}
+                    onChange={e => setFormData(p => ({...p, state: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-1">
+                    District <span className="text-rose-500 font-black">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    required
                     className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black outline-none focus:border-indigo-500 transition-all shadow-inner" 
                     placeholder="e.g. Pathankot"
                     value={formData.district}
