@@ -10,6 +10,7 @@ import { generateGroupPerformanceReport, generateGentsRawDataReport, generateMul
 import { generateTillDatePerformanceReport } from './TillDateReportPDFGenerator';
 import { SuperAdminReports } from './SuperAdminReports';
 import { formatTimeToAMPM, parseTimeToMinutes } from '../utils/timeUtils';
+import { SKRM_LOGO_BASE64 } from '../utils/skrmLogo';
 
 interface Props {
   attendance: AttendanceRecord[];
@@ -607,131 +608,212 @@ const Dashboard: React.FC<Props> = ({
     const dateDisplay = (typeof currentSession?.date === 'string' ? currentSession.date : '').split('-').reverse().join('/') || '-';
 
     if (isZoneLogin) {
-      const doc = new jsPDF('p', 'mm', 'a4');
+      // Landscape A4 PDF (297mm x 210mm)
+      const doc = new jsPDF('l', 'mm', 'a4');
       const wingText = isLadiesZone ? 'Ladies Wing' : 'Gents Wing';
-      const groupText = isLadiesZone ? `${zoneName} Zone Ladies Security Group` : `${zoneName} Zone Gents Security Group`;
-      
-      let currentY = 15;
+      const zoneDisplay = `${zoneName} Zone (${wingText})`;
 
-      const ensureSpace = (h: number) => {
-        if (currentY + h > 275) {
-          doc.addPage();
-          currentY = 20;
-          return true;
-        }
-        return false;
-      };
+      // Extract shift(s)
+      const handedOverShifts = Array.from(new Set(
+        handedOverSewadarsForSession.map(s => {
+          if (s.shift) return s.shift;
+          const att = attendance.find(a => a.sewadarId === s.id);
+          return att?.shift;
+        }).filter(Boolean)
+      ));
+      const shiftDisplay = handedOverShifts.length > 0 ? handedOverShifts.join(' / ') : 'DAY';
 
-      // Header Intro
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      const introText = `With the blessings of H.H. Sant Rajinder Singh Ji Maharaj, ${groupText}, presents the handover report for ${dateDisplay}`;
-      doc.text(introText, 14, currentY);
+      // Extract time
+      const sessionTimeStart = currentSession?.start_time ? formatTimeToAMPM(currentSession.start_time) : (dutyStartTime ? formatTimeToAMPM(dutyStartTime) : '');
+      const sessionTimeEnd = currentSession?.end_time ? formatTimeToAMPM(currentSession.end_time) : (dutyEndTime ? formatTimeToAMPM(dutyEndTime) : '');
+      const timeDisplay = (sessionTimeStart && sessionTimeEnd) 
+        ? `${sessionTimeStart} - ${sessionTimeEnd}` 
+        : (sessionTimeStart || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
 
-      // Title
-      currentY += 12;
+      // Extract unique duty incharge(s) handed over to by the zone
+      const dutyInchargesList = Array.from(new Set(
+        handedOverSewadarsForSession.map(s => s.hrTableData?.handoverIncharge?.trim()).filter(Boolean)
+      ));
+      const dutyInchargeDisplay = dutyInchargesList.length > 0 ? dutyInchargesList.join(', ') : '-';
+
+      // Header Logo & Titles
+      try {
+        const logoWidth = 17;
+        const logoHeight = 12.1;
+        const logoX = 148.5 - (logoWidth / 2);
+        const logoY = 10;
+        doc.addImage(SKRM_LOGO_BASE64, 'PNG', logoX, logoY, logoWidth, logoHeight);
+      } catch (err) {
+        console.warn('SKRM logo embed failed:', err);
+      }
+
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.setTextColor(50, 60, 120);
-      doc.text("SKRM Security Sewa report", 14, currentY);
-      
-      // Subtitle
-      currentY += 7;
-      doc.setFontSize(12);
-      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(14);
+      doc.setTextColor(14, 116, 184); // Lighter blue matching the SKRM logo
+      doc.text("SAWAN KIRPAL RUHANI MISSION", 148.5, 27, { align: "center" });
+
+      doc.setFontSize(10.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text("SECURITY SEWA - ZONE ATTENDANCE & HANDOVER REPORT", 148.5, 32.5, { align: "center" });
+
+      // Metadata Headings Box (Date, Shift, Time, Zone, Duty Incharge)
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(186, 230, 253);
+      doc.roundedRect(14, 36, 269, 20, 2.5, 2.5, 'FD');
+
+      // Row 1: Date, Shift, Time, Zone
+      doc.setFontSize(9);
+
+      // Date
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("Date:-", 18, 42.5);
       doc.setFont("helvetica", "normal");
-      doc.text(`${zoneName} Zone - Sewadar Handover Report (${wingText})`, 14, currentY);
-      
-      // Horizontal Divider
-      currentY += 4;
-      doc.setDrawColor(220, 220, 220);
-      doc.line(14, currentY, 196, currentY);
+      doc.setTextColor(71, 85, 105);
+      doc.text(dateDisplay, 31, 42.5);
 
-      // 1. Handover Overview
-      currentY += 10;
-      ensureSpace(40);
-      doc.setFontSize(11);
+      // Shift
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("1. Handover Overview", 14, currentY);
+      doc.setTextColor(30, 41, 59);
+      doc.text("Shift:-", 82, 42.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text(shiftDisplay, 94, 42.5);
 
-      autoTable(doc, {
-        startY: currentY + 3,
-        head: [['Metric', 'Details']],
-        body: [
-          ['Zone', zoneName],
-          ['Reporting Wing', isLadiesZone ? `${zoneName} Zone (Ladies)` : `${zoneName} Zone (Gents)`],
-          ['Report Type', 'Sewadar Handover Report'],
-          ['Session Date', dateDisplay],
-          ['Total Sewadars Handed Over', String(handedOverSewadarsForSession.length)]
-        ],
-        headStyles: { fillColor: [50, 60, 120], textColor: 255, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 9 },
-        theme: 'grid'
-      });
-
-      currentY = (doc as any).lastAutoTable.finalY + 12;
-
-      // 2. Handover Details Table
-      ensureSpace(40);
-      doc.setFontSize(11);
+      // Time
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("2. Handover Details", 14, currentY);
+      doc.setTextColor(30, 41, 59);
+      doc.text("Time:-", 140, 42.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text(timeDisplay, 153, 42.5);
 
+      // Zone
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("Zone:-", 215, 42.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text(zoneDisplay, 228, 42.5);
+
+      // Row 2: Duty Incharge & Handover Summary
+      // Duty Incharge (name of the incharge handed over to by the zone)
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("Duty Inch.:-", 18, 50.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(dutyInchargeDisplay, 40, 50.5);
+
+      // Total Sewadars Handed Over
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("Total Handed Over:-", 215, 50.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text(`${handedOverSewadarsForSession.length} Volunteers`, 252, 50.5);
+
+      // Table of all volunteers with phone numbers handed over on that day
       const tableRows = handedOverSewadarsForSession.length > 0
         ? handedOverSewadarsForSession.map((s, idx) => {
             const targetDay = s.hrTableData?.handoverDayGroup || s.group;
             const groupDisplay = targetDay ? `${targetDay} ${s.gender}` : `${s.group}`;
-            const incharge = s.hrTableData?.handoverIncharge || '-';
+            const incharge = s.hrTableData?.handoverIncharge || dutyInchargeDisplay || '-';
+            const phone = s.hrTableData?.phoneNumber || details?.[s.id]?.phone || '-';
+            const sewadarZone = s.originZone || s.tag || `${zoneName} Zone`;
             return [
               String(idx + 1),
-              s.originZone || s.tag || zoneName,
               s.name,
+              phone,
+              sewadarZone,
               groupDisplay,
               incharge
             ];
           })
-        : [['-', zoneName, 'No sewadars were handed over for this session date', '-', '-']];
+        : [['-', 'No volunteers were handed over for this session date', '-', zoneName, '-', '-']];
 
       autoTable(doc, {
-        startY: currentY + 3,
-        head: [['#', 'Zone', 'Sewadar Name', 'Handover Group', 'Group Incharge']],
+        startY: 59,
+        head: [['#', 'Volunteer Name', 'Phone Number', 'Origin Zone', 'Handover Group / Spot', 'Duty Incharge']],
         body: tableRows,
-        headStyles: { fillColor: [50, 60, 120], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        theme: 'grid',
+        showHead: 'everyPage',
+        headStyles: { 
+          fillColor: [14, 130, 203], // Lighter blue matching the SKRM logo color
+          textColor: 255, 
+          fontStyle: 'bold', 
+          fontSize: 9, 
+          halign: 'center',
+          cellPadding: 3 
+        },
         columnStyles: {
           0: { halign: 'center', cellWidth: 14 },
-          1: { halign: 'center', cellWidth: 26 },
-          2: { fontStyle: 'bold', cellWidth: 50 },
-          3: { halign: 'center', cellWidth: 46 },
-          4: { halign: 'center', cellWidth: 46 }
+          1: { fontStyle: 'bold', cellWidth: 62 },
+          2: { halign: 'center', cellWidth: 42 },
+          3: { halign: 'center', cellWidth: 36 },
+          4: { halign: 'center', cellWidth: 55 },
+          5: { halign: 'center', cellWidth: 60 }
         },
-        bodyStyles: { fontSize: 9 },
-        theme: 'grid'
+        bodyStyles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+        alternateRowStyles: { fillColor: [246, 250, 254] },
+        margin: { left: 14, right: 14, top: 20, bottom: 24 }
       });
 
-      currentY = (doc as any).lastAutoTable.finalY + 8;
+      // Verification / Handover Footer: Sending By - Anil Gulati ji (SKRM), Received By - Duty Incharge
+      let finalY = (doc as any).lastAutoTable.finalY + 9;
+      if (finalY + 28 > 194) {
+        doc.addPage();
+        finalY = 22;
+      }
 
-      // Note
-      const noteText = `Note: This report lists sewadars originating from ${zoneName} Zone handed over to respective security duty groups along with the assigned group incharge name for session date ${dateDisplay}.`;
-      const splitNote = doc.splitTextToSize(noteText, 182);
-      ensureSpace(splitNote.length * 4 + 6);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.setTextColor(100, 100, 100);
-      doc.text(splitNote, 14, currentY);
+      // Sending By (Left)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text("Sending By:-", 20, finalY);
 
-      // Page numbers footer
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Anil Gulati ji", 20, finalY + 6);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text("(SKRM)", 20, finalY + 11);
+
+      // Received By (Right)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text("Received By:-", 215, finalY);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(dutyInchargeDisplay !== '-' ? dutyInchargeDisplay : 'Duty Incharge', 215, finalY + 6);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text("(Signature & Date)", 215, finalY + 11);
+
+      // Running page border and footer for all pages
       const pageCount = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
+        // Outer border enclosing the page (matching the slip form)
+        doc.setDrawColor(186, 230, 253);
+        doc.setLineWidth(0.5);
+        doc.rect(8, 8, 281, 194);
+
         doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(148, 163, 184);
         doc.text(
-          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`,
+          `Page ${i} of ${pageCount} • Generated on ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} • SKRM Security Sewa`,
           14,
-          287
+          205
         );
       }
 
@@ -1923,6 +2005,7 @@ ${inchargeName}`;
                     <th className="px-4 py-3 text-center">#</th>
                     <th className="px-4 py-3 text-center">Zone</th>
                     <th className="px-4 py-3">Sewadar Name</th>
+                    <th className="px-4 py-3 text-center">Phone No</th>
                     <th className="px-4 py-3 text-center">Handover Group</th>
                     <th className="px-4 py-3 text-center">Group Incharge</th>
                   </tr>
@@ -1937,6 +2020,9 @@ ${inchargeName}`;
                         </span>
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">{s.name}</td>
+                      <td className="px-4 py-3 text-center font-mono text-slate-600">
+                        {s.hrTableData?.phoneNumber || details?.[s.id]?.phone || '-'}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-[10px]">
                           {s.hrTableData?.handoverDayGroup || s.group} {s.gender}
