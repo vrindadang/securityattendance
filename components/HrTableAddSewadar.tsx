@@ -1004,7 +1004,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                 >
                   <option value="ALL">All Groups</option>
                   <option value="HR Table">Pending Handover</option>
-                  {DAYS_LIST.map(d => (
+                  {[...DAYS_LIST, 'Sawan Ashram'].map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -1191,7 +1191,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                               1. Choose Day ({s.gender} Groups)
                             </span>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {DAYS_LIST.map(day => {
+                              {(s.gender === 'Gents' ? [...DAYS_LIST, 'Sawan Ashram'] : DAYS_LIST).map(day => {
                                 const isSelected = handoverDay === day;
                                 return (
                                   <button
@@ -1326,7 +1326,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                   className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none"
                 >
                   <option value="ALL">All Groups</option>
-                  {DAYS_LIST.map(d => (
+                  {[...DAYS_LIST, 'Sawan Ashram'].map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -1479,7 +1479,7 @@ export const HrTableAddSewadar: React.FC<HrTableAddSewadarProps> = ({
                               1. Choose Day ({s.gender} Groups)
                             </span>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {DAYS_LIST.map(day => {
+                              {(s.gender === 'Gents' ? [...DAYS_LIST, 'Sawan Ashram'] : DAYS_LIST).map(day => {
                                 const isSelected = handoverDay === day;
                                 return (
                                   <button

@@ -69,7 +69,8 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
       const matchGroup = isGlobalAdmin || isLadies || 
         sGroupLower === assignedLower || 
         sGroupLower === `ladies-${assignedLower}` || 
-        sGroupLower.includes(assignedLower);
+        sGroupLower.includes(assignedLower) ||
+        Boolean(s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase() === assignedLower);
       const sDetail = details[s.id];
       const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (sDetail?.state && sDetail.state.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -258,6 +259,7 @@ const VolunteerDetails: React.FC<Props> = ({ sewadars, allSewadars, details, act
           const targetLower = groupName.toLowerCase();
           const belongsToGroup = sGroupLower === targetLower || 
             sGroupLower === `ladies-${targetLower}` ||
+            Boolean(s.hrTableData?.handoverDayGroup && s.hrTableData.handoverDayGroup.toLowerCase() === targetLower) ||
             (targetLower.includes('uttar pradesh') && sGroupLower.includes('uttar pradesh')) ||
             (targetLower.includes('punjab') && sGroupLower.includes('punjab'));
           const matchesGender = s.gender === gender;

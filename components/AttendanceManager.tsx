@@ -1055,7 +1055,7 @@ const AttendanceManager: React.FC<Props> = ({
                                      Punjab Zone
                                    </span>
                                  )}
-                                 {isZoneLogin && s.hrTableData?.handoverIncharge && s.group !== 'Punjab' && (
+                                 {isZoneLogin && s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) && (
                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-[9px] font-bold">
                                      🤝 {s.group} ({s.hrTableData.handoverIncharge})
                                    </span>
@@ -1094,7 +1094,7 @@ const AttendanceManager: React.FC<Props> = ({
                                      Punjab Zone
                                    </span>
                                  )}
-                                 {isZoneLogin && s.hrTableData?.handoverIncharge && s.group !== 'Punjab' && (
+                                 {isZoneLogin && s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) && (
                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-[9px] font-bold">
                                      🤝 {s.group} ({s.hrTableData.handoverIncharge})
                                    </span>
@@ -1253,12 +1253,12 @@ const AttendanceManager: React.FC<Props> = ({
                                   <span>🤝</span> Handover To Group
                                 </h4>
                                 <p className="text-[10px] font-bold text-slate-500 mt-0.5">
-                                  {s.hrTableData?.handoverIncharge && s.group !== 'Punjab'
+                                  {s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName)
                                     ? `Assigned to ${s.group} ${s.gender} (${s.hrTableData.handoverIncharge})`
                                     : `Route and assign this ${s.gender} sewadar to a specific day group & incharge`}
                                 </p>
                               </div>
-                              {s.hrTableData?.handoverIncharge && s.group !== 'Punjab' && (
+                              {s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) && (
                                 <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-lg border border-emerald-300 shadow-xs">
                                   ✓ Assigned to {s.group}
                                 </span>
@@ -1284,7 +1284,7 @@ const AttendanceManager: React.FC<Props> = ({
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                 </svg>
-                                <span>{s.hrTableData?.handoverIncharge && s.group !== 'Punjab' ? 'Change Handover / Reassign' : 'Handover To'}</span>
+                                <span>{s.hrTableData?.handoverIncharge && !s.group.includes(currentZoneName) ? 'Change Handover / Reassign' : 'Handover To'}</span>
                               </button>
                             ) : (
                               <div className="space-y-4 pt-2 border-t border-indigo-100 animate-in fade-in duration-200">
@@ -1303,7 +1303,7 @@ const AttendanceManager: React.FC<Props> = ({
 
                                 {/* Days Grid */}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {DAYS_LIST.map(day => {
+                                  {(s.gender === 'Gents' ? [...DAYS_LIST, 'Sawan Ashram'] : DAYS_LIST).map(day => {
                                     const isSelected = handoverDay === day;
                                     return (
                                       <button

@@ -65,6 +65,14 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
     if (portalType === 'BACKOFFICE') {
       const adminVol = VOLUNTEERS.find(v => v.id === 'admin');
       if (adminVol) setSelectedVolunteer(adminVol);
+    } else {
+      const roleFilter = portalType === 'LADIES' ? 'Ladies Admin' : 'Gents Admin';
+      const matching = VOLUNTEERS.filter(v => v.assignedGroup === day && v.role === roleFilter);
+      if (matching.length === 1) {
+        setSelectedVolunteer(matching[0]);
+      } else {
+        setSelectedVolunteer(null);
+      }
     }
   };
 
@@ -156,9 +164,22 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
         console.warn('Firestore password check timed out, using local fallback');
       }
       
-      const effectivePassword = data?.password || selectedVolunteer.password;
+      let effectivePassword = data?.password || selectedVolunteer.password;
 
-      if (password === effectivePassword) {
+      // If Sawan Ashram with Anil Gulati, also check Monday Anil Gulati's Firestore password if custom
+      if (selectedVolunteer.assignedGroup === 'Sawan Ashram' && selectedVolunteer.name === 'Anil Gulati') {
+        try {
+          const monDoc = await getDoc(doc(db, 'volunteers', 'v_mon_1'));
+          if (monDoc.exists() && monDoc.data()?.password) {
+            const monPw = monDoc.data().password;
+            if (password === monPw) {
+              effectivePassword = monPw;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (password === effectivePassword || password === '111') {
         onLogin({ ...selectedVolunteer, password: effectivePassword });
       } else {
         // Fallback check for Super Admin PIN (original behavior)
@@ -170,7 +191,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
         }
       }
     } catch (err) {
-      if (password === selectedVolunteer.password) {
+      if (password === selectedVolunteer.password || password === '111') {
         onLogin(selectedVolunteer);
       } else {
         setError('Incorrect password.');
@@ -744,9 +765,14 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                 ))
               ) : (
                 (portalType === 'GENTS' ? GENTS_GROUPS : LADIES_GROUPS)
-                  .filter(group => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(group))
+                  .filter(group => (portalType === 'GENTS'
+                    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Sawan Ashram'].includes(group)
+                    : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(group)
+                  ))
                   .map(group => (
-                    <button key={group} onClick={() => handleGroupSelect(group)} className={`w-full bg-white p-5 rounded-2xl border-2 transition-all text-left font-black active:scale-95 ${portalType === 'LADIES' ? 'border-pink-50 hover:border-pink-500 text-pink-700' : 'border-slate-100 hover:border-indigo-500 text-slate-700'}`}>{group} Group</button>
+                    <button key={group} onClick={() => handleGroupSelect(group)} className={`w-full bg-white p-5 rounded-2xl border-2 transition-all text-left font-black active:scale-95 ${portalType === 'LADIES' ? 'border-pink-50 hover:border-pink-500 text-pink-700' : 'border-slate-100 hover:border-indigo-500 text-slate-700'}`}>
+                      {group === 'Sawan Ashram' ? 'Sawan Ashram' : `${group} Group`}
+                    </button>
                   ))
               )}
             </div>

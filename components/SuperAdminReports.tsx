@@ -221,7 +221,7 @@ export const SuperAdminReports: React.FC<SuperAdminReportsProps> = ({
               </p>
             </div>
             <span className="text-[10px] font-bold text-slate-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-              15 Groups Available
+              {GENTS_GROUPS.length} Groups Available
             </span>
           </div>
 

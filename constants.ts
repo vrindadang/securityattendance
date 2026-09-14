@@ -3,6 +3,7 @@ import { Sewadar, DutyGroup, Volunteer, SewadarDetails } from './types';
 
 export const GENTS_GROUPS: DutyGroup[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  'Sawan Ashram',
   'HR Department', 'HR Table', 'Lost and Found', 'PR Department', 'Langar Department', 'CCTV Vision Team', 'CCTV Maintenance', 'Punjab', 'Uttar Pradesh', 'Other Zones'
 ];
 
@@ -15,7 +16,8 @@ export const GENTS_INCHARGES: Record<string, string> = {
   'Thursday': 'Sanjay Grover',
   'Friday': 'Sushil Ahuja',
   'Saturday': 'Rajan Nagpal',
-  'Sunday': 'Manish Munjal'
+  'Sunday': 'Manish Munjal',
+  'Sawan Ashram': 'Anil Gulati'
 };
 
 export const LADIES_INCHARGES: Record<string, string[]> = {
@@ -418,6 +420,7 @@ const GROUP_INCHARGES: Record<string, string[]> = {
   'Friday': FRIDAY_LIST.slice(0, 3),
   'Saturday': SATURDAY_LIST.slice(0, 3),
   'Sunday': SUNDAY_LIST.slice(0, 3),
+  'Sawan Ashram': ['Anil Gulati'],
   'Ladies': ['KIRAN BALA']
 };
 

@@ -207,7 +207,7 @@ const App: React.FC = () => {
         return matchGender && (isMatchZoneSewadar || isMarked);
       }
 
-      const matchGroup = !assignedGroup || s.group === assignedGroup;
+      const matchGroup = !assignedGroup || s.group === assignedGroup || s.hrTableData?.handoverDayGroup === assignedGroup;
       
       return (matchGender && matchGroup) || isMarked;
     });
@@ -359,6 +359,14 @@ const App: React.FC = () => {
     ].includes(targetGroup);
   }, [activeVolunteer]);
 
+  const isPermanentSawanAshram = useMemo(() => {
+    if (!activeVolunteer) return false;
+    const targetGroup = activeVolunteer.role.includes('Ladies') 
+      ? `Ladies-${activeVolunteer.assignedGroup}` 
+      : (activeVolunteer.assignedGroup || 'Global');
+    return targetGroup === 'Sawan Ashram';
+  }, [activeVolunteer]);
+
   const isWorkshopCoordinator = useMemo(() => {
     if (!activeVolunteer) return false;
     return (
@@ -404,7 +412,11 @@ const App: React.FC = () => {
         const rawEnd = sessionToLoad.end_time ? formatDate(end) : getTomorrowDate();
 
         setConfigForm({
-          locations: isPermanentKirpalBagh ? ['Kirpal Bagh'] : (sessionToLoad.location ? sessionToLoad.location.split(', ').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)) : []),
+          locations: isPermanentKirpalBagh 
+            ? ['Kirpal Bagh'] 
+            : isPermanentSawanAshram 
+              ? ['Sawan Ashram'] 
+              : (sessionToLoad.location ? sessionToLoad.location.split(', ').map(l => l.trim()).filter(l => LOCATIONS_LIST.includes(l)) : []),
           startDate: rawStart || getLocalDate(),
           startTime: formatTime(start),
           endDate: rawEnd || getTomorrowDate(),
@@ -412,7 +424,11 @@ const App: React.FC = () => {
         });
       } else {
         setConfigForm({
-          locations: isPermanentKirpalBagh ? ['Kirpal Bagh'] : [],
+          locations: isPermanentKirpalBagh 
+            ? ['Kirpal Bagh'] 
+            : isPermanentSawanAshram 
+              ? ['Sawan Ashram'] 
+              : [],
           startDate: getLocalDate(),
           startTime: '07:00',
           endDate: getTomorrowDate(),
@@ -420,7 +436,7 @@ const App: React.FC = () => {
         });
       }
     }
-  }, [showSettingsModal, activeVolunteer, activeView, dashboardSelectedSession, activeSession, isPermanentKirpalBagh]);
+  }, [showSettingsModal, activeVolunteer, activeView, dashboardSelectedSession, activeSession, isPermanentKirpalBagh, isPermanentSawanAshram]);
 
   const fetchSessions = useCallback(async (isInitial = false, customList?: Sewadar[]) => {
     if (!activeVolunteer) return;
@@ -1716,7 +1732,11 @@ const App: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalLocations = isPermanentKirpalBagh ? ['Kirpal Bagh'] : configForm.locations;
+    const finalLocations = isPermanentKirpalBagh 
+      ? ['Kirpal Bagh'] 
+      : isPermanentSawanAshram 
+        ? ['Sawan Ashram'] 
+        : configForm.locations;
     if (finalLocations.length === 0) {
       alert("Please select at least one location.");
       return;
@@ -1960,17 +1980,23 @@ const App: React.FC = () => {
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duty Location</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {LOCATIONS_LIST.filter(loc => !isPermanentKirpalBagh || loc === 'Kirpal Bagh').map(loc => {
+                        {LOCATIONS_LIST.filter(loc => {
+                          if (isPermanentKirpalBagh) return loc === 'Kirpal Bagh';
+                          if (isPermanentSawanAshram) return loc === 'Sawan Ashram';
+                          return true;
+                        }).map(loc => {
                           const isSelected = isPermanentKirpalBagh 
                             ? loc === 'Kirpal Bagh' 
-                            : configForm.locations.includes(loc);
+                            : isPermanentSawanAshram 
+                              ? loc === 'Sawan Ashram' 
+                              : configForm.locations.includes(loc);
 
                           return (
                             <button
                               key={loc}
                               type="button"
                               onClick={() => {
-                                if (isPermanentKirpalBagh) return;
+                                if (isPermanentKirpalBagh || isPermanentSawanAshram) return;
                                 setConfigForm(prev => {
                                   const exists = prev.locations.includes(loc);
                                   if (exists) {
@@ -1980,7 +2006,7 @@ const App: React.FC = () => {
                                   }
                                 });
                               }}
-                              className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${isPermanentKirpalBagh ? 'col-span-2 w-full text-center' : ''} ${
+                              className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${isPermanentKirpalBagh || isPermanentSawanAshram ? 'col-span-2 w-full text-center' : ''} ${
                                 isSelected
                                   ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 font-bold'
                                   : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
@@ -1994,6 +2020,11 @@ const App: React.FC = () => {
                       {isPermanentKirpalBagh && (
                         <p className="text-[9px] font-bold text-indigo-500 mt-1 ml-1 uppercase tracking-wider">
                           * Location permanently locked to Kirpal Bagh for your department
+                        </p>
+                      )}
+                      {isPermanentSawanAshram && (
+                        <p className="text-[9px] font-bold text-indigo-500 mt-1 ml-1 uppercase tracking-wider">
+                          * Location permanently locked to Sawan Ashram for this group
                         </p>
                       )}
                     </div>
