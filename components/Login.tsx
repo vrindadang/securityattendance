@@ -771,7 +771,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
                   ))
                   .map(group => (
                     <button key={group} onClick={() => handleGroupSelect(group)} className={`w-full bg-white p-5 rounded-2xl border-2 transition-all text-left font-black active:scale-95 ${portalType === 'LADIES' ? 'border-pink-50 hover:border-pink-500 text-pink-700' : 'border-slate-100 hover:border-indigo-500 text-slate-700'}`}>
-                      {group === 'Sawan Ashram' ? 'Sawan Ashram' : `${group} Group`}
+                      {group === 'Sawan Ashram' ? 'Sawan Ashram (Anil Gulati)' : `${group} Group`}
                     </button>
                   ))
               )}
@@ -816,7 +816,7 @@ const Login: React.FC<Props> = ({ onLogin, onShowNotice, onMainScreenChange, lat
               <div>
                 <h2 className="text-2xl font-black text-slate-900 leading-none">Access Required</h2>
                 <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">
-                  {portalType === 'SUPERADMIN' ? 'Master Admin' : `${selectedGroup} Assignment`}
+                  {portalType === 'SUPERADMIN' ? 'Master Admin' : (selectedGroup === 'Sawan Ashram' ? 'Sawan Ashram (Anil Gulati)' : `${selectedGroup} Assignment`)}
                 </p>
               </div>
             </div>
